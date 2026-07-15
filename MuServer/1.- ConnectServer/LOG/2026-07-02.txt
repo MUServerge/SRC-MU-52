@@ -1,0 +1,4 @@
+11:20:49 [ServerList] GameServer offline (General) (0)
+11:20:49 [ServerList] GameServer offline (Castle) (19)
+11:20:49 [ServerList] GameServer online (Castle) (19)
+11:20:49 [ServerList] GameServer online (General) (0)

@@ -1,0 +1,43 @@
+0
+//Monster      MapNumber      Range      PositionX      PositionY      Direction      Comment
+
+406            88             00         149            142            07             //Apostle Devin
+229            88             00         147            147            08             //Marlon
+235            88             00         142            148            01             //Sebina the Priest
+579            88             00         138            146            02             //Sebina the Priest
+
+
+//256            51             00         037            241            01             //Lahap
+//415            51             00         044            229            01             //Silvia
+//416            51             00         029            236            02             //Rhea
+//417            51             00         036            219            02             //Marce
+//257            51             00         043            191            03             //Shadow Phantom Soldier
+//257            51             00         057            232            03             //Shadow Phantom Soldier
+//257            51             00         073            220            01             //Shadow Phantom Soldier
+//240            51             00         050            229            01             //Safety Guardian
+//385            51             00         055            243            01             //Mirage
+//568            51             00         055            199            01             //Wandering Merchant Zyro
+//452            51             00         046            243            01             //Seed Master
+//453            51             00         050            243            01             //Seed Researcher
+//540            51             00         049            216            02             //Lugard
+//579            51             00         020            214            03             //David
+end
+
+
+1
+//Monster      MapNumber      Range      BeginPosX      BeginPosY      EndPosX      EndPosY      Direction      Quantity      Comment
+//003            51             30         013            125            056          168          5             15            //Spider
+//003            51             30         102            194            142          238          3             15            //Spider
+//418            51             30         054            131            088          180          1             10            //Strange Rabbit
+//418            51             30         084            178            142          212          6             10            //Strange Rabbit
+//421            51             30         087            090            125          170          4             10            //Polluted Butterfly
+//421            51             30         118            130            164          172          2             10            //Polluted Butterfly
+//419            51             30         118            087            160          141          4             20            //Hideous Rabbit
+end
+
+
+2
+//Monster      MapNumber      Range      PositionX      PositionY      Direction      Comment
+
+end
+

@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Build, Release & QA
+  short_description: Reproducible builds releases and regression QA
+  default_prompt: Use $mu-main52-build-release-qa to build, package, and verify MU
+    Main 5.2 changes safely.
+policy:
+  allow_implicit_invocation: true

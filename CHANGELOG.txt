@@ -1,0 +1,425 @@
+============================================================
+ SRC 5.2 BASE - CHANGELOG
+============================================================
+
+------------------------------------------------------------
+ 2026-07-15
+------------------------------------------------------------
+
+- Client: replaced LookAndFeel5's fixed 1.8 screen rate with a uniform responsive
+  640x480 design transform derived from the current drawable size, exposed explicit
+  safe-area forward/inverse conversions, and invalidated existing UI layout and 3D
+  camera sizes on client-area resize. LookAndFeel1-4, atlas UVs, texture IDs,
+  gameplay, packets, item slots, and EXP logic are unchanged. (WINHANDLE.cpp,
+  WINHANDLE.h)
+
+------------------------------------------------------------
+ 2026-07-15
+------------------------------------------------------------
+
+- Client: added renderer Phase 0 startup diagnostics and opt-in baseline
+  instrumentation. The log now records the actual selected pixel format, GLEW
+  result, guarded OpenGL capabilities/limits, and active VBO entry points;
+  MU_RENDER_PROFILER=1 enables fixed-storage frame statistics and renderer
+  counters. Pixel-format/context selection, shaders, draw eligibility, render
+  order, and visual behavior are unchanged. (CreateOpenglWindow,
+  RenderProfiler, CShaderScene, CShaderGL, BMD renderer)
+
+------------------------------------------------------------
+ 2026-07-15
+------------------------------------------------------------
+
+- Client: corrected the first-evolution Grow Lancer HQ skin registration from
+  BITMAP_HQSKIN + 8 to its consumer-selected BITMAP_HQSKIN + 7 slot, preventing
+  the following Rune Wizard HQSkinClass109 load from overwriting its texture
+  identity. Asset names, texture ranges, model mapping, and render behavior are
+  otherwise unchanged. (ZzzOpenData.cpp OpenPlayerData)
+
+------------------------------------------------------------
+ 2026-07-15
+------------------------------------------------------------
+
+- Client+GameServer: fixed the Master Skill Tree EXP percentage data mismatch.
+  Persisted cumulative EXP from an older level-1600 table could survive after a
+  character was capped to Master Level 1000, leaving current EXP above the active
+  EX603 next boundary. CalcMasterLevelNextExperience now validates the loaded
+  level/table interval and logs corrections; the client renders a percentage only
+  for valid boundaries, including the maximum-level 100% case. Packet layouts and
+  progression formulas are unchanged. (MasterSkillTree.cpp,
+  NewUIMasterSkillTree.cpp RenderText)
+
+------------------------------------------------------------
+ 2026-07-14
+------------------------------------------------------------
+
+- GameServer: reflect damage no longer passes the general DAMAGE_CONFIG multipliers
+  (GeneralDamageRatePvP/PvM, DamageRatePvP/PvM, DamageRateTo class-vs-class table,
+  Duel/Gens/Arena/CC/IT/CS event rates) — the region is skipped for effect==4 (reflect),
+  so gear reflect % returns exactly as-is and is tuned only by the dedicated
+  ReflectDamageRatePvP/PvM + per-class ClassReflectDamageRate keys. The reflected base
+  already derives from the landed (event-scaled) damage, so the old behavior double-dipped.
+  (Attack.cpp CAttack::Attack DAMAGE_CONFIG; NOT built yet — user builds separately)
+- GameServer: added per-class reflect damage rate config (PvP/PvM) — new
+  m_ClassReflectDamageRatePvP/PvM[MAX_CLASS] arrays loaded in ReadCharacterInfo from
+  "GameServerInfo - Character.dat" (DWReflectDamageRatePvP..KINReflectDamageRatePvM, all
+  14 classes), applied in CAttack::Attack reflect branch after the existing global
+  ReflectDamageRatePvP/PvM multiplier; guarded on lpObj->Type==OBJECT_USER so a monster
+  reflector can't index the class array out of bounds. Config sections added to both
+  MuServer runtime Character.dat files (all values 100 = behavior unchanged).
+  (ServerInfo.h/.cpp, Attack.cpp)
+- GameServer: restored missing Source\Util third-party libs (mapm, cryptopp, etc.) —
+  the tree was missing them entirely so GameServer.sln could not compile (Protocol.h
+  includes ..\..\Util\mapm\M_APM.h, stdafx.h links mapm.lib/cryptlib.lib).
+- GameServer: fixed missing #include "Map.h" in CustomNpcQuest.cpp (MAX_MAP undeclared,
+  broke the build; leftover from the quest HUD work).
+
+------------------------------------------------------------
+ 2026-07-13
+------------------------------------------------------------
+
+- Client: disabled the Swamp of Peace (map 56) fullscreen base wind/smoke overlay — the
+  additive CHROME cloud layer washed the screen out in a bright sweeping blob; both
+  RenderBitmapUV layers commented out in SEASON3C::GMSwampOfQuiet::RenderBaseSmoke.
+  Tarkan/Karutan/IceCity overlays untouched. (GMSwampOfQuiet.cpp)
+- Client: fixed jerky/stuttering WorldTime-driven animations after long Windows uptime
+  (most visible as the Swamp of Peace base wind/smoke overlay "moving badly" while idle,
+  also Tarkan/Karutan wind, grass sway, water). Root cause: WorldTime is a float fed the
+  absolute timeGetTime() value; past ~3 days of OS uptime float precision drops to 32ms+
+  steps, so the animation clock advanced in visible jumps (masked while the camera moves).
+  WorldTime is now fed the session-relative threadTime->GetTimeElapsed() (QPC ms since
+  client start) inside csteady_clock::LoadInformationFps — same epoch for all consumers,
+  deltas/modulo/sin phases unaffected. (steady_clock.cpp)
+
+------------------------------------------------------------
+ 2026-07-12
+------------------------------------------------------------
+
+- Client: wired the Data\Effect\VBO GLSL material shaders into a real VBO + GPU-skinning
+  model path, behind the SHADER_VERSION_TEST compile flag (default OFF, shipping build
+  byte-unchanged). CShaderGL now compiles/links all Effect\VBO programs (Model, BlendMesh,
+  Metal, Oil, Chrome1..7) via InitVBOShaders/loadVBOProgram (CShaderGL.cpp/.h).
+  BMD::CreateVertexBuffer rebuilt to upload a STATIC bind-pose VAO matching the shader
+  layout (0=pos,1=normal,2=uv,3=bone=Node*3); BMD::Transform now stashes the current
+  object's bone matrix + light context; new BMD::RenderMeshVBO draws the standard textured
+  path with GPU skinning (u_Bones from BoneTransform, uView/uProj read back from the
+  fixed-function stack) — no per-frame vertex re-upload. Chrome/metal/oil/wave/shadow and
+  body-translated draws keep the legacy immediate-mode path as fallback. Mesh_t gained
+  VBO_Bones/VBO_ElementCount (additive). (ZzzBMD.cpp, ZzzBMD.h, CShaderGL.cpp, CShaderGL.h)
+
+- Client: extended the Effect\VBO path to ALL materials, not just the plain textured one.
+  RenderMeshVBO now selects the matching program (Chrome1..7, Metal, Oil) from the render
+  flags and drives its u_setting1/2/u_meshUV uniforms so the GPU reproduces the legacy
+  g_chrome reflection-UV formulas 1:1 (CHROME/CHROME2..7, METAL, OIL). Returns bool so a
+  missing program cleanly falls back to legacy. CHROME8, scrolling blend/stream (EnableWave),
+  wave/shadow and body-translated draws stay on legacy. Fixed the lighting mismatch reported
+  in testing: removed the `max(color.rgb, 0.45)` brightness floor from every Effect\VBO
+  vertex shader (it over-brightened dark areas) and fed the shader the correct per-mesh
+  EnableLight (flat body colour for chrome), matching the legacy fixed-function result.
+  (ZzzBMD.cpp, ZzzBMD.h, Client\Data\Effect\VBO\*.vs)
+
+- Client: fixed a crash and an over-bright regression in the Effect\VBO path.
+  Crash (0xC0000005): u_Bones was uploaded as MAX_BONES*3 (600 vec4) but the source
+  OBJECT::BoneTransform is heap-allocated as vec34_t[NumBones] (< 200) -> read overran the
+  block; now uploads only NumBones*3. CreateVertexBuffer now bails to the legacy path on
+  NULL/empty vertex/normal/texcoord streams or out-of-range indices (no partial VBO), and
+  clamps the bone index. Over-bright: lightmapped/additive/subtractive/doppelganger meshes
+  (RENDER_LIGHTMAP/BRIGHT/DARK/DOPPELGANGER/EXTRA) were being drawn by the flat GPU shader,
+  losing their lightmap/blend shading (washed-out floors/environment); these are now kept on
+  the legacy immediate-mode path. (ZzzBMD.cpp)
+
+- Client: locked FPS to stable 60 and removed the 25/30/40/60 selection dialog
+  (steady_clock.cpp, Winmain.cpp, Defined_Global.h, ZzzScene.cpp). Fixed five precision
+  bugs that caused frame-time jitter: integer division in Getframe_per_second (1000/60=16
+  instead of 16.667), ceil() quantization on fpsNormalizer, thread_sleep assuming perfect
+  OS sleep instead of measuring actual elapsed time, integer-ms return type losing sub-ms
+  precision in the accumulator, and artificially capped FPS display. Replaced pure sleep
+  limiter with sleep+spin-wait hybrid (sleep until ~1.5ms before target, then busy-wait)
+  for sub-0.1ms frame-time variance. Enabled VSync (V_SYNCRONIZE) for tear-free
+  presentation. Direct reads of gmProtect->ajust_fps_render in CSWaterTerrain and
+  GMHellas replaced with gsteady_clock->GetLimitFps() for consistency.
+
+- Client: consolidated the F10 free-camera (CGMCameraWorld) tuning into one named-constant
+  block at the top of CGMCameraWorld.cpp - zoom range (CAMW_ZOOM_MIN/MAX_PERCENT), wheel step,
+  ease/snap, and pitch default/clamp/step are no longer scattered magic numbers. Behavior
+  unchanged except the zoom-out cap was tightened 200% -> 150% (CAMW_ZOOM_MAX_PERCENT) for a
+  closer, classic-MU feel. Gating (F10 toggle) is untouched.
+
+- Client: invasion widget resized to the art's native proportions (CGMInvasionManager) - the
+  MuDream textures are 2x resolution, so everything now draws at native/2 with zero stretching:
+  widget width 200 -> 136.5 (background 273/2), header 30 -> 25 (50/2), row 18 -> 16.5 (33/2).
+  The expanded body went back to background_new.ozt, one plate per row (time row + each monster)
+  instead of a stretched panel; corner icons draw 10x10 (native 1:1), chevrons keep the 48x52
+  cell aspect (22x24).
+
+- Client: fixed the HUD/widget rendering as flat WHITE rectangles after the invasion body restyle
+  (CGMInvasionManager::RenderFrame) - RenderColor() calls DisableTexture() and nothing re-enabled
+  GL_TEXTURE_2D, so every textured draw after it (row text, rest of the HUD) came out as untextured
+  white quads. The body now batches all color quads in one pass and calls EndRenderColor() before
+  any text, same pattern as CNewUIPartyInfoWindow::RenderGroupBox.
+
+- Client: invasion notify icon hover feedback (CGMInvasionManager::RenderNotifyIcon) - on mouse-over
+  the icon grows around its center (NOTIFY_HOVER_GROW) inside a faint black 1px frame
+  (NOTIFY_HOVER_BORDER_ALPHA); hit test keeps using the base rect so the hover can't flicker.
+
+- Client: fixed the whole bottom HUD turning opaque black while the invasion widget was visible
+  (CGMInvasionManager::RenderFrame) - the widget ended its pass with DisableAlphaBlend(), killing
+  blending for everything CNewUIMainFrameWindow::Render draws after it (Look-5 frame, gauges,
+  skill bar). The widget now leaves alpha-test ON, matching the caller's HUD pass.
+
+- Client: restyled the invasion widget's expanded body to the reference look
+  (CGMInvasionManager::RenderFrame) - dropped the stretched background_new.ozt bar (read as a
+  giant button) in favor of a flat translucent black panel (RenderColor), with each monster on
+  a slightly darker strip: name gold on the left, kill count white right-aligned.
+  background_new.ozt/btn.ozt stay load-only. All rects still in virtual 640x480 space.
+
+- Client: added the invasion notify icon to the Look-5 HUD (CGMInvasionManager::RenderNotifyIcon).
+  While any invasion is active, the crossed-swords cell (index 7) of Look-5
+  UI_HUD_NOTIFICATIONS.ozt (792x72 strip, 11 cells of 72x72) is drawn right-aligned above the
+  AG gauge with an "Active Invasion ON / OFF" tooltip; clicking it toggles the Golden Invasion
+  widget, so closing the widget with X no longer loses it until the next invasion. New
+  BITMAP_INTERFACE_ACTINV_NOTIFY slot (ACTINV_BEGIN+7). Hit test uses the icon rect cached by
+  the render pass and is parked off-screen every RenderFrame, so the icon is only clickable on
+  frames the Look-5 HUD actually drew it (other HUD looks are untouched).
+
+- Client: fixed ActiveInvasion HUD texture sampling (CGMInvasionManager::RenderFrame). background,
+  background_new, plus/minus and close were drawn with SEASON3B::RenderImage, which assumes the
+  on-screen size equals the texture pixel size and so sampled only a top-left chunk of the
+  high-res MuDream art (background.ozt is 273x50 drawn at 200x30, icons are 10x10 drawn at 12x12).
+  Switched them to RenderImageF with the native pixel rects (TEX_* constants in the layout
+  namespace), same pattern as the other MuDream texture fixes; arrows.ozt atlas calls were
+  already pixel-correct and btn.ozt is still load-only.
+
+- Client: reskinned the ActiveInvasion HUD (CGMInvasionManager) to MuDream style. RenderFrame no
+  longer 9-slices the shared IMAGE_HUD_PLAYER atlas; it now draws the header from
+  Interface\ActiveInvasion\background.ozt, the expanded body from background_new.ozt, prev/next
+  chevrons from arrows.ozt (2x3 atlas: normal/hover cells wired), and the top-right icon strip
+  from plus.ozt / minus.ozt / close.ozt. btn.ozt slot reserved for future button backing.
+  Added BITMAP_INTERFACE_ACTINV_* texture-index range (_TextureIndex.h) with a fixed name-per-slot
+  mapping so ordering never drifts. LoadImages() runs lazily on the first RenderFrame so the
+  singleton constructor stays safe if it fires before the GL context. UpdateMouseEvent now
+  distinguishes prev/next arrows, plus/minus toggle, close (X, sets m_bHidden), and legacy
+  header-tap; SetInvasion clears m_bHidden so a fresh invasion re-shows the widget. All hit
+  tests and draw rects live in virtual 640x480 space via CheckMouseIn / RenderImageF, so the
+  widget stays resolution-aware across ScreenType 0/1/2.
+
+------------------------------------------------------------
+ 2026-07-11
+------------------------------------------------------------
+
+- Client: inventory window (NewUIMyInventory.cpp): removed the Open Personal Store button (m_BtnMyShop)
+  from all code paths — commented out init, positioning, render, and mouse-event handling. Repurposed
+  its Bt_openshop texture for the JewelBank button (IMAGE_INVENTORY_JEWEL_BTN now loads
+  newui_Bt_openshop.tga with uw=144 vh=116). Fixed the expansion-button guard that depended on
+  m_BtnMyShop.UpdateMouseEvent (now always enters the block).
+
+- Client: fixed inventory/bank/character windows rendering behind the LookAndFeel 5 bottom bar.
+  CNewUIMainFrameWindow::GetLayerDepth() now returns 1.5f for LookAndFeel 5 (was 10.6f), so panels
+  draw on top of the HUD bar. Other LookAndFeel modes unchanged.
+
+- Client: fixed JewelBank Deposit/Withdraw buttons (NewUIInventoryJewel.cpp) — added uw/vh 216×92
+  to m_Button1/m_Button2 ChangeButtonImgState calls for the btn_empty_very_small MuDream texture.
+
+- Client: fixed skill selector showing old low-quality textures for LookAndFeel 5. Added an
+  else-if block in CNewUISkillList::LoadImages() (NewUIMainFrameWindow.cpp) to load MuDream skill
+  atlases from Interface\HUD\Look-5\ (newui_skill/skill2/skill3, newui_non_skill/non_skill2/non_skill3,
+  newui_skillbox/skillbox2, newui_non_command — all .ozj). Previously LookAndFeel 5 fell through to the
+  else block loading the original Interface\ root textures.
+
+- Client: updated all UI button and title-bar UV source dimensions (uw/vh) for the MuDream high-res
+  replacement textures in Client\Data\Interface\. The new OZT textures (btn_empty 432x348,
+  btn_empty_big 720x348, btn_empty_small 256x348, btn_empty_very_small 216x276, chainfo_btn_level
+  64x120, Bt_accept/close/open 144x232, Account_title 680x112, Box_openTitle 680x104,
+  cha_textbox02 680x84) are larger than the originals, so hardcoded UV values produced cropped/oversized
+  renders. Fix: (a) CNewUIMessageBoxButton::SetInfo auto-detects uw/vh from the loaded texture's
+  output_width/output_height (NewUICommonMessageBox.cpp, active #else path); (b) all CNewUIButton-based
+  callers (~30 calls across ~25 files) now pass explicit uw/vh matching each texture variant;
+  (c) title-bar and textbox RenderImage calls switched to SEASON3B::RenderImageF with correct source
+  rects. Also fixed a duplicate IMAGE_MSGBOX_BTN_EMPTY_VERY_SMALL check in RegisterButtonState
+  (NewUIButton.cpp, should have been EMPTY_SMALL).
+
+------------------------------------------------------------
+ 2026-07-07
+------------------------------------------------------------
+
+- Client+GameServer: wired the CustomNpcQuest tracker HUD end-to-end (it previously never showed).
+  Root cause #1: NewUISystem::HideAll() (runs on every map join/teleport) hid INTERFACE_QUESTINFO_HUD
+  and nothing re-showed it -> added it to IsImpossibleHideInterface like the other always-on HUDs.
+  Root cause #2: the HUD had no data source (placeholder text only) -> new C1:F3:EF packet
+  (PMSG_CUSTOMNPCQUEST_HUD_SEND in GameServer\CustomNpcQuest.h = PMSG_CUSTOMNPCQUEST_HUD_RECV in
+  NewUIQuestInfoHUD.cpp, dispatched in client ProtocolCoreEx). Server pushes it on quest accept
+  (CheckMonster), on every counted kill, on quest completion (clears the HUD) and on config reload.
+  Refactor: the kill-count block in ObjectManager.cpp moved into CCustomNpcQuest::MonsterDieProc
+  (same behavior, logic now lives in the owning manager); added FindMonsterInfo helper; removed the
+  HUD placeholder seed and deduplicated its anchor math (UpdateAnchor); fixed the completion log
+  printing the wrong field (lpObj->CustomQuest instead of the finished quest id).
+
+- Client: fixed the reconnect window drawing cropped. LegendUI\reconnect.ozt is a 440x160 ATLAS
+  (window 0,0 440x102; progress fill 0,108 362x24; progress track 0,132 368x28) but RenderFrame drew
+  the whole texture as a 352x113 "window" via RenderImage (which crops - see the RenderImage/
+  RenderImageF gotcha). Now each atlas region is drawn via RenderImageF sub-rects: window 352x82
+  (aspect-correct), track + left-to-right revealed fill (348x22 area) replacing the old shared
+  IMAGE_MSGBOX_PROGRESS_* sprites; status text recentered into the body (CNewUIReconnect layout
+  enum, NewUIReconnect.h/.cpp; spawn position updated in NewUISystem.cpp).
+
+- Client: reskinned the in-game ESC system menu (CSystemMenuMsgBox, NewUICustomMessageBox.cpp/.h) with
+  the MuDream-style LegendUI textures: window = LegendUI\UI_ExitMenu_Window.ozt (388x498), buttons =
+  LegendUI\buttons_big.ozt (252x204 = 3 stacked 252x68 states: normal/hover/pressed). Added
+  BITMAP_INTERFACE_EXITMENU_WINDOW/_BUTTONS slots (_TextureIndex.h), loaded/freed in Create/Release
+  (reconnect-window pattern). Window resized to 230x295 (keeps skin aspect), centered on screen; 5
+  buttons 156x34 with a gold "System Menu" title; hover/click states drawn via a dedicated
+  BITMAP_INTERFACE_EXITMENU_BUTTONS case in CNewUIMessageBoxButton::Render (NewUICommonMessageBox.cpp).
+  Gotcha found: SEASON3B::RenderImage(bmp,x,y,w,h) interprets w/h as the TEXTURE region to sample, so a
+  skin larger than its on-screen size gets cropped - use RenderImageF(bmp,x,y,w,h), which samples the
+  whole image (output_width/Width UVs) and scales it.
+
+------------------------------------------------------------
+ 2026-07-06
+------------------------------------------------------------
+
+- Client: reconnect window now uses a dedicated background texture (LegendUI\reconnect.ozt) instead of
+  the shared message-box skin (BITMAP_MESSAGE_WIN), so restyling it no longer affects every message box.
+  Added BITMAP_INTERFACE_RECONNECT (_TextureIndex.h); loaded/freed in CNewUIReconnect::Create/Release and
+  drawn in RenderFrame (NewUIReconnect.cpp). Asset lives under the live client's Data\Interface\LegendUI\.
+
+- Client: scaffolded the CustomNpcQuest on-screen tracker HUD (MuDream-style), phase 1. New window
+  CNewUIQuestInfoHUD (NewUIQuestInfoHUD.h/.cpp), INTERFACE_QUESTINFO_HUD (_enum.h),
+  BITMAP_INTERFACE_QUESTINFO_HUD_BEGIN/_END range (_TextureIndex.h), registered in NewUISystem
+  (new/Create/getter/g_pQuestInfoHUD) and added to Main.vcxproj(.filters). Renders a top-right,
+  resolution-aware objective banner (QuestInfo\MissionView_I7A.ozt + Monsters.ozt) with title and
+  "cur/max" progress; currently seeded with placeholder data (server packet not wired yet).
+
+- Client: fixed character/NPC/monster shadows flickering (shimmer) while moving (BMD::RenderBodyShadow,
+  ZzzBMD.cpp). Root cause was NOT depth z-fighting: the shadow is the model's mesh flattened onto the
+  ground, so the projected triangles' winding is unreliable (silhouette triangles are near-degenerate).
+  The scene renders with GL_CULL_FACE enabled and the shadow pass never disabled it, so as the model
+  moved/animated the facing of those borderline triangles flipped frame to frame and they were culled
+  in and out - that flicker. Fix: draw the shadow double-sided (DisableCullFace before the pass,
+  EnableCullFace to restore the scene default afterwards). Verified in-game with a temporary
+  GL_DEPTH_BITS readout (driver already gives 24-bit depth), which ruled out the depth-precision
+  theory; that diagnostic and an experimental glPolygonOffset/pixel-format change were reverted so
+  this fix is just the cull-face change.
+
+------------------------------------------------------------
+ 2026-07-05
+------------------------------------------------------------
+
+- Client: smoothed the free-camera horizontal rotation (CGMCameraWorld::RotateInNearFar).
+  Middle-mouse yaw was a flat +/-5 deg per frame keyed only on cursor direction - not
+  proportional to mouse movement, no momentum, framerate-dependent and steppy. Replaced
+  it with a momentum model (inspired by the community SmoothCamera): the real mouse delta
+  is accumulated into the existing rotateVelocityX and eased out every frame with the
+  framerate-independent FPS_ANIMATION_FACTOR, so turns are proportional and glide to a
+  smooth stop. Zoom (already eased) and the vertical up/down pitch (SetAngleY) are left
+  unchanged. Sensitivity/settle are tunable via ROTATE_SENSITIVITY / ROTATE_SMOOTH.
+  Pending build+run.
+- Client: fixed the KMUA2 (MuArchangel2) boot loading screen not filling the window /
+  not respecting resolution (UIMng.cpp RenderTitleSceneUI + CRenderNumber). As a
+  fullscreen splash it must cover the whole window at any resolution AND ScreenType.
+  The original double-scaled (pre-mul by ScreenW/800 + RenderBitmap's own g_fScreenRate
+  scale); simply removing the pre-scale then under-filled, because RenderBitmap's
+  g_fScreenRate does NOT map the 640x480 base to the full window on ScreenType 1
+  (aspect-lock) or 2 (fixed rate) - leaving black margins (right/bottom). Now the art
+  is scaled by the ACTUAL window size (WindowWidth/640, WindowHeight/480) and drawn
+  with RenderBitmap Scale/StartScale = false (raw window pixels), so it fills the whole
+  GL surface on every ScreenType. Back01/Back02 now render as the left/right window
+  halves (no crop/black bar). Gauge bar untouched - it keys off the real window size
+  too (ScreenW/800), so it stays aligned via the 640/800 == 480/600 == 0.8 equivalence.
+  Dropped the now-unused m_fTitleScaleX/Y members (UIMng.h). Pending build+run.
+- Client: fixed the bottom-right FPS/RTT readout rendering off-screen to the right
+  (NewUIMainFrameWindow.cpp). It used RenderText + RT3_SORT_RIGHT at GetWindowsX-8;
+  switched to RenderFont + RT3_SORT_LEFT inset ~110px from the right edge, matching
+  the working runtime_render_fps() readout. Pending build+run verification.
+- Client: LookAndFeel 5 exp bar now spans the full empty MainBar groove - the
+  RenderExperience call was pos_center()+100 / width 440 while the MainBar
+  (IMAGE_MENU_2, Render64Frame) is pos_center() / width 640, so the fill looked
+  short/offset. Aligned to pos_center() / 640 (resolution-aware). Pending build+run.
+- Client: LookAndFeel 5 HUD - raised the elements above the exp bar by 2px each
+  (main frame IMAGE_MENU_1, HP/MP orbs+gauges, end caps IMAGE_MENU_2_1, helper gear,
+  HP/MP numbers, and the Q/W/E/R item hotkey slots in CNewUIItemHotKey::Init) in
+  NewUIMainFrameWindow.cpp; exp bar + its empty groove unchanged. Skill-icon slots
+  (current/hotkey skill icons via m_iRenderSkillSlot) still pending - their position
+  source not yet traced. Pending build+run.
+- Client/Data: added 2560x1440 (2K) as resolution index 15 in Client\Data\
+  Resolutions.xml (data-driven; UI scales via g_fScreenRate). Pending build+run.
+- Client/Shaders: fixed the SHADER_VERSION_TEST model shader (Client\Shaders\
+  shader.fs) blowing NPCs/monsters/effects out to white. The engine bakes per-vertex
+  lighting into gl_Color (to_light), so the fragment now MODULATES to_light.rgb by the
+  texture (legacy GL_MODULATE look) instead of re-applying ambient+diffuse+specular on
+  top (double-lit -> white; the default normal made diffuse bogus too). Loaded at
+  runtime - client restart, no rebuild. Pending run verification.
+- Client: smoother mouse-wheel zoom (CGMCameraWorld::ZoomInNearFar). Rewrote the zoom
+  to a framerate-independent exponential ease (FPS_ANIMATION_FACTOR) toward a persistent
+  accumulated target - rapid scrolls now add up and glide instead of restarting each
+  tick, and the glide completes even if the cursor moves onto the UI. Removed the dead
+  zoom-tilt block. Zoom-out cap set to 225 (260 pushed the camera well past the engine's
+  render distance -> distant objects culled + FPS drop; more than this needs a deliberate
+  render-distance extension, not just a wider zoom). Pending build+run.
+
+------------------------------------------------------------
+ 2026-06-30
+------------------------------------------------------------
+
+- Client+Encoder: over-head NPC icons (MuDream-style) with float+pulse anim.
+  Data-driven via new Local\CustomNpcIcon.txt (ID|World|OffY|Scale|Icon),
+  encoded into av-code45.pak as a new trailing vector (CUSTOM_NPC_ICON,
+  appended #022 so the pak stays backward-compatible; client read is EOF-guarded
+  for older paks). Icons load on demand from Data\Interface\NpcIcons\ into the
+  new BITMAP_NPCICON texture range. Files: Encoder.cpp, Encoder supportingfeature
+  .h/.cpp, stdafx.h; client supportingfeature.h/.cpp, _TextureIndex.h,
+  CGMProtect.h/.cpp (GetNpcIcon), NewUINameWindow.h/.cpp (RenderNpcIcons).
+
+- Client: Inventory + Character window frames now render from the single
+  MuDream CharacterOverview.tga sheet (left/right panel crop via RenderImageF)
+  instead of the shared window_nomal() frame, so other windows that reuse
+  window_nomal() are unaffected (NewUIMyInventory.cpp/.h,
+  NewUICharacterInfoWindow.cpp/.h, new IMAGE_CHAROVERVIEW slot in each).
+  Equip-slot positions (SetEquipmentSlotInfo) and bottom buttons left as-is.
+- Client: Inventory equip-slot icons (Helper/Helm/Wing, WeaponR/Armor/WeaponL,
+  Gloves/Pants/Boots) and jewelry (Ring x2, Earring x2, Amulet) now use
+  cropped artwork from CharacterOverview.tga instead of the old separate
+  per-slot images. Added EQUIPMENT_ITEM su/sv/uw/vh source-crop fields and a
+  SetEquipmentInfo() overload to support this; legacy whole-texture slots
+  (dwBgImage with uw==0) render exactly as before (NewUIMyInventory.cpp/.h,
+  _struct.h).
+- Client: corrected all CharacterOverview.tga crop/placement coordinates using
+  the authoritative CharacterOverview.json (found in the MuDream client install)
+  instead of guessed pixel-detection - background split (0-515 / 516-1031,
+  848 tall) and every equip+jewelry slot's ox/oy placement scaled to
+  WIN_WINDOW_SIZEX/Y, source crop taken from json x/y/w/h verbatim
+  (NewUIMyInventory.cpp, NewUICharacterInfoWindow.cpp).
+- Client: reverted equip-slot + jewelry icon artwork/positions back to the
+  original IMAGE_INVENTORY_ITEM_* textures and anchors (the json-scaled
+  version still looked wrong in-game) - SetEquipmentSlotInfo,
+  NewUIMyInventory.cpp. Panel background (RenderFrame) still uses
+  CharacterOverview.tga; only the equip-slot icons were reverted.
+
+------------------------------------------------------------
+ 2026-06-29
+------------------------------------------------------------
+
+- Client: Look-5 HUD elements (frame, life/mana, AG/SD gauges, helper gear,
+  CShop/MyInven buttons) raised 2px so they no longer overlap the new
+  ActionBarsView_I2AC exp-bar background (IMG_L5_Y_RAISE, NewUIMainFrameWindow.cpp)
+- Client: fixed build errors in the new buff-window collapse/expand arrow
+  (BuffSort missing arg, RenderBuffTooltip extra arg, bad macro calls,
+  undefined gIconBuff progress bar removed, IMAGE_BUFF_arrow/arrow_1 added
+  to IMAGE_LIST + BITMAP_BUFFWINDOW_END widened) - NewUIBuffWindow.cpp/.h
+
+------------------------------------------------------------
+ 2026-06-21
+------------------------------------------------------------
+
+- GameServer: build fix (std::random_device / SetLargeRand)
+- Client: screenshot crash fix (SaveScreen)
+- Encoder: CustomItemToolTip / CustomTextTooltip fix (EncoderText)
+- Client: Look-5 interface added (LookAndFeel 5 - bottom bar)
+- Look-5: skill icon load for LookAndFeel 5 (newui_skillbox1/2)
+- Look-5: bottom selected-skill + top skill-selector positions
+- Look-5: buttons (CShop/Inventory) position, size, text-on-button
+- Look-5: buttons fix vanish when window open (SetBtnState frame)
+- Client: macro skill blacklist (Dark Spirit passives 120-123)
+- Client: experience bar gap render fix (RenderExperience)
+- Client: nick height on mounts (Dark Horse / Fenrir) - CGMHeadChat
+- Client: F5 hotkey opens the existing custom menu (INTERFACE_CUSTOM_MENU)
+
+============================================================

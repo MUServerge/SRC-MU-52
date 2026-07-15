@@ -1,0 +1,38 @@
+19:23:47 [SocketManager] Server started at port [55970]
+19:23:49 [ServerManager][0] AddServer (127.0.0.1)
+19:23:49 [ServerManager][0] ServerInfo (General) (55901) (0)
+19:23:50 [ServerManager][1] AddServer (127.0.0.1)
+19:23:50 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:35:06 [SocketManager] Server started at port [55970]
+19:35:11 [ServerManager][0] AddServer (127.0.0.1)
+19:35:11 [ServerManager][0] ServerInfo (General) (55901) (0)
+19:35:13 [ServerManager][1] AddServer (127.0.0.1)
+19:35:13 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:39:32 [SocketManager] Server started at port [55970]
+19:39:34 [ServerManager][0] AddServer (127.0.0.1)
+19:39:34 [ServerManager][0] ServerInfo (General) (55901) (0)
+19:39:35 [ServerManager][1] AddServer (127.0.0.1)
+19:39:35 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:42:50 [SocketManager] Server started at port [55970]
+19:42:52 [ServerManager][0] AddServer (127.0.0.1)
+19:42:52 [ServerManager][0] ServerInfo (General) (55901) (0)
+19:42:53 [ServerManager][1] AddServer (127.0.0.1)
+19:42:53 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:48:53 EXEC WZ_DISCONNECT_MEMB 'louismk'
+19:48:53 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+19:48:53 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+20:28:26 [SocketManager] Server started at port [55970]
+20:28:30 [ServerManager][0] AddServer (127.0.0.1)
+20:28:30 [ServerManager][0] ServerInfo (General) (55901) (0)
+20:28:32 [ServerManager][1] AddServer (127.0.0.1)
+20:28:32 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+20:31:31 [SocketManager] Server started at port [55970]
+20:31:32 [ServerManager][0] AddServer (127.0.0.1)
+20:31:32 [ServerManager][0] ServerInfo (General) (55901) (0)
+20:31:34 [ServerManager][1] AddServer (127.0.0.1)
+20:31:34 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+21:04:59 [SocketManager] Server started at port [55970]
+21:05:04 [ServerManager][0] AddServer (127.0.0.1)
+21:05:04 [ServerManager][0] ServerInfo (General) (55901) (0)
+21:05:06 [ServerManager][1] AddServer (127.0.0.1)
+21:05:06 [ServerManager][1] ServerInfo (Castle) (55919) (19)

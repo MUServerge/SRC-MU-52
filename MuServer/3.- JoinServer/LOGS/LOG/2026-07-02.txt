@@ -1,0 +1,3 @@
+11:20:48 EXEC WZ_DISCONNECT_MEMB 'rando'
+11:20:48 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+11:20:48 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.

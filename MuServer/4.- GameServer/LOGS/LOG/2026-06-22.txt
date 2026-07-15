@@ -1,0 +1,100 @@
+04:12:32 [CustomQuiz] Start
+04:12:32 [Invasion Manager] Index(0) Boss Position (Map: 0 X: 129 Y: 195)
+04:12:32 [Invasion Manager] Index(1) Boss Position (Map: 0 X: 234 Y: 123)
+04:12:32 [Invasion Manager] Index(2) Boss Position (Map: 57 X: 46 Y: 137)
+04:12:32 [Invasion Manager] Index(3) Boss Position (Map: 3 X: 200 Y: 70)
+04:12:32 [Invasion Manager] Index(7) Boss Position (Map: 3 X: 200 Y: 84)
+04:12:32 [Invasion Manager] Index(8) Boss Position (Map: 56 X: 181 Y: 116)
+04:12:33 [OnlineLoterry] No Winner
+04:15:32 [CustomQuiz] Finish
+04:25:00 [Invasion Manager] Index(2) Boss Position (Map: 37 X: 52 Y: 235)
+04:36:01 [OnlineLoterry] No Winner
+04:50:00 [Invasion Manager] Index(3) Boss Position (Map: 0 X: 150 Y: 47)
+05:00:00 [Invasion Manager] Index(8) Boss Position (Map: 56 X: 154 Y: 10)
+05:10:00 [CustomQuiz] Start
+05:13:00 [CustomQuiz] Finish
+05:36:02 [OnlineLoterry] No Winner
+06:10:00 [CustomQuiz] Start
+06:13:00 [CustomQuiz] Finish
+18:56:13 [CustomQuiz] Start
+18:56:13 [Invasion Manager] Index(0) Boss Position (Map: 0 X: 133 Y: 198)
+18:56:13 [Invasion Manager] Index(1) Boss Position (Map: 3 X: 212 Y: 224)
+18:56:13 [Invasion Manager] Index(2) Boss Position (Map: 37 X: 122 Y: 29)
+18:56:13 [Invasion Manager] Index(3) Boss Position (Map: 0 X: 151 Y: 49)
+18:56:13 [Invasion Manager] Index(7) Boss Position (Map: 2 X: 163 Y: 22)
+18:56:13 [Invasion Manager] Index(8) Boss Position (Map: 56 X: 56 Y: 103)
+18:56:14 [OnlineLoterry] No Winner
+19:07:29 [ServerInfo] CashShop loaded successfully
+19:07:29 [ServerInfo] ChaosMix loaded successfully
+19:07:29 [ServerInfo] Character loaded successfully
+19:07:29 [ServerInfo] Custom loaded successfully
+19:07:29 [ServerInfo] Command loaded successfully
+19:07:29 [ServerInfo] Common loaded successfully
+19:07:29 [ServerInfo] Event loaded successfully
+19:07:30 [ServerInfo] EventItemBag loaded successfully
+19:07:30 [ServerInfo] Hack loaded successfully
+19:07:30 [ServerInfo] Item loaded successfully
+19:07:31 [ServerInfo] Monster loaded successfully
+19:07:31 [ServerInfo] Move loaded successfully
+19:07:32 [ServerInfo] Quest loaded successfully
+19:07:32 [ServerInfo] Shop loaded successfully
+19:07:32 [ServerInfo] Skill loaded successfully
+19:07:32 [ServerInfo] Util loaded successfully
+19:07:32 [ReadBotInfo] BotSystem loaded successfully
+19:07:36 [ CRYWOLF ] SYNC Occupation: 0, State: 0
+19:08:01 [Obj][12500] AddClient (10.40.5.54)
+19:08:03 [Obj][12500] AddAccount (louismk)
+19:08:05 [Obj][12500] LogInCharacter (LouisSM)
+19:08:17 [Obj][12500] LogOutCharacter (LouisSM)
+19:08:21 [Obj][12500] LogInCharacter (KmmR)
+19:08:49 [Obj][12500] LogOutCharacter (KmmR)
+19:08:49 [Obj][12500] DelAccount (louismk)
+19:08:49 [Obj][12500] DelClient (10.40.5.54)
+19:09:29 [Obj][12500] AddClient (10.40.5.54)
+19:09:31 [Obj][12500] AddAccount (louismk)
+19:09:32 [Obj][12500] LogInCharacter (KmmR)
+19:10:00 [CustomQuiz] Start
+19:10:37 GCReqEventTime1
+19:11:35 [Obj][12501] AddClient (10.40.5.54)
+19:11:41 [Obj][12501] AddAccount (louismk2)
+19:11:43 [Obj][12501] LogInCharacter (MGTeste)
+19:13:00 [CustomQuiz] Finish
+19:36:01 [OnlineLoterry] No Winner
+19:41:22 GCReqEventTime1
+19:47:22 [Obj][12501] LogOutCharacter (MGTeste)
+19:47:22 [Obj][12501] DelAccount (louismk2)
+19:47:22 [Obj][12501] DelClient (10.40.5.54)
+19:47:24 [Obj][12500] LogOutCharacter (KmmR)
+19:47:24 [Obj][12500] DelAccount (louismk)
+19:47:24 [Obj][12500] DelClient (10.40.5.54)
+19:53:06 [Obj][12501] AddClient (10.40.5.54)
+19:53:08 [Obj][12501] AddAccount (louismk)
+19:53:10 [Obj][12501] LogInCharacter (KmmR)
+19:53:32 [Obj][12501] LogOutCharacter (KmmR)
+19:53:32 [Obj][12501] DelAccount (louismk)
+19:53:32 [Obj][12501] DelClient (10.40.5.54)
+19:54:13 [Obj][12500] AddClient (10.40.5.54)
+19:54:18 [Obj][12500] AddAccount (louismk2)
+19:54:20 [Obj][12500] LogInCharacter (LouisMK)
+19:55:11 [Obj][12500] LogOutCharacter (LouisMK)
+19:55:11 [Obj][12500] DelAccount (louismk2)
+19:55:11 [Obj][12500] DelClient (10.40.5.54)
+19:55:29 [Obj][12501] AddClient (10.40.5.54)
+19:55:31 [Obj][12501] AddAccount (louismk2)
+19:55:32 [Obj][12501] LogInCharacter (LouisMK)
+20:02:44 [Obj][12501] LogOutCharacter (LouisMK)
+20:02:44 [Obj][12501] DelAccount (louismk2)
+20:02:44 [Obj][12501] DelClient (10.40.5.54)
+20:05:00 [Invasion Manager] Index(0) Boss Position (Map: 3 X: 199 Y: 84)
+20:10:00 [CustomQuiz] Start
+20:13:00 [CustomQuiz] Finish
+20:15:00 [Invasion Manager] Index(1) Boss Position (Map: 2 X: 80 Y: 216)
+20:24:05 [Obj][12500] AddClient (10.40.5.54)
+20:24:08 [Obj][12500] AddAccount (louismk)
+20:24:09 [Obj][12500] LogInCharacter (KmmR)
+20:24:25 GCReqEventTime1
+20:25:00 [Invasion Manager] Index(2) Boss Position (Map: 57 X: 34 Y: 212)
+20:25:24 GCReqEventTime1
+20:31:42 [Obj][12500] LogOutCharacter (KmmR)
+20:31:42 [Obj][12500] DelAccount (louismk)
+20:31:42 [Obj][12500] DelClient (10.40.5.54)

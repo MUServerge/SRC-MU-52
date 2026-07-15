@@ -1,0 +1,38 @@
+19:23:46 [SocketManager] Server started at port [55960]
+19:23:49 [ServerManager][0] AddServer (127.0.0.1)
+19:23:49 [ServerManager][0] ServerInfo (General) (55901) (0)
+19:23:50 [ServerManager][1] AddServer (127.0.0.1)
+19:23:50 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:35:05 [SocketManager] Server started at port [55960]
+19:35:11 [ServerManager][0] AddServer (127.0.0.1)
+19:35:11 [ServerManager][0] ServerInfo (General) (55901) (0)
+19:35:13 [ServerManager][1] AddServer (127.0.0.1)
+19:35:13 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:39:31 [SocketManager] Server started at port [55960]
+19:39:34 [ServerManager][0] AddServer (127.0.0.1)
+19:39:34 [ServerManager][0] ServerInfo (General) (55901) (0)
+19:39:35 [ServerManager][1] AddServer (127.0.0.1)
+19:39:35 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:42:49 [SocketManager] Server started at port [55960]
+19:42:52 [ServerManager][0] AddServer (127.0.0.1)
+19:42:52 [ServerManager][0] ServerInfo (General) (55901) (0)
+19:42:53 [ServerManager][1] AddServer (127.0.0.1)
+19:42:53 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:48:53 UPDATE Character SET cLevel=1000,Class=19,LevelUpPoint=298780,Experience=-430866688,Strength=20015,Dexterity=18015,Vitality=1015,Energy=16015,Leadership=0,Inventory=?,MagicList=?,Money=783137195,Life=8096.000000,MaxLife=7078.000000,Mana=20324.000000,MaxMana=17024.000000,BP=22924.000000,MaxBP=22924.000000,Shield=337228.000000,MaxShield=337228.000000,MapNumber=87,MapPosX=126,MapPosY=126,MapDir=1,PkCount=0,PkLevel=3,PkTime=0,Quest=?,EffectList=?,FruitAddPoint=0,FruitSubPoint=13,ExtInventory=2,Power=2206 WHERE AccountID='louismk' AND Name='LuisADM'
+19:48:53 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+19:48:53 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+20:28:24 [SocketManager] Server started at port [55960]
+20:28:30 [ServerManager][0] AddServer (127.0.0.1)
+20:28:30 [ServerManager][0] ServerInfo (General) (55901) (0)
+20:28:32 [ServerManager][1] AddServer (127.0.0.1)
+20:28:32 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+20:31:30 [SocketManager] Server started at port [55960]
+20:31:32 [ServerManager][0] AddServer (127.0.0.1)
+20:31:32 [ServerManager][0] ServerInfo (General) (55901) (0)
+20:31:34 [ServerManager][1] AddServer (127.0.0.1)
+20:31:34 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+21:04:58 [SocketManager] Server started at port [55960]
+21:05:04 [ServerManager][0] AddServer (127.0.0.1)
+21:05:04 [ServerManager][0] ServerInfo (General) (55901) (0)
+21:05:06 [ServerManager][1] AddServer (127.0.0.1)
+21:05:06 [ServerManager][1] ServerInfo (Castle) (55919) (19)

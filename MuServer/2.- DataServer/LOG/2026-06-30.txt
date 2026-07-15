@@ -1,0 +1,13 @@
+18:19:00 [SocketManager] Server started at port [55960]
+18:19:03 [ServerManager][0] AddServer (127.0.0.1)
+18:19:03 [ServerManager][0] ServerInfo (General) (55901) (0)
+18:19:05 [ServerManager][1] AddServer (127.0.0.1)
+18:19:05 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+21:07:21 UPDATE Character SET cLevel=1000,Class=19,LevelUpPoint=298780,Experience=-430866688,Strength=20015,Dexterity=18015,Vitality=1015,Energy=16015,Leadership=0,Inventory=?,MagicList=?,Money=783154195,Life=8496.000000,MaxLife=7078.000000,Mana=20424.000000,MaxMana=17024.000000,BP=22924.000000,MaxBP=22924.000000,Shield=337228.000000,MaxShield=337228.000000,MapNumber=0,MapPosX=190,MapPosY=109,MapDir=2,PkCount=0,PkLevel=3,PkTime=0,Quest=?,EffectList=?,FruitAddPoint=0,FruitSubPoint=13,ExtInventory=2,Power=2206 WHERE AccountID='louismk' AND Name='LuisADM'
+21:07:21 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+21:07:21 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+21:45:24 [SocketManager] Server started at port [55960]
+21:45:32 [ServerManager][0] AddServer (127.0.0.1)
+21:45:32 [ServerManager][0] ServerInfo (General) (55901) (0)
+21:45:35 [ServerManager][1] AddServer (127.0.0.1)
+21:45:35 [ServerManager][1] ServerInfo (Castle) (55919) (19)

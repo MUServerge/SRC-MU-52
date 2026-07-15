@@ -1,0 +1,6 @@
+interface:
+  display_name: MU Main 5.2 UI & LookAndFeel5
+  short_description: Responsive UI layout input and LookAndFeel5
+  default_prompt: Use $mu-main52-ui-lookandfeel5 to analyze or change this UI safely.
+policy:
+  allow_implicit_invocation: true

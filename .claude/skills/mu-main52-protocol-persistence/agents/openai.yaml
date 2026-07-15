@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Protocol & Persistence
+  short_description: Packets reconnect authentication and persistence
+  default_prompt: Use $mu-main52-protocol-persistence to analyze or change this network
+    or persistence path safely.
+policy:
+  allow_implicit_invocation: true

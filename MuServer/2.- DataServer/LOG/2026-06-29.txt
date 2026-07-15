@@ -1,0 +1,11 @@
+21:34:55 [SocketManager] Server started at port [55960]
+21:35:01 [ServerManager][0] AddServer (127.0.0.1)
+21:35:01 [ServerManager][0] ServerInfo (General) (55901) (0)
+21:35:02 [ServerManager][1] AddServer (127.0.0.1)
+21:35:02 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+23:17:16 SELECT Id FROM AccountCharacter WHERE Id='louismk'
+23:17:16 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+23:17:16 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+23:17:16 INSERT INTO AccountCharacter (Id) VALUES ('louismk')
+23:17:16 [QueryManager] State (23000), Diagnostic: [Microsoft][ODBC SQL Server Driver][SQL Server]Violation of PRIMARY KEY constraint 'PK_AccountCharacter'. Cannot insert duplicate key in object 'dbo.AccountCharacter'. The duplicate key value is (louismk).
+23:17:16 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][SQL Server]The statement has been terminated.

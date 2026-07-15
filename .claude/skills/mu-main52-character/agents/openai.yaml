@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Character
+  short_description: Character state stats equipment lifecycle
+  default_prompt: Use $mu-main52-character to analyze or change this character system
+    safely.
+policy:
+  allow_implicit_invocation: true

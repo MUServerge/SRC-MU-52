@@ -1,0 +1,29 @@
+07:55:47 [SocketManager] Server started at port [55960]
+07:55:53 [ServerManager][0] AddServer (127.0.0.1)
+07:55:53 [ServerManager][0] ServerInfo (General) (55901) (0)
+07:55:55 [ServerManager][1] AddServer (127.0.0.1)
+07:55:55 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+09:04:28 SELECT Id FROM AccountCharacter WHERE Id='louismk'
+09:04:28 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+09:04:28 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+09:04:28 INSERT INTO AccountCharacter (Id) VALUES ('louismk')
+09:04:28 [QueryManager] State (23000), Diagnostic: [Microsoft][ODBC SQL Server Driver][SQL Server]Violation of PRIMARY KEY constraint 'PK_AccountCharacter'. Cannot insert duplicate key in object 'dbo.AccountCharacter'. The duplicate key value is (louismk).
+09:04:28 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][SQL Server]The statement has been terminated.
+10:14:20 [SocketManager] Server started at port [55960]
+10:14:25 [ServerManager][0] AddServer (127.0.0.1)
+10:14:25 [ServerManager][0] ServerInfo (General) (55901) (0)
+10:14:27 [ServerManager][1] AddServer (127.0.0.1)
+10:14:27 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+10:36:31 UPDATE Character SET cLevel=267,Class=50,LevelUpPoint=122154,Experience=199567550,Strength=25015,Dexterity=64015,Vitality=25015,Energy=25015,Leadership=0,Inventory=?,MagicList=?,Money=1999982000,Life=50354.000000,MaxLife=50354.000000,Mana=50304.000000,MaxMana=50304.000000,BP=32263.000000,MaxBP=32263.000000,Shield=281892.000000,MaxShield=281892.000000,MapNumber=51,MapPosX=126,MapPosY=125,MapDir=2,PkCount=0,PkLevel=3,PkTime=0,Quest=?,EffectList=?,FruitAddPoint=0,FruitSubPoint=0,ExtInventory=4,Power=0 WHERE AccountID='louismk2' AND Name='MGTeste'
+10:36:31 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+10:36:31 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+12:12:24 [SocketManager] Server started at port [55960]
+12:12:30 [ServerManager][0] AddServer (127.0.0.1)
+12:12:30 [ServerManager][0] ServerInfo (General) (55901) (0)
+12:12:31 [ServerManager][1] AddServer (127.0.0.1)
+12:12:31 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+13:03:32 [SocketManager] Server started at port [55960]
+13:03:35 [ServerManager][0] AddServer (127.0.0.1)
+13:03:35 [ServerManager][0] ServerInfo (General) (55901) (0)
+13:03:36 [ServerManager][1] AddServer (127.0.0.1)
+13:03:36 [ServerManager][1] ServerInfo (Castle) (55919) (19)

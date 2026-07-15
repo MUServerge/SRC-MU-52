@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Performance
+  short_description: Evidence-based client optimization workflow
+  default_prompt: Use $mu-main52-performance to profile and optimize this MU Main
+    5.2 performance issue.
+policy:
+  allow_implicit_invocation: true

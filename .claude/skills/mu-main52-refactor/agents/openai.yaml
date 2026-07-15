@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Refactor
+  short_description: Safe incremental architecture refactoring
+  default_prompt: Use $mu-main52-refactor to clean up this MU Main 5.2 code without
+    changing behavior.
+policy:
+  allow_implicit_invocation: true

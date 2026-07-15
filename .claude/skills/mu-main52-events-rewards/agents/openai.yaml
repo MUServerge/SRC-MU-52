@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Events & Rewards
+  short_description: Event states packets rewards and UI
+  default_prompt: Use $mu-main52-events-rewards to analyze or change this event or
+    reward system safely.
+policy:
+  allow_implicit_invocation: true

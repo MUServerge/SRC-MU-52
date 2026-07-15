@@ -1,0 +1,5 @@
+0
+//ServerCode   ServerClient          ServerName          ServerAddress         ServerPort       ServerType
+0              "General"            "General"           "10.40.5.52"        55901            "SHOW"
+19             "Castle"             "Castle"            "10.40.5.52"        55919            "HIDE"
+end

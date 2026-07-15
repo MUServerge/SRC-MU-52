@@ -1,0 +1,39 @@
+# Visual Studio user/cache state
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+ipch/
+
+# Build outputs and intermediate files
+Debug/
+Release/
+x64/
+x86/
+*.obj
+*.pch
+*.pdb
+*.idb
+*.ilk
+*.exp
+*.lib
+*.log
+*.lastbuildstate
+*.tlog
+*.recipe
+*.iobj
+*.ipdb
+
+# Generated databases and indexes
+*.VC.db
+*.VC.VC.opendb
+*.opensdf
+*.sdf
+*.vsidx
+Browse.VC.db
+
+# Local packaged snapshots
+*.rar
+*.zip
+

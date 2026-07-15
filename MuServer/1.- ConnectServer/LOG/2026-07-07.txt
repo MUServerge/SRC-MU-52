@@ -1,0 +1,7 @@
+12:37:10 [ServerList] JoinServer offline
+19:01:46 [ServerList] JoinServer offline
+19:01:46 [ServerList] GameServer offline (General) (0)
+19:01:46 [ServerList] GameServer offline (Castle) (19)
+19:01:46 [ServerList] JoinServer online
+19:01:46 [ServerList] GameServer online (Castle) (19)
+19:01:46 [ServerList] GameServer online (General) (0)

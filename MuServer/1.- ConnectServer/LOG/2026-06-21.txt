@@ -1,0 +1,35 @@
+19:01:51 [SocketManager] Server started at port [44404]
+19:01:51 [ServerList] ServerList loaded successfully
+19:01:51 [ServerVersion] ServerVersion loaded successfully
+19:08:25 [SocketManager] Server started at port [44405]
+19:08:25 [ServerList] ServerList loaded successfully
+19:08:25 [ServerVersion] ServerVersion loaded successfully
+19:08:37 [ServerList] JoinServer online
+19:08:56 [ServerList] GameServer online (General) (0)
+19:09:07 [ServerList] GameServer online (Castle) (19)
+19:17:16 [ServerList] GameServer offline (Castle) (19)
+19:17:20 [ServerList] GameServer offline (General) (0)
+19:18:57 [SocketManager] Server started at port [44405]
+19:18:57 [ServerList] ServerList loaded successfully
+19:18:57 [ServerVersion] ServerVersion loaded successfully
+19:19:00 [ServerList] JoinServer online
+19:19:02 [ServerList] GameServer online (General) (0)
+19:19:03 [ServerList] GameServer online (Castle) (19)
+20:40:51 [SocketManager] Server started at port [44405]
+20:40:51 [ServerList] ServerList loaded successfully
+20:40:51 [ServerVersion] ServerVersion loaded successfully
+20:40:54 [ServerList] JoinServer online
+20:40:59 [ServerList] GameServer online (General) (0)
+20:41:01 [ServerList] GameServer online (Castle) (19)
+20:41:27 [SocketManager] Server started at port [44405]
+20:41:27 [ServerList] ServerList loaded successfully
+20:41:27 [ServerVersion] ServerVersion loaded successfully
+20:41:30 [ServerList] JoinServer online
+20:41:32 [ServerList] GameServer online (General) (0)
+20:41:33 [ServerList] GameServer online (Castle) (19)
+20:43:31 [SocketManager] Server started at port [44405]
+20:43:31 [ServerList] ServerList loaded successfully
+20:43:31 [ServerVersion] ServerVersion loaded successfully
+20:43:34 [ServerList] JoinServer online
+20:43:36 [ServerList] GameServer online (General) (0)
+20:43:37 [ServerList] GameServer online (Castle) (19)

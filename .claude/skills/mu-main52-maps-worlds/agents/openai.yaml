@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Maps & Worlds
+  short_description: Maps worlds terrain gates and server rules
+  default_prompt: Use $mu-main52-maps-worlds to analyze or change this map or world
+    safely.
+policy:
+  allow_implicit_invocation: true

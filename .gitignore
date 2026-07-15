@@ -1,0 +1,58 @@
+# ------------------------------------------------------------
+# SRC 5.2 BASE
+# Tracked: SRCMainGS (source), MuServer, MainInfo, root docs.
+# Build output is ignored; MuServer is a runtime tree, so its
+# folders are kept intact on purpose.
+# ------------------------------------------------------------
+
+# --- Not part of this repo -----------------------------------
+/Client/
+/Client_2/
+/MuServerTK/
+/SRCMainGS/.git_backup_old/
+"/SRCMainGS some fixes/"
+
+# --- Visual Studio user/cache state (anywhere) ---------------
+.vs/
+*.suo
+*.user
+*.sdf
+*.opensdf
+*.opendb
+*.ncb
+*.aps
+*.VC.db
+*.VC.opendb
+
+# --- Compiler / linker output (anywhere) ---------------------
+*.obj
+*.ipch
+*.pch
+*.pdb
+*.ilk
+*.idb
+*.tlog
+*.iobj
+*.ipdb
+*.exp
+*.res
+*.bsc
+*.lastbuildstate
+*.FileListAbsolute.txt
+
+# --- Build directories (source trees only) -------------------
+# Scoped to SRCMainGS/MainInfo: MuServer has a real
+# Tools/TitanNgocNhiSV/Release folder holding item icons.
+/SRCMainGS/**/Debug/
+/SRCMainGS/**/Release/
+/SRCMainGS/**/ipch/
+/SRCMainGS/**/x64/
+/MainInfo/**/Debug/
+/MainInfo/**/Release/
+/MainInfo/**/ipch/
+/MainInfo/**/x64/
+
+# --- Misc ----------------------------------------------------
+Thumbs.db
+desktop.ini
+*.tmp

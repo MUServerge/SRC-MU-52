@@ -1,0 +1,6 @@
+interface:
+  display_name: MU Main 5.2 Items
+  short_description: Items options excellent socket and ancient
+  default_prompt: Use $mu-main52-items to analyze or change this item system safely.
+policy:
+  allow_implicit_invocation: true

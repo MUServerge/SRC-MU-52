@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Data & Assets
+  short_description: Asset formats loaders IDs caches and validation
+  default_prompt: Use $mu-main52-data-assets to trace and safely change the MU Main
+    5.2 asset and data pipeline.
+policy:
+  allow_implicit_invocation: true

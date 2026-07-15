@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Social Systems
+  short_description: Party guild chat friends duel and Gens
+  default_prompt: Use $mu-main52-social-systems to trace and safely change the MU
+    Main 5.2 social architecture.
+policy:
+  allow_implicit_invocation: true

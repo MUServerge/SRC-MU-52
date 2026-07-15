@@ -1,0 +1,7 @@
+//SkillIndex  	MinSpeed  MaxSpeed  MaxDelay     MaxCount   Comment
+41           000        125        1000       1         //Death Stab
+41           126        250        1000       1         //Death Stab
+41           251        500        1000       1         //Death Stab
+41           501        1000       1000       1         //Death Stab
+41           1001       *          1000       1         //Death Stab
+end

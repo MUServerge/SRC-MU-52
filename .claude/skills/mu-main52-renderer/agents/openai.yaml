@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Renderer
+  short_description: OpenGL shader VBO rendering workflow
+  default_prompt: Use $mu-main52-renderer to improve the MU Main 5.2 OpenGL renderer
+    safely.
+policy:
+  allow_implicit_invocation: true

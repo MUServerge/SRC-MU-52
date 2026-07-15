@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Skills & Combat
+  short_description: Skills damage buffs cooldowns and combat authority
+  default_prompt: Use $mu-main52-skills-combat to analyze or change this skill or
+    combat path safely.
+policy:
+  allow_implicit_invocation: true

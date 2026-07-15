@@ -1,0 +1,23 @@
+//=======================================================================================
+// Over-head NPC icons (MuDream-style). Icon files live in Data\Interface\NpcIcons\
+// and must include the extension (.tga -> the client reads the matching .ozt).
+//
+//  ID    = NPC MonsterIndex
+//  World = map index, or -1 for any map
+//  OffY  = extra vertical offset over the head (pixels, + = higher)
+//  Scale = on-screen icon size in pixels
+//  Icon  = file name inside Data\Interface\NpcIcons\
+//=======================================================================================
+//ID    World   OffY    Scale   Icon
+//---------------------------------------------------------------------------------------
+406     -1      0       32      "Quests.tga"
+229     -1      0       32      "Quests.tga"
+235     -1      0       32      "Quests.tga"
+579     -1      0       38      "Monsters.tga"
+
+
+580     -1      0       26      "Quests.tga"
+543     -1      0       26      "UIKit_I242.tga"
+544     -1      0       26      "UIKit_I244.tga"
+240     -1      0       26      "UIKit_I25C.tga"
+end

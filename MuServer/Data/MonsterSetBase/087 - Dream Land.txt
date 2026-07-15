@@ -1,0 +1,31 @@
+0
+//Monster      MapNumber      Range      PositionX      PositionY      Direction      Comment
+
+406            88             00         149            142            07             //Apostle Devin
+229            88             00         147            147            08             //Marlon
+235            88             00         142            148            01             //Sebina the Priest
+579            88             00         138            146            02             //Sebina the Priest
+
+256            51             00         037            241            01             //Lahap
+257            51             00         043            191            03             //Shadow Phantom Soldier
+257            51             00         057            232            03             //Shadow Phantom Soldier
+257            51             00         073            220            01             //Shadow Phantom Soldier
+240            51             00         050            229            01             //Safety Guardian
+
+
+
+
+end
+
+
+1
+//Monster      MapNumber      Range      BeginPosX      BeginPosY      EndPosX      EndPosY      Direction      Quantity      Comment
+
+end
+
+
+2
+//Monster      MapNumber      Range      PositionX      PositionY      Direction      Comment
+
+end
+

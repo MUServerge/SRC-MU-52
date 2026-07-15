@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Monsters
+  short_description: Monster creation state models and effects
+  default_prompt: Use $mu-main52-monsters to analyze or change this monster system
+    safely.
+policy:
+  allow_implicit_invocation: true

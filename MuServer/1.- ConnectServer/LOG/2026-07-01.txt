@@ -1,0 +1,42 @@
+19:23:45 [SocketManager] Server started at port [44405]
+19:23:45 [ServerList] ServerList loaded successfully
+19:23:45 [ServerVersion] ServerVersion loaded successfully
+19:23:48 [ServerList] JoinServer online
+19:23:50 [ServerList] GameServer online (General) (0)
+19:23:51 [ServerList] GameServer online (Castle) (19)
+19:35:04 [SocketManager] Server started at port [44405]
+19:35:04 [ServerList] ServerList loaded successfully
+19:35:04 [ServerVersion] ServerVersion loaded successfully
+19:35:07 [ServerList] JoinServer online
+19:35:12 [ServerList] GameServer online (General) (0)
+19:35:14 [ServerList] GameServer online (Castle) (19)
+19:39:30 [SocketManager] Server started at port [44405]
+19:39:30 [ServerList] ServerList loaded successfully
+19:39:30 [ServerVersion] ServerVersion loaded successfully
+19:39:33 [ServerList] JoinServer online
+19:39:35 [ServerList] GameServer online (General) (0)
+19:39:36 [ServerList] GameServer online (Castle) (19)
+19:42:48 [SocketManager] Server started at port [44405]
+19:42:48 [ServerList] ServerList loaded successfully
+19:42:48 [ServerVersion] ServerVersion loaded successfully
+19:42:51 [ServerList] JoinServer online
+19:42:53 [ServerList] GameServer online (General) (0)
+19:42:54 [ServerList] GameServer online (Castle) (19)
+20:28:23 [SocketManager] Server started at port [44405]
+20:28:23 [ServerList] ServerList loaded successfully
+20:28:23 [ServerVersion] ServerVersion loaded successfully
+20:28:27 [ServerList] JoinServer online
+20:28:31 [ServerList] GameServer online (General) (0)
+20:28:33 [ServerList] GameServer online (Castle) (19)
+20:31:28 [SocketManager] Server started at port [44405]
+20:31:28 [ServerList] ServerList loaded successfully
+20:31:28 [ServerVersion] ServerVersion loaded successfully
+20:31:32 [ServerList] JoinServer online
+20:31:33 [ServerList] GameServer online (General) (0)
+20:31:35 [ServerList] GameServer online (Castle) (19)
+21:04:57 [SocketManager] Server started at port [44405]
+21:04:57 [ServerList] ServerList loaded successfully
+21:04:57 [ServerVersion] ServerVersion loaded successfully
+21:05:00 [ServerList] JoinServer online
+21:05:05 [ServerList] GameServer online (General) (0)
+21:05:07 [ServerList] GameServer online (Castle) (19)

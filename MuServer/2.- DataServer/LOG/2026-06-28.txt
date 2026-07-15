@@ -1,0 +1,26 @@
+11:33:43 [SocketManager] Server started at port [55960]
+11:33:46 [ServerManager][0] AddServer (127.0.0.1)
+11:33:46 [ServerManager][0] ServerInfo (General) (55901) (0)
+11:33:48 [ServerManager][1] AddServer (127.0.0.1)
+11:33:48 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+11:45:15 [SocketManager] Server started at port [55960]
+11:45:18 [ServerManager][0] AddServer (127.0.0.1)
+11:45:18 [ServerManager][0] ServerInfo (General) (55901) (0)
+11:45:19 [ServerManager][1] AddServer (127.0.0.1)
+11:45:19 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+15:32:04 UPDATE Character SET cLevel=534,Class=98,LevelUpPoint=29968,Experience=101361670,Strength=1515,Dexterity=52015,Vitality=1515,Energy=1515,Leadership=0,Inventory=?,MagicList=?,Money=34389126,Life=5974.000000,MaxLife=5072.000000,Mana=4116.000000,MaxMana=3516.000000,BP=12599.000000,MaxBP=12599.000000,Shield=230260.000000,MaxShield=229560.000000,MapNumber=3,MapPosX=175,MapPosY=94,MapDir=3,PkCount=0,PkLevel=3,PkTime=0,Quest=?,EffectList=?,FruitAddPoint=0,FruitSubPoint=0,ExtInventory=4,Power=0 WHERE AccountID='louismk' AND Name='KmmR'
+15:32:04 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+15:32:04 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+15:55:28 [SocketManager] Server started at port [55960]
+15:55:34 [ServerManager][0] AddServer (127.0.0.1)
+15:55:34 [ServerManager][0] ServerInfo (General) (55901) (0)
+15:55:36 [ServerManager][1] AddServer (127.0.0.1)
+15:55:36 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+15:58:14 [SocketManager] Server started at port [55960]
+15:58:20 [ServerManager][0] AddServer (127.0.0.1)
+15:58:20 [ServerManager][0] ServerInfo (General) (55901) (0)
+15:58:22 [ServerManager][1] AddServer (127.0.0.1)
+15:58:22 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+19:18:34 UPDATE Character SET cLevel=534,Class=98,LevelUpPoint=29968,Experience=101361670,Strength=1515,Dexterity=52015,Vitality=1515,Energy=1515,Leadership=0,Inventory=?,MagicList=?,Money=33587626,Life=5974.000000,MaxLife=5072.000000,Mana=4116.000000,MaxMana=3516.000000,BP=12599.000000,MaxBP=12599.000000,Shield=230260.000000,MaxShield=229560.000000,MapNumber=2,MapPosX=206,MapPosY=39,MapDir=3,PkCount=0,PkLevel=3,PkTime=0,Quest=?,EffectList=?,FruitAddPoint=0,FruitSubPoint=0,ExtInventory=4,Power=0 WHERE AccountID='louismk' AND Name='KmmR'
+19:18:34 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+19:18:34 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.

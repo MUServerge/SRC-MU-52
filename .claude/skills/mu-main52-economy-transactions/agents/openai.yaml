@@ -1,0 +1,7 @@
+interface:
+  display_name: MU Main 5.2 Economy & Transactions
+  short_description: Safe trades shops storage mixes and currencies
+  default_prompt: Use $mu-main52-economy-transactions to analyze or change this economy
+    flow safely.
+policy:
+  allow_implicit_invocation: true

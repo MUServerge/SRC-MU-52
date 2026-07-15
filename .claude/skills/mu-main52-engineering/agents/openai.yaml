@@ -1,0 +1,6 @@
+interface:
+  display_name: MU Main 5.2 Engineering
+  short_description: Project rules and architecture guidance
+  default_prompt: Use $mu-main52-engineering to work safely on the MU Main 5.2 project.
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,26 @@
+07:55:48 [SocketManager] Server started at port [55970]
+07:55:53 [ServerManager][0] AddServer (127.0.0.1)
+07:55:53 [ServerManager][0] ServerInfo (General) (55901) (0)
+07:55:55 [ServerManager][1] AddServer (127.0.0.1)
+07:55:55 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+09:04:25 SELECT memb__pwd FROM MEMB_INFO WHERE memb___id='louismk' COLLATE Latin1_General_BIN
+09:04:25 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+09:04:25 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+10:14:21 [SocketManager] Server started at port [55970]
+10:14:25 [ServerManager][0] AddServer (127.0.0.1)
+10:14:25 [ServerManager][0] ServerInfo (General) (55901) (0)
+10:14:27 [ServerManager][1] AddServer (127.0.0.1)
+10:14:27 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+10:36:31 EXEC WZ_DISCONNECT_MEMB 'louismk2'
+10:36:31 [QueryManager] State (01000), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]ConnectionWrite (send()).
+10:36:31 [QueryManager] State (08S01), Diagnostic: [Microsoft][ODBC SQL Server Driver][Shared Memory]General network error. Check your network documentation.
+12:12:26 [SocketManager] Server started at port [55970]
+12:12:30 [ServerManager][0] AddServer (127.0.0.1)
+12:12:30 [ServerManager][0] ServerInfo (General) (55901) (0)
+12:12:31 [ServerManager][1] AddServer (127.0.0.1)
+12:12:31 [ServerManager][1] ServerInfo (Castle) (55919) (19)
+13:03:33 [SocketManager] Server started at port [55970]
+13:03:35 [ServerManager][0] AddServer (127.0.0.1)
+13:03:35 [ServerManager][0] ServerInfo (General) (55901) (0)
+13:03:36 [ServerManager][1] AddServer (127.0.0.1)
+13:03:36 [ServerManager][1] ServerInfo (Castle) (55919) (19)

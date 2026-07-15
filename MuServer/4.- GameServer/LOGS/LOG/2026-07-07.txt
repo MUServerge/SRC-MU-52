@@ -1,0 +1,35 @@
+00:00:09 [Obj][12500] AddClient (10.40.5.52)
+00:00:10 [Obj][12500] AddAccount (louismk2)
+00:00:11 [Obj][12500] LogInCharacter (MGTeste)
+00:01:25 [Obj][12500] LogOutCharacter (MGTeste)
+00:01:26 [Obj][12500] LogInCharacter (ImpELF)
+00:01:30 [Obj][12500] LogOutCharacter (ImpELF)
+00:01:31 [Obj][12500] LogInCharacter (LouisMK)
+12:37:10 [Obj][12500] LogOutCharacter (LouisMK)
+12:37:10 [Obj][12500] DelAccount (louismk2)
+12:37:10 [Obj][12500] DelClient (10.40.5.52)
+12:37:10 [CustomQuiz] Start
+12:37:10 [Invasion Manager] Index(0) Boss Position (Map: 0 X: 134 Y: 196)
+12:37:10 [Invasion Manager] Index(1) Boss Position (Map: 0 X: 190 Y: 84)
+12:37:10 [Invasion Manager] Index(2) Boss Position (Map: 57 X: 126 Y: 212)
+12:37:10 [Invasion Manager] Index(3) Boss Position (Map: 3 X: 195 Y: 75)
+12:37:10 [Invasion Manager] Index(7) Boss Position (Map: 3 X: 201 Y: 84)
+12:37:10 [Invasion Manager] Index(8) Boss Position (Map: 56 X: 128 Y: 167)
+12:37:11 [OnlineLoterry] No Winner
+12:40:10 [CustomQuiz] Finish
+12:50:00 [Invasion Manager] Index(3) Boss Position (Map: 2 X: 158 Y: 12)
+19:01:45 [CustomQuiz] Start
+19:01:45 [Invasion Manager] Index(0) Boss Position (Map: 0 X: 125 Y: 200)
+19:01:45 [Invasion Manager] Index(1) Boss Position (Map: 2 X: 101 Y: 115)
+19:01:45 [Invasion Manager] Index(2) Boss Position (Map: 37 X: 179 Y: 13)
+19:01:45 [Invasion Manager] Index(7) Boss Position (Map: 0 X: 159 Y: 59)
+19:01:45 [Invasion Manager] Index(8) Boss Position (Map: 56 X: 183 Y: 122)
+19:01:46 [OnlineLoterry] No Winner
+19:04:45 [CustomQuiz] Finish
+19:10:00 [CustomQuiz] Start
+19:13:00 [CustomQuiz] Finish
+19:36:01 [OnlineLoterry] No Winner
+20:05:00 [Invasion Manager] Index(0) Boss Position (Map: 3 X: 196 Y: 81)
+20:10:00 [CustomQuiz] Start
+20:13:00 [CustomQuiz] Finish
+20:15:00 [Invasion Manager] Index(1) Boss Position (Map: 0 X: 66 Y: 235)
