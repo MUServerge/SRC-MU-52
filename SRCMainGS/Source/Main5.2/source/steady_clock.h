@@ -250,6 +250,12 @@ public:
 	double GetNormalizerFps();
 	double GetDeltAccumulated();
 
+	// Bounded 25 Hz scheduler. Consumers migrate to the step count incrementally;
+	// the legacy CheckNormalizer cadence remains unchanged until its Phase 4 audit.
+	int GetFixedUpdateStepCount() const;
+	int GetDroppedFixedUpdateStepCount() const;
+	double GetFixedUpdateAlpha() const;
+
 	void normalizefps();
 	void LoadInformationFps();
 	std::chrono::steady_clock::time_point GetthreadTime();
@@ -264,14 +270,19 @@ public:
 	int get_ping_time();
 	static csteady_clock* Instance();
 private:
+	void UpdateFixedUpdateScheduler();
+
 	int32_t counterframe;
 	bool normal_check;
+	int fixedUpdateStepCount;
+	int droppedFixedUpdateStepCount;
 
 	double fpsNormalizer;
 	double realDeltaTime;
 	double realLegacyStep;
 	double speedNormalizer;
 	double deltaAccumulated;
+	double fixedUpdateAccumulator;
 	CheckerTime frame_limit;
 	FramePacingMode framePacingMode;
 	std::chrono::steady_clock::time_point mainthread;

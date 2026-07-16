@@ -6,6 +6,21 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client FPS Phase 3: replaced the inactive MainScene accumulator scaffold
+  with one bounded 25 Hz compatibility scheduler owned by csteady_clock. It
+  carries fractional time between render frames, emits up to five fixed steps
+  per frame, reports discarded whole steps after long stalls and exposes a
+  0..1 interpolation alpha for later consumers. The water texture sequence
+  consumes the full emitted step count. Existing CheckNormalizer consumers keep
+  their prior 40 ms compatibility cadence until their Phase 4 audit, avoiding an
+  unreviewed simultaneous timing change across pets, effects, minimap and map
+  specializations. Removed the commented-out while loop, render-FPS-sized pseudo
+  fixed delta and unused post-frame accumulator. Added opt-in RenderProfiler counters for emitted
+  and dropped fixed steps. MoveMainScene, input, UI, physics, gameplay logic,
+  render FPS, frame-pacing policy and GLEW are unchanged. Static source review
+  only; Windows build and runtime cadence/parity checks remain pending.
+  (steady_clock.cpp/.h, ZzzScene.cpp, RenderProfiler.cpp/.h)
+
 - Client FPS Phase 2: introduced one explicit frame-pacing authority while
   preserving the current 60 FPS safety limit. At startup, a display reporting
   approximately 60 Hz uses VSync only when WGL swap-control initialization and

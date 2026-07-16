@@ -11,6 +11,9 @@ csteady_clock::csteady_clock()
 	ping_reg_id = 0;
 	counterframe = 0;
 	deltaAccumulated = 0.0;
+	fixedUpdateAccumulator = 1.0 / REFERENCE_FPS;
+	fixedUpdateStepCount = 0;
+	droppedFixedUpdateStepCount = 0;
 	fpsNormalizer = REFERENCE_FPS;
 	realDeltaTime = 1.0 / REFERENCE_FPS;
 	realLegacyStep = 1.0;
@@ -78,6 +81,32 @@ double csteady_clock::GetDeltAccumulated()
 	return deltaAccumulated;
 }
 
+int csteady_clock::GetFixedUpdateStepCount() const
+{
+	return fixedUpdateStepCount;
+}
+
+int csteady_clock::GetDroppedFixedUpdateStepCount() const
+{
+	return droppedFixedUpdateStepCount;
+}
+
+double csteady_clock::GetFixedUpdateAlpha() const
+{
+	const double fixedStepSeconds = 1.0 / REFERENCE_FPS;
+	if (fixedStepSeconds <= 0.0)
+	{
+		return 0.0;
+	}
+
+	const double alpha = fixedUpdateAccumulator / fixedStepSeconds;
+	if (alpha <= 0.0)
+		return 0.0;
+	if (alpha >= 1.0)
+		return 1.0;
+	return alpha;
+}
+
 int csteady_clock::GetLimitFps()
 {
 	return 60;
@@ -101,6 +130,41 @@ bool csteady_clock::IsSoftwareFrameLimitEnabled() const
 double csteady_clock::Getframe_per_second()
 {
 	return 1000.0 / static_cast<double>(this->GetLimitFps());
+}
+
+void csteady_clock::UpdateFixedUpdateScheduler()
+{
+	const double fixedStepSeconds = 1.0 / REFERENCE_FPS;
+	const int maxFixedStepsPerFrame = 5;
+	const double maxAccumulatedSeconds = fixedStepSeconds * maxFixedStepsPerFrame;
+
+	fixedUpdateStepCount = 0;
+	droppedFixedUpdateStepCount = 0;
+
+	double pendingSeconds = fixedUpdateAccumulator + realDeltaTime;
+	if (pendingSeconds > maxAccumulatedSeconds)
+	{
+		const double discardedSeconds = pendingSeconds - maxAccumulatedSeconds;
+		droppedFixedUpdateStepCount = static_cast<int>(discardedSeconds / fixedStepSeconds);
+		pendingSeconds = maxAccumulatedSeconds;
+	}
+	else if (pendingSeconds < 0.0)
+	{
+		pendingSeconds = 0.0;
+	}
+
+	fixedUpdateStepCount = static_cast<int>(pendingSeconds / fixedStepSeconds);
+	if (fixedUpdateStepCount > maxFixedStepsPerFrame)
+	{
+		fixedUpdateStepCount = maxFixedStepsPerFrame;
+	}
+
+	fixedUpdateAccumulator = pendingSeconds -
+		(static_cast<double>(fixedUpdateStepCount) * fixedStepSeconds);
+	if (fixedUpdateAccumulator < 0.0)
+	{
+		fixedUpdateAccumulator = 0.0;
+	}
 }
 
 void csteady_clock::normalizefps()
@@ -176,6 +240,7 @@ void csteady_clock::LoadInformationFps()
 
 	deltaAccumulated += speedNormalizer;
 
+	UpdateFixedUpdateScheduler();
 	normalizefps();
 }
 
