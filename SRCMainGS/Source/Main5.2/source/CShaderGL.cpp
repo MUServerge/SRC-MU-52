@@ -320,6 +320,8 @@ void CShaderGL::InitVBOShaders()
 	if (m_VBOBoneCapacity[eVBO_Model] > 0)
 	{
 		m_BoneTransport = eVBOBoneTransport_UniformArray;
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] selected uniform-array bone transport fallback");
 		return;
 	}
 
