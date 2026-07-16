@@ -205,7 +205,8 @@ bool CShaderScene::Init()
 
 bool CShaderScene::EnsureProgram(eShaderSProgram program)
 {
-	if (program < 0 || program >= eShaderS_MaxValue)
+	if (program < 0 || program >= eShaderS_MaxValue ||
+		glCreateShader == NULL || glCreateProgram == NULL)
 		return false;
 	if (m_Program[program] != 0)
 		return true;
