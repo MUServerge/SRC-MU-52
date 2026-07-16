@@ -6,6 +6,14 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 2: centralized all active GLSL program binding and
+  nested restoration through CShaderScene's authoritative GL_CURRENT_PROGRAM
+  tracker. CShaderGL now uses adapters for legacy/VBO programs and no longer
+  keeps an independent stale current-program cache. Scene techniques, shader
+  sources, material selection and legacy fallback are unchanged. Static review
+  only; Windows build and runtime visual/state validation remain pending.
+  (CShaderScene.cpp/.h, CShaderGL.cpp/.h, ZzzBMD.cpp)
+
 - Client renderer Phase 1: made shutdown idempotent and moved ImGui, model,
   texture and shader teardown ahead of WGL context destruction. BMD::Release now
   deletes and clears every mesh-owned VAO/VBO/EBO while a context is current;
