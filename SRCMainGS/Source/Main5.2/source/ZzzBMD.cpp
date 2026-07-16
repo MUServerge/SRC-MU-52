@@ -56,7 +56,6 @@ vec2_t RenderArrayTexCoords[MAX_VERTICES * 3];
 static float (*g_pShaderBoneMatrix)[3][4] = NULL;
 static bool   g_bShaderGPUEligible = false;
 static vec3_t g_ShaderLightPos = { 0.f, 0.f, 0.f };
-static int    g_ShaderLightEnable = 0;
 
 static bool IsVboSceneEnabled()
 {
@@ -360,7 +359,6 @@ void BMD::Transform(float(*BoneMatrix)[3][4], vec3_t BoundingBoxMin, vec3_t Boun
 	// Capture this object's context for a possible GPU-skinned draw of its meshes.
 	g_pShaderBoneMatrix = BoneMatrix;
 	g_bShaderGPUEligible = (Translate == false && BoneScale == 1.f && _Scale == 0.f);
-	g_ShaderLightEnable = LightEnable ? 1 : 0;
 	if (LightEnable)
 		VectorCopy(LightPosition, g_ShaderLightPos);
 #endif // SHADER_VERSION_TEST
