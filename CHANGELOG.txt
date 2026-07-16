@@ -15,8 +15,7 @@
   their prior 40 ms compatibility cadence until their Phase 4 audit, avoiding an
   unreviewed simultaneous timing change across pets, effects, minimap and map
   specializations. Removed the commented-out while loop, render-FPS-sized pseudo
-  fixed delta and
-  unused post-frame accumulator. Added opt-in RenderProfiler counters for emitted
+  fixed delta and unused post-frame accumulator. Added opt-in RenderProfiler counters for emitted
   and dropped fixed steps. MoveMainScene, input, UI, physics, gameplay logic,
   render FPS, frame-pacing policy and GLEW are unchanged. Static source review
   only; Windows build and runtime cadence/parity checks remain pending.
