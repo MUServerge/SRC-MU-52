@@ -17,7 +17,7 @@
   and fallback state. Gameplay/update timing, rendering order, GLEW, shaders,
   assets and the 60 FPS target are unchanged. Static source verification only;
   Windows build and runtime pacing/tearing checks remain pending.
-  (Winmain.cpp, ZzzOpenglUtil.cpp/.h, steady_clock.cpp/.h)
+  (Winmain.cpp, ZzzOpenglUtil.cpp, steady_clock.cpp/.h)
 
 - Client FPS Phase 1: corrected the existing 60 FPS software pacer to time
   the complete current MainScene frame against its own monotonic deadline.
