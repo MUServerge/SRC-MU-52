@@ -3665,6 +3665,22 @@ bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float
 		// RENDER_CHROME8 is excluded by the caller (no matching shader) -> legacy.
 	}
 
+	// Validate the live model against the linked shader's active u_Bones array
+	// before binding or uploading. CPU transforms remain available for fallback.
+	if (g_pShaderBoneMatrix == NULL || NumBones <= 0 || NumBones > MAX_BONES)
+	{
+		g_RenderProfiler.AddCounter(RPC_VBO_BONE_CAPACITY_REJECTED);
+		return false;
+	}
+
+	const int boneCount = NumBones;
+	const int shaderBoneCapacity = gShaderGL->GetVBOBoneCapacity(prog);
+	if (shaderBoneCapacity <= 0 || boneCount > shaderBoneCapacity)
+	{
+		g_RenderProfiler.AddCounter(RPC_VBO_BONE_CAPACITY_REJECTED);
+		return false;
+	}
+
 	// The authoritative shader-state owner returns the exact predecessor so this
 	// nested material draw can restore a scene shader or the legacy program 0.
 	GLuint prevProgram = 0;
@@ -3724,17 +3740,10 @@ bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float
 		}
 	}
 
-	// Upload only THIS model's bones. The source (o->BoneTransform) is allocated
-	// as vec34_t[NumBones] (w_ObjectInfo.cpp), so reading MAX_BONES*3 vec4 would
-	// overrun that heap block -> access violation. NumBones*3 is exact and safe.
-	int boneCount = NumBones;
-	if (boneCount < 0) boneCount = 0;
-	if (boneCount > MAX_BONES) boneCount = MAX_BONES;
-	if (g_pShaderBoneMatrix != NULL && boneCount > 0)
-	{
-		gShaderGL->vboSetVec4Array("u_Bones", (const float*)g_pShaderBoneMatrix, boneCount * 3);
-		g_RenderProfiler.AddCounter(RPC_GPU_UPLOADED_BONES, boneCount);
-	}
+	// Upload only THIS model's verified bone range. The source
+	// (o->BoneTransform) is vec34_t[NumBones], so boneCount*3 vec4 is exact.
+	gShaderGL->vboSetVec4Array("u_Bones", (const float*)g_pShaderBoneMatrix, boneCount * 3);
+	g_RenderProfiler.AddCounter(RPC_GPU_UPLOADED_BONES, boneCount);
 
 	gShaderGL->vboSetVec4("u_bodyLight", BodyLight[0], BodyLight[1], BodyLight[2], Alpha);
 	gShaderGL->vboSetVec4("u_lightPosition", g_ShaderLightPos[0], g_ShaderLightPos[1], g_ShaderLightPos[2], 0.f);
