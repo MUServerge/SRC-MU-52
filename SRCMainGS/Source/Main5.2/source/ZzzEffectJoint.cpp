@@ -5000,7 +5000,7 @@ void MoveJoint(JOINT* o, int iIndex)
 				}
 				else
 				{
-					assert(!"ë””ë²„ê¹…");
+					assert(!"µð¹ö±ë");
 				}
 			}
 			break;
@@ -5210,7 +5210,7 @@ void MoveJoint(JOINT* o, int iIndex)
 				o->Light[2] -= timefac(10.12f);
 			}
 		}
-		else if (o->SubType == 1 || o->SubType == 2 || o->SubType == 3 || o->SubType == 5 || o->SubType == 6 || o->SubType == 7) //  ìœ„ì—ì„œ ì•„ëž˜ë¡œ ë‚´ë ¤ì˜¤ëŠ” ë²ˆê°œ.
+		else if (o->SubType == 1 || o->SubType == 2 || o->SubType == 3 || o->SubType == 5 || o->SubType == 6 || o->SubType == 7) //  À§¿¡¼­ ¾Æ·¡·Î ³»·Á¿À´Â ¹ø°³.
 
 		{
 			VectorCopy(o->StartPosition, o->Position);
@@ -5798,7 +5798,7 @@ void MoveJoint(JOINT* o, int iIndex)
 			else
 			{
 				if (fLife < 10.f)
-				{	// ë
+				{	// ³¡
 					fPos = fLife * 7.0f;
 				}
 				else
@@ -6042,7 +6042,7 @@ void MoveJoint(JOINT* o, int iIndex)
 		{
 			if (o->Target->Live)
 			{
-				o->LifeTime = 100.f; //ë¬´í•œ
+				o->LifeTime = 100.f; //¹«ÇÑ
 				o->life_time_work = standlimit((int)o->LifeTime);
 
 				if (rand() % 3 == 0)
@@ -6508,8 +6508,8 @@ void MoveJoint(JOINT* o, int iIndex)
 							CreateParticleSync(BITMAP_FIRE, o->Position, o->Angle, o->Light, 0);
 						}
 
-						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 10 + 5.f, 5, 10); //  ì „ê¸° 
-						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 8 + 4.f, 5, 10); //  ì „ê¸° 
+						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 10 + 5.f, 5, 10); //  Àü±â 
+						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 8 + 4.f, 5, 10); //  Àü±â 
 					}
 				}
 				if (o->SubType == 0)

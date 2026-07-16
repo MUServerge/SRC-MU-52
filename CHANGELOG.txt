@@ -6,6 +6,27 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client: restored the original legacy source encoding (CP949/ISO-8859) on the
+  files that the FPS Phase 4A/4B changes had re-saved as UTF-8 or double-encoded
+  mojibake. The conversion had altered the Korean text bytes in ZzzCharacter.cpp,
+  UIControls.cpp, ZzzEffect.cpp, ZzzEffectJoint.cpp, ZzzEffectParticle.cpp and
+  ZzzEffectFireLeave.cpp, plus the Spanish comments in w_BasePet.cpp. Because the
+  project sets no /utf-8 switch and these files carry no BOM, the compiler reads
+  them in the system code page, so the converted bytes would have mis-encoded the
+  narrow string literals - most importantly the monster/NPC name literals in
+  ZzzCharacter.cpp (strcpy(c->ID, ...)), which would render as garbage in game.
+  Every FPS Phase 4A/4B functional change is preserved byte-for-byte; only the
+  source encoding was reverted to the original shipped bytes (verified: the only
+  non-encoding differences from the pre-FPS source are the intended migrations).
+  Also restored the tab indentation lost on the two CSParts.cpp PlayAnimation
+  calls during the fps_new_system cleanup. Build/runtime verification pending.
+  (ZzzCharacter.cpp, UIControls.cpp, ZzzEffect.cpp, ZzzEffectJoint.cpp,
+  ZzzEffectParticle.cpp, ZzzEffectFireLeave.cpp, w_BasePet.cpp, CSParts.cpp)
+
+------------------------------------------------------------
+ 2026-07-16
+------------------------------------------------------------
+
 - Client FPS Phase 4B-3: added one explicit non-burst fixed visual
   emission policy to csteady_clock and migrated CreateEffectSync,
   CreateJointSync and CreateParticleSync away from CheckNormalizer. A render

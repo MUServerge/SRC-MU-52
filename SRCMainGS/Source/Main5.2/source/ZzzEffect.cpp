@@ -5680,7 +5680,7 @@ void CreateEffect(OBJECT* o, int Type, vec3_t Position, vec3_t Angle, vec3_t Lig
 			break;
 			case MODEL_SWORDRIGHT02_EMPIREGUARDIAN_BOSS_GAION_:
 			{
-				if (o->SubType == 1)	// Ã€ÃÂ¹ÃÂ°Ã¸Â°Ã Animation
+				if (o->SubType == 1)	// ÀÏ¹Ý°ø°Ý Animation
 				{
 					//const int	TOTAL_LIFETIME = 24;
 					const int	TOTAL_LIFETIME = 30;
@@ -7944,7 +7944,7 @@ void MoveEffect(OBJECT* o, int iIndex)
 			VectorAdd(pObject->Position, vPos, o->Position);
 
 			if (pObject->Live)
-				o->LifeTime = 100.f; //Â¹Â«Ã‡Ã‘
+				o->LifeTime = 100.f; //¹«ÇÑ
 		}
 		BMD* b = gmClientModels->GetModel(o->Type);
 		if (b)
@@ -9664,7 +9664,7 @@ void MoveEffect(OBJECT* o, int iIndex)
 			{
 				fScale = (float)(rand() % 80 + 32) * 0.01f * 1.0f;
 				Vector(o->Position[0] + (rand() % 70 - 35) * 1.0f, o->Position[1] + (rand() % 70 - 35) * 1.0f, o->Position[2] + (rand() % 70 - 35) * 1.0f, vPos);
-				CreateParticleSync(BITMAP_LIGHTNING_MEGA1 + rand() % 3, vPos, pObject->Angle, vLight, 0, fScale);	// Ã€Ã¼Â±Ã¢
+				CreateParticleSync(BITMAP_LIGHTNING_MEGA1 + rand() % 3, vPos, pObject->Angle, vLight, 0, fScale);	// Àü±â
 			}
 
 			Vector(1.0f, 0.0f, 0.0f, vLight);
@@ -9680,7 +9680,7 @@ void MoveEffect(OBJECT* o, int iIndex)
 				interpolatesum2(vPosition, o->Position, vPosition);
 				vPosition[2] = RequestTerrainHeight(vPosition[0], vPosition[1]) + 20;
 
-				CreateParticleSync(BITMAP_LIGHTNING_MEGA1 + rand() % 3, vPosition, pObject->Angle, vLight, 0, fScale);	// Ã€Ã¼Â±Ã¢
+				CreateParticleSync(BITMAP_LIGHTNING_MEGA1 + rand() % 3, vPosition, pObject->Angle, vLight, 0, fScale);	// Àü±â
 			}
 
 			VectorCopy(o->Position, vPosition);
@@ -11912,7 +11912,7 @@ void MoveEffect(OBJECT* o, int iIndex)
 		{
 			Vector(1.f, 1.f, 1.f, Light);
 
-			CreateJointSync(BITMAP_JOINT_THUNDER, o->Position, o->Position, o->Angle, 3, NULL, 20.f, 7); //  Ã€Ã¼Â±Ã¢ 
+			CreateJointSync(BITMAP_JOINT_THUNDER, o->Position, o->Position, o->Angle, 3, NULL, 20.f, 7); //  Àü±â 
 			CreateSprite(BITMAP_SHINY + 1, o->Position, (float)(rand() % 8 + 8) * 0.2f, Light, o, (float)(rand() % 360));
 		}
 
@@ -16739,10 +16739,10 @@ void MoveEffect(OBJECT* o, int iIndex)
 				o->m_Interpolates.GetAlphaCurrent(o->Alpha, fCurrentRate);
 			}
 
-			// 13. APPEAR EFFECTÂµÃ©
+			// 13. APPEAR EFFECTµé
 			if (fCurrentRate >= 0.0f && fCurrentRate <= 0.5f)
 			{
-				o->Visible = true;		// MoveEffectÂ­ CreateEffect
+				o->Visible = true;		// MoveEffect­ CreateEffect
 				BMD* b = gmClientModels->GetModel(o->Type);
 				vec3_t* arrEachBonePos;
 				vec3_t	v3LightModify;
@@ -16844,7 +16844,7 @@ void MoveEffect(OBJECT* o, int iIndex)
 				o->m_Interpolates.GetAlphaCurrent(o->Alpha, fCurrentRate);
 			}
 
-			// 3. APPEAR EFFECTÂµÃ©
+			// 3. APPEAR EFFECTµé
 			if (fCurrentRate >= 0.0f && fCurrentRate <= 0.6f)
 			{
 				o->Visible = true;		// MoveEffect CreateEffect
@@ -17560,7 +17560,7 @@ void MoveEffect(OBJECT* o, int iIndex)
 				CreateEffect(MODEL_WINDFOCE, o->Position, o->Angle, vLight, 3, o, -1, 0, 0, 0, 1.0f);
 			}
 		}
-		else if (o->SubType == 1)		//ÃÃ¶Â¼Ã“Ã€Ã»Ã€ÃŽÂ°Ã… 
+		else if (o->SubType == 1)		//Áö¼ÓÀûÀÎ°Å 
 		{
 			if (o->Owner != NULL && o->Owner->Live == true
 				&& (g_isCharacterBuff(o->Owner, eBuff_Att_up_Ourforces)
