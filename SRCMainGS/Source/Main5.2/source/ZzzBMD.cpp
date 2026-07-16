@@ -3694,8 +3694,35 @@ bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float
 		glGetFloatv(GL_PROJECTION_MATRIX, localProjection);
 	}
 
-	gShaderGL->vboSetMat4("uView", modelView);
-	gShaderGL->vboSetMat4("uProj", projection);
+	// Uniform values persist per linked program. Within this snapshot lifetime,
+	// upload the identical camera matrices only on the first use of each VBO
+	// material program. Capacity exhaustion intentionally falls back to uploading.
+	const GLuint matrixProgram = gShaderGL->GetVBOProgram(prog);
+	bool uploadMatrices = true;
+	if (matrixSnapshot != NULL && matrixProgram != 0)
+	{
+		for (int programIndex = 0; programIndex < matrixSnapshot->UploadedMatrixProgramCount; ++programIndex)
+		{
+			if (matrixSnapshot->UploadedMatrixPrograms[programIndex] == matrixProgram)
+			{
+				uploadMatrices = false;
+				break;
+			}
+		}
+	}
+
+	if (uploadMatrices)
+	{
+		gShaderGL->vboSetMat4("uView", modelView);
+		gShaderGL->vboSetMat4("uProj", projection);
+
+		if (matrixSnapshot != NULL &&
+			matrixProgram != 0 &&
+			matrixSnapshot->UploadedMatrixProgramCount < ShaderMatrixSnapshot::MATRIX_PROGRAM_CAPACITY)
+		{
+			matrixSnapshot->UploadedMatrixPrograms[matrixSnapshot->UploadedMatrixProgramCount++] = matrixProgram;
+		}
+	}
 
 	// Upload only THIS model's bones. The source (o->BoneTransform) is allocated
 	// as vec34_t[NumBones] (w_ObjectInfo.cpp), so reading MAX_BONES*3 vec4 would
