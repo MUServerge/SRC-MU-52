@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
-// 3D Æ¯¼öÈ¿°ú °ü·Ã ÇÔ¼ö
+// 3D íŠ¹ìˆ˜íš¨ê³¼ ê´€ë ¨ í•¨ìˆ˜
 //
-// *** ÇÔ¼ö ·¹º§: 3
+// *** í•¨ìˆ˜ ë ˆë²¨: 3
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
@@ -441,7 +441,8 @@ bool MoveLeaves()
 			if (weather == 2)
 				iMaxLeaves = 50;
 	}
-	if (checkNormalizer)
+	const int fixedUpdateSteps = gsteady_clock->GetFixedUpdateStepCount();
+	for (int fixedStep = 0; fixedStep < fixedUpdateSteps; ++fixedStep)
 	{
 		if (RainCurrent > RainTarget)
 			RainCurrent--;
@@ -451,7 +452,7 @@ bool MoveLeaves()
 
 	RainSpeed = (int)sinf(WorldTime * 0.001f) * 10 + 30;
 	RainAngle = (int)sinf(WorldTime * 0.0005f + 50.f) * 20;
-	if (checkNormalizer)
+	for (int fixedStep = 0; fixedStep < fixedUpdateSteps; ++fixedStep)
 	{
 		RainPosition += 20;
 		RainPosition %= 2000;
