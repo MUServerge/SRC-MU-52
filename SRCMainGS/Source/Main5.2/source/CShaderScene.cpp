@@ -31,6 +31,7 @@ CShaderScene::CShaderScene()
 		m_Program[i] = 0;
 	for (int i = 0; i < PROGRAM_STACK_CAPACITY; ++i)
 		m_ProgramStack[i] = 0;
+	ClearUniformCache();
 }
 
 CShaderScene::~CShaderScene()
@@ -111,6 +112,26 @@ GLuint CShaderScene::LinkProgram(GLuint vs, GLuint fs, const char* tag)
 	return program;
 }
 
+GLuint CShaderScene::BuildProgram(const char* vertexSource, const char* fragmentSource, const char* tag)
+{
+	if (vertexSource == NULL || fragmentSource == NULL || vertexSource[0] == '\0' || fragmentSource[0] == '\0')
+		return 0;
+
+	const char* safeTag = (tag != NULL && tag[0] != '\0') ? tag : "unnamed";
+	const GLuint vs = CompileShader(GL_VERTEX_SHADER, std::string(vertexSource), safeTag);
+	if (vs == 0)
+		return 0;
+
+	const GLuint fs = CompileShader(GL_FRAGMENT_SHADER, std::string(fragmentSource), safeTag);
+	if (fs == 0)
+	{
+		RenderProfilerDeleteShader(vs);
+		return 0;
+	}
+
+	return LinkProgram(vs, fs, safeTag);
+}
+
 GLuint CShaderScene::LoadProgram(const char* baseName)
 {
 	const std::string vsSrc = ReadShaderFile((std::string(baseName) + ".vs").c_str());
@@ -118,16 +139,7 @@ GLuint CShaderScene::LoadProgram(const char* baseName)
 	if (vsSrc.empty() || fsSrc.empty())
 		return 0;
 
-	const GLuint vs = CompileShader(GL_VERTEX_SHADER, vsSrc, baseName);
-	const GLuint fs = CompileShader(GL_FRAGMENT_SHADER, fsSrc, baseName);
-	if (vs == 0 || fs == 0)
-	{
-		if (vs) RenderProfilerDeleteShader(vs);
-		if (fs) RenderProfilerDeleteShader(fs);
-		return 0;
-	}
-
-	return LinkProgram(vs, fs, baseName);
+	return BuildProgram(vsSrc.c_str(), fsSrc.c_str(), baseName);
 }
 
 bool CShaderScene::Init()
@@ -229,11 +241,99 @@ void CShaderScene::Unuse()
 	BindProgram(previousProgram);
 }
 
+
+void CShaderScene::ClearUniformCache()
+{
+	for (int i = 0; i < PROGRAM_UNIFORM_CACHE_CAPACITY; ++i)
+	{
+		m_UniformCache[i].Program = 0;
+		m_UniformCache[i].Count = 0;
+		for (int j = 0; j < UNIFORMS_PER_PROGRAM; ++j)
+		{
+			m_UniformCache[i].Uniforms[j].Name[0] = '\0';
+			m_UniformCache[i].Uniforms[j].Location = -1;
+		}
+	}
+}
+
+void CShaderScene::ForgetProgram(GLuint program)
+{
+	if (program == 0)
+		return;
+
+	for (int i = 0; i < PROGRAM_UNIFORM_CACHE_CAPACITY; ++i)
+	{
+		if (m_UniformCache[i].Program != program)
+			continue;
+
+		m_UniformCache[i].Program = 0;
+		m_UniformCache[i].Count = 0;
+		for (int j = 0; j < UNIFORMS_PER_PROGRAM; ++j)
+		{
+			m_UniformCache[i].Uniforms[j].Name[0] = '\0';
+			m_UniformCache[i].Uniforms[j].Location = -1;
+		}
+		return;
+	}
+}
+
+GLint CShaderScene::GetUniformLocation(GLuint program, const char* name) const
+{
+	if (program == 0 || name == NULL || name[0] == '\0' || glGetUniformLocation == NULL)
+		return -1;
+
+	ProgramUniformCache* programCache = NULL;
+	ProgramUniformCache* emptyCache = NULL;
+	for (int i = 0; i < PROGRAM_UNIFORM_CACHE_CAPACITY; ++i)
+	{
+		if (m_UniformCache[i].Program == program)
+		{
+			programCache = &m_UniformCache[i];
+			break;
+		}
+		if (emptyCache == NULL && m_UniformCache[i].Program == 0)
+			emptyCache = &m_UniformCache[i];
+	}
+
+	if (programCache == NULL)
+	{
+		programCache = emptyCache;
+		if (programCache != NULL)
+		{
+			programCache->Program = program;
+			programCache->Count = 0;
+		}
+	}
+
+	if (programCache != NULL)
+	{
+		for (int i = 0; i < programCache->Count; ++i)
+		{
+			if (strcmp(programCache->Uniforms[i].Name, name) == 0)
+				return programCache->Uniforms[i].Location;
+		}
+	}
+
+	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
+	const GLint location = glGetUniformLocation(program, name);
+
+	const size_t nameLength = strlen(name);
+	if (programCache != NULL &&
+		programCache->Count < UNIFORMS_PER_PROGRAM &&
+		nameLength < UNIFORM_NAME_CAPACITY)
+	{
+		UniformCacheEntry& entry = programCache->Uniforms[programCache->Count++];
+		strcpy_s(entry.Name, UNIFORM_NAME_CAPACITY, name);
+		entry.Location = location;
+	}
+
+	return location;
+}
+
 void CShaderScene::SetInt(const char* name, int value) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
-	const GLint loc = glGetUniformLocation(m_Program[m_CurrentProgram], name);
+	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -244,8 +344,7 @@ void CShaderScene::SetInt(const char* name, int value) const
 void CShaderScene::SetFloat(const char* name, float value) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
-	const GLint loc = glGetUniformLocation(m_Program[m_CurrentProgram], name);
+	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -256,8 +355,7 @@ void CShaderScene::SetFloat(const char* name, float value) const
 void CShaderScene::SetVec3(const char* name, float x, float y, float z) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
-	const GLint loc = glGetUniformLocation(m_Program[m_CurrentProgram], name);
+	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -277,11 +375,14 @@ void CShaderScene::Release()
 
 	for (int i = 0; i < eShaderS_MaxValue; ++i)
 	{
+		if (m_Program[i] != 0)
+			ForgetProgram(m_Program[i]);
 		if (canDelete && m_Program[i] != 0)
 			RenderProfilerDeleteProgram(m_Program[i]);
 		m_Program[i] = 0;
 	}
 
+	ClearUniformCache();
 	m_CurrentProgram = -1;
 	if (!canDelete)
 		m_BoundProgram = 0;
