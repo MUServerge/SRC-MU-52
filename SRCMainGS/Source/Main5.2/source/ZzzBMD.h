@@ -263,9 +263,18 @@ public:
 	bool Save2(char* DirName, char* FileName);
 	void Release();
 	void CreateBoundingBox();
+	struct ShaderMatrixSnapshot
+	{
+		bool Captured;
+		float ModelView[16];
+		float Projection[16];
+
+		ShaderMatrixSnapshot() : Captured(false) {}
+	};
+
 	void CreateVertexBuffer(int i, Mesh_t& mesh);
 	void RenderVertexBuffer(int i, Mesh_t* m, int vertex_index, vec3_t* vertices, vec2_t* textCoords, vec4_t* colors);
-	bool RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float Alpha, int EnableLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV);
+	bool RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float Alpha, int EnableLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, ShaderMatrixSnapshot* matrixSnapshot);
 
 	bool PlayAnimation(float* AnimationFrame, float* PriorAnimationFrame, unsigned short* PriorAction, float Speed, vec3_t Origin, vec3_t Angle);
 	void Animation(float(*BoneTransform)[3][4], float AnimationFrame, float PriorAnimationFrame, unsigned short PriorAction, vec3_t Angle, vec3_t HeadAngle, bool Parent = false, bool Translate = true);
@@ -301,6 +310,7 @@ public:
 
 	void RenderMeshEffect(int i, int iType, int iSubType = 0, vec3_t Angle = 0, VOID* obj = NULL);
 	void RenderMesh(int i, int RenderFlag, float Alpha = 1.f, int BlendMesh = -1, float BlendMeshLight = 1.f, float BlendMeshTexCoordU = 0.f, float BlendMeshTexCoordV = 0.f, int Texture = -1);
+	void RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, float BlendMeshLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, int Texture, ShaderMatrixSnapshot* matrixSnapshot);
 	void RenderBody(int RenderFlag, float Alpha = 1.f, int BlendMesh = -1, float BlendMeshLight = 1.f, float BlendMeshTexCoordU = 0.f, float BlendMeshTexCoordV = 0.f, int HiddenMesh = -1, int Texture = -1);
 	void RenderMeshTranslate(int i, int RenderFlag, float Alpha = 1.f, int BlendMesh = -1, float BlendMeshLight = 1.f, float BlendMeshTexCoordU = 0.f, float BlendMeshTexCoordV = 0.f, int Texture = -1);
 	void RenderBodyTranslate(int RenderFlag, float Alpha = 1.f, int BlendMesh = -1, float BlendMeshLight = 1.f, float BlendMeshTexCoordU = 0.f, float BlendMeshTexCoordV = 0.f, int HiddenMesh = -1, int Texture = -1);
