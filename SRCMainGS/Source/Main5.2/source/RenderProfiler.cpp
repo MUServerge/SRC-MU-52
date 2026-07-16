@@ -44,11 +44,13 @@ namespace
 		case RPC_CURRENT_PROGRAM_QUERIES: return "CurrentProgramQueries";
 		case RPC_UNIFORM_LOCATION_QUERIES: return "UniformLocationQueries";
 		case RPC_UNIFORM_UPLOAD_MATRIX: return "UniformUploadsMatrix";
-		case RPC_UNIFORM_UPLOAD_BONE: return "UniformUploadsBone";
+		case RPC_UNIFORM_UPLOAD_BONE: return "UniformArrayBoneUploads";
+		case RPC_BONE_PALETTE_UPLOAD_UBO: return "UBOBonePaletteUploads";
 		case RPC_UNIFORM_UPLOAD_MATERIAL: return "UniformUploadsMaterial";
 		case RPC_VAO_BINDS: return "VAOBinds";
 		case RPC_ARRAY_BUFFER_BINDS: return "ArrayBufferBinds";
 		case RPC_ELEMENT_BUFFER_BINDS: return "ElementBufferBinds";
+		case RPC_UNIFORM_BUFFER_BINDS: return "UniformBufferBinds";
 		case RPC_TEXTURE_BIND_REQUESTS: return "TextureBindRequests";
 		case RPC_TEXTURE_BIND_CHANGES: return "TextureBindChanges";
 		case RPC_CPU_VERTEX_TRANSFORM_REQUIRED: return "CPUVertexTransformRequired";
@@ -246,6 +248,8 @@ void CRenderProfiler::RecordBufferBind(GLenum target)
 		AddCounter(RPC_ARRAY_BUFFER_BINDS);
 	else if (target == GL_ELEMENT_ARRAY_BUFFER)
 		AddCounter(RPC_ELEMENT_BUFFER_BINDS);
+	else if (target == GL_UNIFORM_BUFFER)
+		AddCounter(RPC_UNIFORM_BUFFER_BINDS);
 }
 
 void CRenderProfiler::RecordTextureBind(GLenum target, GLuint texture)
