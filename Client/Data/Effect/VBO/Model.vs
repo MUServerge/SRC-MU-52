@@ -7,7 +7,18 @@ layout(location = 3) in uint aBone;
 
 uniform mat4 uProj;
 uniform mat4 uView;
+
+// One authoritative source supports both bone transports. CShaderGL first
+// compiles MU_USE_BONE_UBO when the context, entry points and 9,600-byte block
+// contract are valid; otherwise it compiles the existing uniform-array fallback.
+#ifdef MU_USE_BONE_UBO
+layout(std140) uniform BoneBlock
+{
+    vec4 u_Bones[600];
+};
+#else
 uniform vec4 u_Bones[600];
+#endif
 
 uniform vec4 u_bodyLight;
 uniform vec4 u_lightPosition;
