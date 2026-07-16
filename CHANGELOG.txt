@@ -6,6 +6,17 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client FPS Phase 4B-1: migrated the two deterministic UI blink
+  consumers from the lossy CheckNormalizer boolean to the bounded 25 Hz
+  scheduler step count. Text-input caret and slide-notice blink counters now
+  consume all recovered fixed steps, preserving their authored 24-step and
+  10-step cycles independently of 60/120 render FPS. NewUIMiniMap was audited
+  but deliberately excluded because its pulse gates Hero movement and SendMove;
+  effects, random emitters, gameplay, packets, frame pacing and rendering remain
+  unchanged. Static source verification only; Windows build and runtime cadence
+  checks remain pending.
+  (UIControls.cpp, docs/FPS_TIMING_CONSUMER_AUDIT_2026-07-16.md)
+
 - Client FPS Phase 4A: completed the active timing-consumer inventory and
   removed the dormant fps_new_system experiment. Its two conditional animation
   branches were byte-for-byte equivalent and its remaining assignments were
