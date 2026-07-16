@@ -35,6 +35,7 @@ public:
 	virtual~CShaderGL();
 
 	void Init();
+	void Release();
 	void RenderShader();
 	bool CheckedShader();
 	GLuint GetShaderId();
