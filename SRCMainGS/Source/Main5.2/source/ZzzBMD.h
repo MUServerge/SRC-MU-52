@@ -150,7 +150,7 @@ typedef struct _Mesh_t
 	unsigned char*	Commands; //ver1.1
 	TextureScript*	m_csTScript;
 
-	GLuint VAO, VBO_Vertices, VBO_Normals, VBO_TexCoords, VBO_Colors, EBO;
+	GLuint VAO, VBO_Vertices, VBO_Normals, VBO_TexCoords, EBO;
 	GLuint VBO_Bones;      // per-vertex bone index (Node*3), Effect\VBO GPU-skinning path
 	GLsizei VBO_ElementCount; // expanded index count for glDrawElements
 
@@ -176,7 +176,6 @@ typedef struct _Mesh_t
 		VBO_Vertices = 0;
 		VBO_Normals = 0;
 		VBO_TexCoords = 0;
-		VBO_Colors = 0;
 		EBO = 0;
 		VBO_Bones = 0;
 		VBO_ElementCount = 0;
@@ -282,9 +281,9 @@ public:
 		}
 	};
 
-	void CreateVertexBuffer(int i, Mesh_t& mesh);
-	void RenderVertexBuffer(int i, Mesh_t* m, int vertex_index, vec3_t* vertices, vec2_t* textCoords, vec4_t* colors);
-	bool RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float Alpha, int EnableLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, ShaderMatrixSnapshot* matrixSnapshot);
+	void CreateVertexBuffer(Mesh_t& mesh);
+	bool RenderMeshVBO(Mesh_t* mesh, float alpha, int enableLight,
+		ShaderMatrixSnapshot* matrixSnapshot);
 
 	bool PlayAnimation(float* AnimationFrame, float* PriorAnimationFrame, unsigned short* PriorAction, float Speed, vec3_t Origin, vec3_t Angle);
 	void Animation(float(*BoneTransform)[3][4], float AnimationFrame, float PriorAnimationFrame, unsigned short PriorAction, vec3_t Angle, vec3_t HeadAngle, bool Parent = false, bool Translate = true);

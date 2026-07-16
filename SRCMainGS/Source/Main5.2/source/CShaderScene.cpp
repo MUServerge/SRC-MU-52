@@ -13,22 +13,8 @@ namespace
 	// File base names per program, matching the package layout.
 	const char* const s_ShaderBaseName[eShaderS_MaxValue] =
 	{
-		"shader",     // eShaderS_Default
 		"terrain",    // eShaderS_Terrain
-		"glow",       // eShaderS_Glow
 		"character",  // eShaderS_Character
-		"colorize",   // eShaderS_Colorize
-	};
-
-	// Repository call-site audit: Terrain and Character are the only scene
-	// techniques currently used. Keep the others available through lazy Use().
-	const bool s_ShaderPreload[eShaderS_MaxValue] =
-	{
-		false, // Default
-		true,  // Terrain
-		false, // Glow
-		true,  // Character
-		false, // Colorize
 	};
 }
 
@@ -39,10 +25,7 @@ CShaderScene::CShaderScene()
 	, m_Ready(false)
 {
 	for (int i = 0; i < eShaderS_MaxValue; ++i)
-	{
 		m_Program[i] = 0;
-		m_ProgramLoadAttempted[i] = false;
-	}
 	for (int i = 0; i < PROGRAM_STACK_CAPACITY; ++i)
 		m_ProgramStack[i] = 0;
 	ClearUniformCache();
@@ -194,38 +177,24 @@ bool CShaderScene::Init()
 	bool allOk = true;
 	for (int i = 0; i < eShaderS_MaxValue; ++i)
 	{
-		if (s_ShaderPreload[i] && !EnsureProgram((eShaderSProgram)i))
+		m_Program[i] = LoadProgram(s_ShaderBaseName[i]);
+		if (m_Program[i] == 0)
+		{
 			allOk = false;
+			g_ErrorReport.Write("> [Shader] Technique '%s' unavailable; fixed-function fallback active\r\n",
+				s_ShaderBaseName[i]);
+		}
+		else
+		{
+			m_Ready = true;
+			g_ErrorReport.Write("> [Shader] Loaded '%s' (program %u)\r\n",
+				s_ShaderBaseName[i], m_Program[i]);
+		}
 	}
 
-	g_ErrorReport.Write("> [Shader] Preload %s; unused techniques remain lazy\r\n",
+	g_ErrorReport.Write("> [Shader] Init %s\r\n",
 		allOk ? "OK" : "completed with errors (fixed-function fallback active)");
 	return allOk;
-}
-
-bool CShaderScene::EnsureProgram(eShaderSProgram program)
-{
-	if (program < 0 || program >= eShaderS_MaxValue ||
-		glCreateShader == NULL || glCreateProgram == NULL)
-		return false;
-	if (m_Program[program] != 0)
-		return true;
-	if (m_ProgramLoadAttempted[program])
-		return false;
-
-	m_ProgramLoadAttempted[program] = true;
-	m_Program[program] = LoadProgram(s_ShaderBaseName[program]);
-	if (m_Program[program] == 0)
-	{
-		g_ErrorReport.Write("> [Shader] Technique '%s' unavailable; fixed-function fallback active\r\n",
-			s_ShaderBaseName[program]);
-		return false;
-	}
-
-	m_Ready = true;
-	g_ErrorReport.Write("> [Shader] Loaded '%s' (program %u)\r\n",
-		s_ShaderBaseName[program], m_Program[program]);
-	return true;
 }
 
 GLuint CShaderScene::GetProgram(eShaderSProgram program) const
@@ -274,9 +243,6 @@ GLuint CShaderScene::BindProgram(GLuint program)
 
 bool CShaderScene::Use(eShaderSProgram program)
 {
-	if (!EnsureProgram(program))
-		return false;
-
 	const GLuint id = GetProgram(program);
 	if (id == 0 || m_ProgramStackDepth >= PROGRAM_STACK_CAPACITY)
 	{
@@ -440,7 +406,6 @@ void CShaderScene::Release()
 		if (canDelete && m_Program[i] != 0)
 			RenderProfilerDeleteProgram(m_Program[i]);
 		m_Program[i] = 0;
-		m_ProgramLoadAttempted[i] = false;
 	}
 
 	ClearUniformCache();

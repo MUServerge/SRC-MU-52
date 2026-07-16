@@ -492,18 +492,59 @@ Safest first slice: diagnostics and baseline only, with no render-path selection
 
 The next narrowly bounded consolidation slice, after baseline evidence, is one internal program registry/binding scope and cached uniform locations. Keep `CShaderScene` and `CShaderGL` public call sites as adapters; preserve all shader files, enums, material selection, the local prior-program restore, and the legacy fallback. Do not combine this with context creation, bone transport, terrain, or UI changes.
 
-## 18. Files that must not yet be removed
+## 18. Resolved shader/VBO experiment classification
 
-- `source\CShaderScene.cpp/.h` and `source\CShaderGL.cpp/.h`: both have active responsibilities and must first be adapted under one owner.
-- `Client\Shaders\shader`, `terrain`, `glow`, `character`, and `colorize` pairs: some are duplicated/unconsumed, but initialization and future/local work still reference the logical programs.
-- All eleven `Client\Data\Effect\VBO` pairs: only Model is currently reachable, but the others are referenced by enum/loading/material-switch code and may be staged local work.
-- `Client\Data\Data\Shaders`: not reached by the normal loader path, but may belong to alternate packaging/CWD/tooling.
-- `Client\Shaders\skin.vs/.fs` and `Client\Data\Effect\Shader\*.glsl`: unowned in the source trace, but external/runtime intent is unresolved.
-- `BMD::RenderVertexBuffer`, `VBO_Colors`, and old buffer-related fields: no confirmed caller, but removal would alter local experimental architecture and potentially class layout.
-- The fixed-function/immediate/client-array renderer, CPU `VertexTransform`, legacy material branches, terrain path, shadow path, and login/selection path: they are the active fallback and visual reference.
-- ImGui OpenGL2 backend: replace only as part of a tested UI/overlay migration, not during shader-owner consolidation.
-- GLAD/glprocs/GLEW support files and link inputs: their historical/alternate build role must be audited before cleanup.
-- The current local `GL_CURRENT_PROGRAM` restore in `BMD::RenderMeshVBO`: retain until superseded by a verified central scoped binding.
+This classification supersedes the earlier blanket retention list after Phases 1-9 established one program owner, audited repository call sites, isolated the production VBO gate, and inspected every uploaded GLSL asset.
+
+### Production-owned programs
+
+- `Shaders\\terrain.vs/.fs`: active terrain scene program.
+- `Shaders\\character.vs/.fs`: active character scene program.
+- `Data\\Effect\\VBO\\Model.vs/.fs`: the only BMD VBO program reachable through the current eligibility gate.
+- The fixed-function/client-array BMD path remains the authoritative fallback and visual reference.
+
+### Redundant or unowned experiments
+
+- `Shaders\\shader.vs/.fs` duplicates the Character technique and its legacy adapter has no caller.
+- Glow and Colorize have no render-pass owner, caller, state contract, resource owner, or runtime selection path. Glow is a visual feature prototype, not a performance path. Colorize is a potentially useful palette-recolouring idea but uses compatibility inputs and has no palette lifecycle.
+- `Data\\Effect\\shader\\*.glsl` is an unowned screen-space text/shadow prototype. It is not connected to NewUI/LookAndFeel5 layout, resolution conversion, font texture ownership, batching, or correct alpha-composition policy.
+- `BMD::RenderVertexBuffer`, the legacy `shader_id` adapter, and `VBO_Colors` form an older dynamic-upload experiment with no verified caller. They duplicate the active static bind-pose/GPU-skinning path.
+
+These paths must not remain in the production runtime merely as dormant executable architecture. Any future feature must be reintroduced through the authoritative renderer owner with an explicit pass, lifecycle, fallback, and validation contract.
+
+### Valuable unfinished design retained as requirements, not dormant programs
+
+`Shaders\\skin.vs/.fs` contains a useful UBO bone-palette concept, but is not a drop-in replacement:
+
+- its attribute layout differs from the active Model VBO layout;
+- it represents the bone index as float rather than the active integer attribute;
+- it expects per-frame CPU vertex-light colour uploads, while the active Model shader computes lighting from the transformed normal;
+- its body transform contract differs from the currently isolated eligibility rules.
+
+The next bone-transport phase should port only the validated std140 3x4 palette concept into the active Model technique, retain capability/size checks and a uniform-array/legacy fallback, and avoid activating the obsolete POC layout.
+
+The inactive BlendMesh/Metal/Oil/Chrome1-7 shaders duplicate the complete skinning and lighting body across separate programs. Their intended legacy UV equations were inspected and are retained here as the parity specification for a future unified BMD material technique:
+
+- Chrome1: `u = N.z*0.5 + Wave`, `v = N.y*0.5 + Wave*2`.
+- Chrome2: `u = (N.z+N.x)*0.8 + Wave2*2`, `v = (N.y+N.x) + Wave2*3`.
+- Chrome3: `u = dot(N, LightVector)`, `v = 1-u`.
+- Chrome4: Chrome3-style animated `L`, then `u += N.y*0.5 + L.y*3`, `v -= N.z*0.5 + Wave*3`, plus mesh UV offset.
+- Chrome5: animated `L`, then `u += N.y*3 + L.y*5`, `v -= N.z*2.5 + Wave`.
+- Chrome6: both coordinates `(N.z+N.x)*0.8 + Wave2*2`.
+- Chrome7: both coordinates `(N.z+N.x)*0.8 + WorldTime*0.00006`.
+- Metal: `u = N.z*0.5 + 0.2`, `v = N.y*0.5 + 0.5`.
+- Oil: `uv = N.xy * sourceUV + meshUVOffset`.
+- BlendMesh/stream: `uv = sourceUV + meshUVOffset`; it remains excluded while wave/stream semantics are not proven.
+- Chrome8 has no experimental VBO counterpart and remains legacy-only.
+
+A future material expansion should share one BMD skinning/bone transport implementation and select a verified material mode (or centrally generated variants), rather than restoring eleven independently owned shader files. Each material remains legacy until screenshot/state/blend/alpha parity is proven.
+
+### Performance interpretation
+
+The current VBO path still executes CPU vertex/normal transformation because `NeedsCpuVertexTransform` deliberately returns true for unresolved shadow, side-hair, attachment, effect, and preview consumers. Consequently GPU skinning currently duplicates part of the CPU work. Shader cleanup reduces startup compilation, file I/O, program/resource ownership, and maintenance risk; it is not proof of higher FPS.
+
+The largest plausible CPU improvement comes only after consumer-specific proof allows CPU transforms to be skipped for an explicitly safe draw contract. UBO bone transport primarily improves portability and may reduce upload/driver overhead; both require the existing profiler and identical runtime scenes before any performance claim.
+
 
 ## 19. Questions that require runtime evidence
 

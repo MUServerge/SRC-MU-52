@@ -4,11 +4,8 @@
 // CShaderScene - scene-wide GLSL program manager for the (otherwise
 // fixed-function) MU client. Ported from the MU Mobile project.
 //
-//   Shaders/shader.vs    + shader.fs      (eShaderS_Default)
 //   Shaders/terrain.vs   + terrain.fs     (eShaderS_Terrain)
-//   Shaders/glow.vs      + glow.fs        (eShaderS_Glow)
 //   Shaders/character.vs + character.fs   (eShaderS_Character)
-//   Shaders/colorize.vs  + colorize.fs    (eShaderS_Colorize)
 //
 // Each pair is loaded from "Shaders/<name>" first, then "Data/Shaders/<name>".
 //
@@ -31,11 +28,8 @@
 
 enum eShaderSProgram
 {
-	eShaderS_Default = 0,
-	eShaderS_Terrain,
-	eShaderS_Glow,
+	eShaderS_Terrain = 0,
 	eShaderS_Character,
-	eShaderS_Colorize,
 	eShaderS_MaxValue,
 };
 
@@ -45,9 +39,7 @@ public:
 	CShaderScene();
 	~CShaderScene();
 
-	// Preload the scene programs used by current draw call sites. Other declared
-	// techniques are loaded once on first Use(), preserving future adapters
-	// without compiling unused programs at startup.
+	// Compile and link the two scene techniques with verified draw call sites.
 	bool Init();
 
 	// True if at least one program is usable this run.
@@ -84,7 +76,6 @@ public:
 	void Release();
 
 private:
-	bool EnsureProgram(eShaderSProgram program);
 	GLuint LoadProgram(const char* baseName);
 	static GLuint CompileShader(GLenum type, const std::string& src, const char* tag);
 	static GLuint LinkProgram(GLuint vs, GLuint fs, const char* tag);
@@ -112,7 +103,6 @@ private:
 	};
 
 	GLuint m_Program[eShaderS_MaxValue];
-	bool   m_ProgramLoadAttempted[eShaderS_MaxValue];
 	GLint  m_CurrentProgram; // bound scene-program enum, -1 for external/legacy
 	GLuint m_BoundProgram;   // synchronized actual GL program, including external VBO programs
 	GLuint m_ProgramStack[PROGRAM_STACK_CAPACITY];

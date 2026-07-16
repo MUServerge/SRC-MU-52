@@ -11,14 +11,10 @@ uniform vec4 u_Bones[600];
 
 uniform vec4 u_bodyLight;
 uniform vec4 u_lightPosition;
-uniform vec4 u_meshUV;
-uniform vec4 u_setting1;
-uniform vec4 u_setting2;
 uniform int u_enableLight;
 
 out vec2 vTex;
 out vec4 vColor;
-out vec3 vNormal;
 
 vec3 ApplyBonePosition(vec3 pos, uint boneIndex)
 {
@@ -43,11 +39,7 @@ void main()
     vec3 worldPos = ApplyBonePosition(aPos, boneIndex);
     vec3 normal = ApplyBoneNormal(aNormal, boneIndex);
 
-    vec2 uv = vec2(0.0);
-    uv = aTex;
-
-    vTex = uv;
-    vNormal = normal;
+    vTex = aTex;
 
     // Match the legacy fixed-function lighting exactly (ZzzBMD.cpp RenderMesh /
     // BMD::Transform): body colour modulated per-vertex by clamp(dot(N,L)*0.8+0.4, min 0.2)
