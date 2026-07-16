@@ -26,6 +26,7 @@ csteady_clock::csteady_clock()
 	//mainthread = GetTickCount64();
 
 	mainthread = std::chrono::steady_clock::now();
+	last_check_time = std::chrono::steady_clock::now();
 
 	threadTime = new CTimer();
 }
@@ -131,7 +132,7 @@ double csteady_clock::Getframe_per_second()
 	return 1000.0 / static_cast<double>(this->GetLimitFps());
 }
 
-void csteady_clock::normalizefps()
+void csteady_clock::UpdateFixedUpdateScheduler()
 {
 	const double fixedStepSeconds = 1.0 / REFERENCE_FPS;
 	const int maxFixedStepsPerFrame = 5;
@@ -164,8 +165,28 @@ void csteady_clock::normalizefps()
 	{
 		fixedUpdateAccumulator = 0.0;
 	}
+}
 
-	normal_check = fixedUpdateStepCount > 0;
+void csteady_clock::normalizefps()
+{
+	if (this->GetLimitFps() == (int)REFERENCE_FPS)
+	{
+		normal_check = true;
+		return;
+	}
+
+	auto current_time = std::chrono::steady_clock::now();
+	double elapsed_time = std::chrono::duration<double>(current_time - last_check_time).count();
+
+	if (elapsed_time >= 0.04)
+	{
+		normal_check = true;
+		last_check_time = current_time;
+	}
+	else
+	{
+		normal_check = false;
+	}
 }
 
 void csteady_clock::LoadInformationFps()
@@ -218,6 +239,7 @@ void csteady_clock::LoadInformationFps()
 
 	deltaAccumulated += speedNormalizer;
 
+	UpdateFixedUpdateScheduler();
 	normalizefps();
 }
 
