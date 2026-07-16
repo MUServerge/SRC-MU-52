@@ -6,6 +6,16 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 6: added runtime introspection for every linked VBO
+  program's active u_Bones vec4 array and compared its declared component use
+  with GL_MAX_VERTEX_UNIFORM_COMPONENTS. Programs with a missing/incompatible
+  bone contract are deleted and disabled; models with null, zero, oversized or
+  over-capacity bone data return to the existing CPU/legacy draw before any VBO
+  bind/upload. Added capability diagnostics and a profiler rejection counter.
+  Shader files, bone transport format, gameplay and legacy output are unchanged.
+  Static review only; Windows build/runtime validation remains pending.
+  (CShaderGL.cpp/.h, ZzzBMD.cpp, Winmain.cpp, RenderProfiler.cpp/.h)
+
 - Client renderer Phase 5: reused uView/uProj uniform values once per VBO program
   inside the Phase 4 per-RenderBody matrix snapshot. Bone, light, material and
   sampler uniforms remain on their original per-mesh update path. Tracking is a
