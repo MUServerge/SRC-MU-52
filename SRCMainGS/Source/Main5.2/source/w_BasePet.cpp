@@ -100,13 +100,13 @@ bool PetObject::Create(int itemType, int modelType, vec3_t Position, CHARACTER* 
 	default:
 		{
 			float randomDistance = 1.0f;
-			// Genera un ángulo aleatorio entre 0 y 360 grados
+			// Genera un Ã¡ngulo aleatorio entre 0 y 360 grados
 			float randomAngle = static_cast<float>(std::rand()) / (static_cast<float>(RAND_MAX / 360.0f));
 			float radianAngle = randomAngle * (Q_PI / 180.0f); // Convierte grados a radianes
-			// Calcula las coordenadas X e Y usando la distancia y el ángulo, ajustando a la escala 1-100
+			// Calcula las coordenadas X e Y usando la distancia y el Ã¡ngulo, ajustando a la escala 1-100
 			float offsetX = randomDistance * std::cos(radianAngle) * TERRAIN_SCALE;
 			float offsetY = randomDistance * std::sin(radianAngle) * TERRAIN_SCALE;
-			// Aplica el desplazamiento a la posición del pet
+			// Aplica el desplazamiento a la posiciÃ³n del pet
 			m_obj->Position[0] += offsetX;
 			m_obj->Position[1] += offsetY;
 		}
@@ -262,10 +262,6 @@ bool PetObject::UpdateModel(double tick, bool bForceRender)
 	if (b)
 	{
 		float myPlaySpeed = m_obj->Velocity;
-
-#ifdef fps_new_system
-		myPlaySpeed = myPlaySpeed;
-#endif // fps_new_system
 
 		b->CurrentAction = m_obj->CurrentAction;
 		b->PlayAnimation(&m_obj->AnimationFrame, &m_obj->PriorAnimationFrame, &m_obj->PriorAction, myPlaySpeed, m_obj->Position, m_obj->Angle);
