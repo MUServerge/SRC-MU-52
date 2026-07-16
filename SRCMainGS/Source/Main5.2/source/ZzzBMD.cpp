@@ -3517,9 +3517,11 @@ void BMD::CreateVertexBuffer(int i, Mesh_t& mesh)
 	if (!gShaderGL->IsReadyVBO())
 		return;
 
-	// The GPU path reads mesh geometry directly; if any stream is missing, leave
-	// VAO == 0 so this mesh renders on the legacy path (and never crashes here).
-	if (mesh.Vertices == NULL || mesh.Normals == NULL || mesh.TexCoords == NULL ||
+	// The GPU path reads mesh geometry and bone matrices directly. If the model
+	// or any required stream is invalid, leave VAO == 0 so the existing legacy
+	// path remains authoritative and no partial GPU resource is created.
+	if (NumBones <= 0 || NumBones > MAX_BONES ||
+		mesh.Vertices == NULL || mesh.Normals == NULL || mesh.TexCoords == NULL ||
 		mesh.Triangles == NULL || mesh.NumVertices <= 0 || mesh.NumNormals <= 0 ||
 		mesh.NumTexCoords <= 0 || mesh.NumTriangles <= 0)
 		return;
@@ -3538,7 +3540,13 @@ void BMD::CreateVertexBuffer(int i, Mesh_t& mesh)
 	for (int j = 0; j < mesh.NumTriangles; j++)
 	{
 		Triangle_t* tr = &mesh.Triangles[j];
-		int passes = (tr->Polygon == 4) ? 2 : 1; // triangulate quads: (0,1,2)+(0,2,3)
+		if (tr->Polygon != 3 && tr->Polygon != 4)
+		{
+			mesh.VBO_ElementCount = 0;
+			return;
+		}
+
+		const int passes = (tr->Polygon == 4) ? 2 : 1; // triangulate quads: (0,1,2)+(0,2,3)
 
 		for (int p = 0; p < passes; ++p)
 		{
@@ -3560,18 +3568,30 @@ void BMD::CreateVertexBuffer(int i, Mesh_t& mesh)
 				positions.push_back(v->Position[1]);
 				positions.push_back(v->Position[2]);
 
-				float* n = mesh.Normals[tr->NormalIndex[k]].Normal;
-				normals.push_back(n[0]);
-				normals.push_back(n[1]);
-				normals.push_back(n[2]);
+				Normal_t* sourceNormal = &mesh.Normals[tr->NormalIndex[k]];
+				const int vertexNode = v->Node;
+				const int normalNode = sourceNormal->Node;
+
+				// The active GLSL layout carries one bone index for both position and
+				// normal. Reject malformed indices and split-node corners instead of
+				// silently skinning them with bone zero or changing legacy lighting.
+				if (vertexNode < 0 || vertexNode >= NumBones ||
+					normalNode < 0 || normalNode >= NumBones ||
+					normalNode != vertexNode)
+				{
+					mesh.VBO_ElementCount = 0;
+					return;
+				}
+
+				normals.push_back(sourceNormal->Normal[0]);
+				normals.push_back(sourceNormal->Normal[1]);
+				normals.push_back(sourceNormal->Normal[2]);
 
 				TexCoord_t* t = &mesh.TexCoords[tr->TexCoordIndex[k]];
 				texcoords.push_back(t->TexCoordU);
 				texcoords.push_back(t->TexCoordV);
 
-				int node = v->Node;
-				if (node < 0 || node >= NumBones) node = 0; // stay within the uploaded u_Bones range
-				bones.push_back((unsigned int)node * 3u);
+				bones.push_back((unsigned int)vertexNode * 3u);
 
 				indices.push_back((unsigned short)indices.size());
 			}
