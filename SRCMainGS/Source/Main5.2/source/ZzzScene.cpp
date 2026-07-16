@@ -2810,19 +2810,16 @@ void MoveClientManager()
 void MainScene(HDC hDC)
 {
 	const auto thread_tick = gsteady_clock->GetthreadTime();
-	const double fixedDeltaTime = gsteady_clock->Getframe_per_second();
-
-	static double accumulatedTime = fixedDeltaTime;
 
 	gsteady_clock->LoadInformationFps();
 	g_RenderProfiler.BeginFrame(SceneFlag, FPS, SceneFlag == MAIN_SCENE && LoadingWorld > 30);
 
-	//while (accumulatedTime >= fixedDeltaTime)
+	const int fixedUpdateSteps = gsteady_clock->GetFixedUpdateStepCount();
+	g_RenderProfiler.AddCounter(RPC_FIXED_UPDATE_STEPS, fixedUpdateSteps);
+	g_RenderProfiler.AddCounter(RPC_FIXED_UPDATE_DROPPED, gsteady_clock->GetDroppedFixedUpdateStepCount());
+
 	{
 		CRenderProfilerScope moveProfilerScope(RP_MOVE_SCENE);
-
-		if(accumulatedTime >= fixedDeltaTime)
-			accumulatedTime -= fixedDeltaTime;
 
 		g_pNewKeyInput->ScanAsyncKeyState();
 
@@ -2869,7 +2866,7 @@ void MainScene(HDC hDC)
 		if (MacroTime > 0)
 			MacroTime --;
 
-		if (checkNormalizer)
+		for (int fixedStep = 0; fixedStep < fixedUpdateSteps; ++fixedStep)
 		{
 			WaterTextureNumber++;
 			WaterTextureNumber %= 32;
@@ -3005,14 +3002,11 @@ void MainScene(HDC hDC)
 		SwapBuffers(hDC);
 	}
 
-	double DifTimer = 0.0;
 	{
 		CRenderProfilerScope sleepProfilerScope(RP_FRAME_SLEEP);
-		DifTimer = gsteady_clock->thread_sleep(thread_tick);
+		gsteady_clock->thread_sleep(thread_tick);
 	}
 	g_RenderProfiler.EndFrame();
-
-	accumulatedTime += DifTimer;
 
 	if (EnableSocket && SceneFlag == MAIN_SCENE)
 	{
