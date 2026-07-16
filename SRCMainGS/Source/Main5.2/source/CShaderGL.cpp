@@ -268,10 +268,29 @@ void CShaderGL::InitVBOShaders()
 		m_VBOBoneCapacity[i] = 0;
 	}
 
+	char requestedTransport[16] = { 0 };
+	const DWORD requestedLength = GetEnvironmentVariableA(
+		"MU_BONE_TRANSPORT", requestedTransport, sizeof(requestedTransport));
+	const bool hasTransportOverride =
+		requestedLength > 0 && requestedLength < sizeof(requestedTransport);
+	const bool forceLegacy = hasTransportOverride &&
+		_stricmp(requestedTransport, "legacy") == 0;
+	const bool forceUniformArray = hasTransportOverride &&
+		_stricmp(requestedTransport, "uniform") == 0;
+	const bool forceUniformBuffer = hasTransportOverride &&
+		_stricmp(requestedTransport, "ubo") == 0;
+
+	if (forceLegacy)
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] MU_BONE_TRANSPORT=legacy; GPU BMD draw disabled for validation");
+		return;
+	}
+
 	// Prefer the portable std140 block. The same source is recompiled without
 	// the define when UBO capability, linking, block introspection or allocation
 	// fails, so no duplicate shader asset or manager is introduced.
-	if (CanUseUniformBuffer())
+	if (!forceUniformArray && CanUseUniformBuffer())
 	{
 		m_VBOProgram[eVBO_Model] = LoadVBOProgram("Model", kBoneUboDefine);
 		if (m_VBOProgram[eVBO_Model] != 0 &&
@@ -291,7 +310,14 @@ void CShaderGL::InitVBOShaders()
 	else
 	{
 		g_ConsoleDebug->Write(5,
-			"[VBO Shader] UBO transport unavailable; trying uniform-array fallback");
+			"[VBO Shader] UBO transport unavailable or bypassed; trying uniform-array fallback");
+	}
+
+	if (forceUniformBuffer)
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] MU_BONE_TRANSPORT=ubo failed; legacy mesh fallback active");
+		return;
 	}
 
 	if (!GLEW_VERSION_2_0 || glGetActiveUniform == NULL)
