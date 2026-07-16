@@ -435,7 +435,7 @@ void CSPetDarkSpirit::MovePet(void)
 		Vector(0.3f, 0.4f, 0.7f, Light);
 		Vector(0.f, 0.f, 0.f, p);
 
-		if ((!g_isCharacterBuff(Owner, eBuff_Cloaking)) && checkNormalizer)
+		if ((!g_isCharacterBuff(Owner, eBuff_Cloaking)) && gsteady_clock->ShouldRunFixedVisualEmission())
 		{
 			for (int i = 0; i < 1; ++i)
 			{

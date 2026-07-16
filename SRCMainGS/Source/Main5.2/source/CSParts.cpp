@@ -224,7 +224,7 @@ void CSParts::IRender(CHARACTER* c)
 
 			b->CurrentAction = m_pObj.CurrentAction;
 
-b->PlayAnimation(&m_pObj.AnimationFrame, &m_pObj.PriorAnimationFrame, &m_pObj.PriorAction, m_pObj.Velocity, m_pObj.Position, m_pObj.Angle);
+			b->PlayAnimation(&m_pObj.AnimationFrame, &m_pObj.PriorAnimationFrame, &m_pObj.PriorAction, m_pObj.Velocity, m_pObj.Position, m_pObj.Angle);
 
 			m_pObj.Scale = (float)((o->Scale / 0.01) * (m_pObj.BackupScale * 0.01));
 
@@ -287,7 +287,7 @@ void CSAnimationParts::Animation(CHARACTER* c)
 		return;
 
 	b->CurrentAction = m_pObj.CurrentAction;
-b->PlayAnimation(&m_pObj.AnimationFrame, &m_pObj.PriorAnimationFrame, &m_pObj.PriorAction, m_pObj.Velocity, m_pObj.Position, m_pObj.Angle);
+	b->PlayAnimation(&m_pObj.AnimationFrame, &m_pObj.PriorAnimationFrame, &m_pObj.PriorAction, m_pObj.Velocity, m_pObj.Position, m_pObj.Angle);
 }
 
 void CSAnimationParts::IRender(CHARACTER* c)

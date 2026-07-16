@@ -895,7 +895,7 @@ bool MoveBug(OBJECT* o, bool bForceRender)
 
 			o->Position[2] += timefac((float)(rand() % 16 - 8));
 
-			if (rand() % 32 == 0 && checkNormalizer)
+			if (rand() % 32 == 0 && gsteady_clock->ShouldRunFixedVisualEmission())
 			{
 				float Speed = 0;
 				if (Distance >= FlyRange * FlyRange)
@@ -1476,7 +1476,7 @@ void MoveBoids()
 	{
 		OBJECT* o = &Hero->Object;
 		vec3_t Position, Angle, Light;
-		if (rand() % 40 == 0 && checkNormalizer)
+		if (rand() % 40 == 0 && gsteady_clock->ShouldRunFixedVisualEmission())
 		{
 			Vector(Hero->Object.Position[0] + (float)(rand() % 600 - 200), Hero->Object.Position[1] + (float)(rand() % 400 + 200), Hero->Object.Position[2] + 300.f, Position);
 			Vector(0.f, 0.f, 0.f, Angle);
@@ -1553,7 +1553,7 @@ void MoveBoids()
 
 		OBJECT* o = &Boids[i];
 
-		if (!o->Live && bCreate && checkNormalizer)
+		if (!o->Live && bCreate && gsteady_clock->ShouldRunFixedVisualEmission())
 		{
 			if (EnableEvent != 0 && dragon_create_max <= 3)
 			{
@@ -1974,7 +1974,7 @@ void MoveFishs()
 		}
 
 		OBJECT* o = &Fishs[i];
-		if (!o->Live && checkNormalizer)
+		if (!o->Live && gsteady_clock->ShouldRunFixedVisualEmission())
 		{
 			Vector(Hero->Object.Position[0] + (float)(rand() % 1024 - 512),
 				Hero->Object.Position[1] + (float)(rand() % 1024 - 512),

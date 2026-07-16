@@ -26,7 +26,7 @@ runtime cadence measurements remain pending.
 
 | Symbol/domain | Active source files | Observed uses | Classification |
 | --- | ---: | ---: | --- |
-| `CheckNormalizer` | 8 | 18 | Remaining discrete 25 Hz compatibility pulse |
+| `CheckNormalizer` | 4 | 8 | Remaining by design: gameplay, network, tail state machine, dead code |
 | `timefac` | 35 | 1772 | Continuous elapsed-time scaling |
 | `timeNormalizer` | 3 | 4 | Continuous normalization helper |
 | `standlimit` | 6 | 55 | Mixed lifetime/modulo compatibility |
@@ -36,12 +36,23 @@ runtime cadence measurements remain pending.
 | `frame_scene_desplace` | 2 | project-local | Scene displacement compatibility |
 | `MacroTime` | 2 | project-local | Render-frame counter |
 
-The remaining `CheckNormalizer` call sites are in pet, boid, minimap and effect
-specializations, including `CSPetSystem.cpp`, `GMHellas.cpp`, `GOBoid.cpp`,
-`NewUIMiniMap.cpp`, `ZzzEffect.cpp`,
-`ZzzEffectBlurSpark.cpp`,
-`ZzzEffectJoint.cpp` and `ZzzEffectParticle.cpp`. A commented
-`GMEmpireGuardian4.cpp` reference is not an active consumer.
+After Phase 4B-5, the deterministic and visual-emission consumers are all
+migrated to the scheduler. The four remaining `CheckNormalizer` sites are
+retained on the legacy pulse **by design**, each for a specific reason:
+
+- `ZzzEffect.cpp:9855` — gameplay: gates `AttackCharacterRange()`; a cadence
+  change would alter client-side combat timing and needs runtime validation.
+- `NewUIMiniMap.cpp:382` — network: gates `Hero->Movement` and `SendMove`;
+  its cadence is packet-facing and must not change without a protocol review.
+- `ZzzEffectJoint.cpp:6726/6769/6774/6848` — the `BITMAP_FLARE_FORCE`
+  tail-generation state machine (`MultiUse`/`Weapon`/`MaxTails`); it needs a
+  dedicated fixed-step update stage, not a per-counter gate swap.
+- `ZzzEffectBlurSpark.cpp:113/287` — `MoveBlurs()`/`MoveObjectBlurs()` have no
+  active caller (dead/dormant); migrating them would have no runtime effect.
+
+`CheckNormalizer` is already FPS-independent (a 40 ms time gate), so these four
+sites keep their exact current 25 Hz cadence. A commented `GMEmpireGuardian4.cpp`
+reference is not an active consumer.
 
 ## Phase 4A change
 
@@ -98,6 +109,35 @@ machine, so replacing each boolean increment independently would either burst
 tail creation or delay a state transition. That path requires a dedicated
 fixed-step update stage rather than arithmetic substitution.
 
+### Phase 4B-4: deterministic pet fly-effect spark
+
+`CSPetSystem.cpp` emits a purely visual spark for flying pets
+(`CreateParticle(BITMAP_SPARK + 1, ...)`) once per legacy pulse, gated by
+`!eBuff_Cloaking && CheckNormalizer`. That gate is now
+`!eBuff_Cloaking && ShouldRunFixedVisualEmission()`, the same non-burst policy
+as Phase 4B-3: one emission opportunity per render frame, never replayed as a
+burst after a stall. The body creates only client visual particles.
+
+### Phase 4B-5: ambient visual emitters
+
+The remaining purely visual emission gates now use
+`ShouldRunFixedVisualEmission()` instead of `CheckNormalizer`. Each is a boolean
+cadence-source swap only — one opportunity per render frame at the same ~25 Hz,
+never a `for`-loop over recovered steps, so no burst and no extra RNG draw:
+
+- `GMHellas.cpp:679` — event big-monster gravity flip (ambient motion).
+- `GOBoid.cpp:898/1479/1556/1977` — decorative boid flight change, event fire
+  effect, and ambient dragon/fish spawns (client Boids/Fishs arrays only).
+- `ZzzEffect.cpp:8213` — `CreateBomb3` visual burst on a summon animation frame.
+- `ZzzEffectJoint.cpp:7164` — bone-trail joint effect during an animation window.
+
+In every case the guard's other terms (`rand() % N == 0`, animation-frame and
+`!o->Live` checks) are unchanged, and any `rand()` calls stay in the same
+positions and run at the same per-frame rate, so RNG consumption and emission
+density are preserved. This completes the visual-emission migration; the four
+sites listed under "Inventory summary" are retained on the legacy pulse by
+design.
+
 Phase 4A removes only those duplicate/no-op branches and the obsolete commented
 define. The surviving statements are the exact calls previously compiled by the
 default path. No animation formula, velocity, order or ownership changes.
@@ -118,19 +158,31 @@ Do not globally replace these systems:
 
 ## Planned Phase 4B order
 
-1. Completed: migrate deterministic caret/notice blink counters in `UIControls.cpp`.
-2. Review minimap auto-movement separately; it has gameplay/network authority.
-3. Completed: migrate active rain intensity/position counters in `MoveLeaves()`.
-4. Decide whether the dormant blur-move lifecycle must be reconnected or removed.
-5. Completed: migrate the three Sync wrappers to a non-burst emission gate.
-6. Design a dedicated fixed-step state update for joint tail-generation counters.
-7. Migrate random pet/boid/Hellas emitters only with explicit stall and RNG rules.
-8. Review `standlimit` and `MoveSceneFrame` owners last.
-9. Remove a legacy helper only after active calls, callbacks, macros and runtime
-   lookups are all proven absent.
+1. Completed (4B-1): deterministic caret/notice blink counters in `UIControls.cpp`.
+2. Completed (4B-2): rain intensity/position counters in `MoveLeaves()`.
+3. Completed (4B-3): the three Sync wrappers, non-burst emission gate.
+4. Completed (4B-4): deterministic pet fly-effect spark gate in `CSPetSystem.cpp`.
+5. Completed (4B-5): ambient visual emitters in `GMHellas.cpp`, `GOBoid.cpp`,
+   `ZzzEffect.cpp` (`CreateBomb3`) and `ZzzEffectJoint.cpp` (bone-trail).
+
+Retained on the legacy pulse **by design** (not further migrated in this pass):
+
+6. `NewUIMiniMap.cpp` auto-movement — gameplay/network authority; needs a packet
+   review before any cadence change.
+7. `ZzzEffect.cpp:9855` combat `AttackCharacterRange` — gameplay; needs runtime
+   validation before a cadence change.
+8. `ZzzEffectJoint` tail-generation counters — need a dedicated fixed-step state
+   stage, not a per-counter gate swap.
+9. `ZzzEffectBlurSpark` blur-move — dead/dormant (no active caller); decide
+   reconnect vs removal separately.
+10. `standlimit` / `MoveSceneFrame` owners and any legacy-helper removal remain
+    future work, only after active calls, callbacks and macros are proven absent.
 
 Each group is a separate rollback point and requires a Release Win32 build plus
-60/120 FPS visual/cadence comparison before performance conclusions.
+60/120 FPS visual/cadence comparison before performance conclusions. Because
+`CheckNormalizer` is already an FPS-independent 40 ms time gate, the four retained
+sites keep their exact current behavior; migrating them offers no cadence benefit
+and only gameplay/network/state risk, so they are intentionally left in place.
 
 ## Runtime acceptance checks
 

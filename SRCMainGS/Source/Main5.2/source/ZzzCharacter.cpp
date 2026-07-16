@@ -1,8 +1,8 @@
 ///////////////////////////////////////////////////////////////////////////////
-// ÏºÄÎ¶≠ÌÑ∞ Í¥ÄÎ†® Ìï®Ïàò
-// ÏºÄÎ¶≠ÌÑ∞ ÎûúÎçîÎßÅ, ÏõÄÏßÅÏûÑÎì±ÏùÑ Ï≤òÎ¶¨
+// ƒ…∏Ø≈Õ ∞¸∑√ «‘ºˆ
+// ƒ…∏Ø≈Õ ∑£¥ı∏µ, øÚ¡˜¿”µÓ¿ª √≥∏Æ
 //
-// *** Ìï®Ïàò Î†àÎ≤®: 3
+// *** «‘ºˆ ∑π∫ß: 3
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
@@ -2144,7 +2144,7 @@ void AttackEffect(CHARACTER* c)
 			PlayBuffer(SOUND_METEORITE01);
 		}
 		break;
-	case 103://Ìï®Ï†ï
+	case 103://«‘¡§
 		if ((c->Skill) == AT_SKILL_BOSS)
 		{
 			Vector(o->Position[0] + rand() % 1024 - 512, o->Position[1] + rand() % 1024 - 512, o->Position[2], Position);
@@ -2152,7 +2152,7 @@ void AttackEffect(CHARACTER* c)
 			PlayBuffer(SOUND_METEORITE01);
 		}
 		break;
-	case 45://Î¨ºÍ≥†Í∏∞
+	case 45://π∞∞Ì±‚
 		for (int i = 0; i < 4; i++)
 		{
 			Vector((float)(rand() % 32 - 16), (float)(rand() % 32 - 16), (float)(rand() % 32 - 16), p);
@@ -2291,7 +2291,7 @@ void AttackEffect(CHARACTER* c)
 					int Hand = 0;
 					if (i >= 3)
 						Hand = 1;
-					b->TransformPosition(o->BoneTransform[c->Weapon[Hand].LinkBone], p, Position, true);//ÏóêÎü¨
+					b->TransformPosition(o->BoneTransform[c->Weapon[Hand].LinkBone], p, Position, true);//ø°∑Ø
 					Vector(0.f, 0.f, (float)(rand() % 360), Angle);
 					CreateJointSync(BITMAP_JOINT_THUNDER, Position, to->Position, Angle, 2, to, 50.f);
 					CreateJointSync(BITMAP_JOINT_THUNDER, Position, to->Position, Angle, 2, to, 10.f);
@@ -2389,7 +2389,7 @@ void AttackEffect(CHARACTER* c)
 			}
 			break;
 
-			case 77://Î∂àÏÇ¨Ï°∞Í≥µÍ≤©
+			case 77://∫“ªÁ¡∂∞¯∞›
 				if (c->AttackTime > 8)
 				{
 					Vector(0.f, 0.f, 0.f, p);
@@ -2401,7 +2401,7 @@ void AttackEffect(CHARACTER* c)
 					}
 				}
 				break;
-			case 37://Îç∞Îπå
+			case 37://µ•∫Ù
 				if (c->AttackTime == 1)
 					PlayBuffer(SOUND_EVIL);
 
@@ -2428,13 +2428,13 @@ void AttackEffect(CHARACTER* c)
 					CreateParticleSync(BITMAP_ENERGY, Position, o->Angle, Light);
 				}
 				break;
-			case 48://Î¶¨ÏûêÎìúÌÇπ
+			case 48://∏Æ¿⁄µÂ≈∑
 				for (int i = 0; i < 6; i++)
 				{
 					int Hand = 0;
 					if (i >= 3)
 						Hand = 1;
-					b->TransformPosition(o->BoneTransform[c->Weapon[Hand].LinkBone], p, Position, true);//ÏóêÎü¨
+					b->TransformPosition(o->BoneTransform[c->Weapon[Hand].LinkBone], p, Position, true);//ø°∑Ø
 					Vector(0.f, 0.f, (float)(rand() % 360), Angle);
 					CreateJointSync(BITMAP_JOINT_THUNDER, Position, to->Position, Angle, 2, to, 50.f);
 					CreateJointSync(BITMAP_JOINT_THUNDER, Position, to->Position, Angle, 2, to, 10.f);
@@ -2476,7 +2476,7 @@ void AttackEffect(CHARACTER* c)
 				CreateParticleSync(BITMAP_ENERGY, Position, o->Angle, Light);
 			}
 			break;
-			// ÌîåÎ†àÏù¥Ïñ¥ Ïù¥Í±∞ÎÇò Í∏∞ÌÉÄ Î™¨Ïä§ÌÑ∞Í∞Ä Ï†ÑÍ∏∞(Î≤àÍ∞ú)Î•º ÏÇ¨Ïö©ÌñàÏùÑÏãú
+			// «√∑π¿ÃæÓ ¿Ã∞≈≥™ ±‚≈∏ ∏ÛΩ∫≈Õ∞° ¿¸±‚(π¯∞≥)∏¶ ªÁøÎ«ﬂ¿ªΩ√
 			default:
 				if (b->NumBones < c->Weapon[0].LinkBone)
 					break;
@@ -4883,7 +4883,7 @@ void MoveCharacter(CHARACTER* c, OBJECT* o)
 					(o->CurrentAction == PLAYER_HIT_BOW || o->CurrentAction == PLAYER_HIT_CROSSBOW ||
 						o->CurrentAction == PLAYER_HIT_FLY_BOW || o->CurrentAction == PLAYER_HIT_FLY_CROSSBOW ||
 						o->CurrentAction == PLAYER_HIT_RIDE_BOW || o->CurrentAction == PLAYER_HIT_RIDE_CROSSBOW
-						|| o->CurrentAction == PLAYER_FENRIR_ATTACK_BOW || o->CurrentAction == PLAYER_FENRIR_ATTACK_CROSSBOW	//^ ÌéúÎ¶¥ Ïä§ÌÇ¨ Í¥ÄÎ†®(ÏöîÏ†ï ÌôîÏÇ¥ ÎÇòÍ∞ÄÍ≤å ÌïòÎäî Í≤É)
+						|| o->CurrentAction == PLAYER_FENRIR_ATTACK_BOW || o->CurrentAction == PLAYER_FENRIR_ATTACK_CROSSBOW	//^ ∆Ê∏± Ω∫≈≥ ∞¸∑√(ø‰¡§ »≠ªÏ ≥™∞°∞‘ «œ¥¬ ∞Õ)
 						))
 				{
 					if (AT_SKILL_MULTI_SHOT != (c->Skill))
@@ -7850,7 +7850,7 @@ void RenderLinkObject(float x, float y, float z, CHARACTER* c, PART_t* f, int Ty
 		CreateSprite(BITMAP_FLARE_BLUE, p, 0.4f, pObject->Light, pObject);
 		CreateSprite(BITMAP_SHINY + 6, p, fRendomScale, Light, pObject);
 
-		// ÏûîÏÉÅ Zx01
+		// ¿‹ªÛ Zx01
 		vec3_t vColor;
 		VectorCopy(p, pObject->EyeLeft);
 		Vector(0.f, 0.f, 0.9f, vColor);
@@ -7867,7 +7867,7 @@ void RenderLinkObject(float x, float y, float z, CHARACTER* c, PART_t* f, int Ty
 		CreateSprite(BITMAP_FLARE_BLUE, p, 0.4f, pObject->Light, pObject);
 		CreateSprite(BITMAP_SHINY + 6, p, 0.4f, Light, pObject);
 
-		// ÏπºÏ£ºÎ≥Ä
+		// ƒÆ¡÷∫Ø
 		Vector(0.0f, 0.3f, 0.7f, Light);
 		pModel->TransformPosition(BoneTransform[2], Position, p, true);		// rx01
 		CreateSprite(BITMAP_LIGHTMARKS, p, 1.0f, Light, pObject);
@@ -7996,8 +7996,8 @@ void RenderLinkObject(float x, float y, float z, CHARACTER* c, PART_t* f, int Ty
 		}
 		// Object->m_iAnimation Random Texture
 		int iRandomTexure1, iRandomTexure2;
-		iRandomTexure1 = (Object->m_iAnimation / 10) % 3;	// 3Í∞ú
-		iRandomTexure2 = (Object->m_iAnimation) % 3;		// 3Í∞ú
+		iRandomTexure1 = (Object->m_iAnimation / 10) % 3;	// 3∞≥
+		iRandomTexure2 = (Object->m_iAnimation) % 3;		// 3∞≥
 
 		// Zx01
 		fRandomScale = (float)(rand() % 10) / 10.0f + 1.0f;		//(1.0~2.0)
@@ -8101,7 +8101,7 @@ void RenderLinkObject(float x, float y, float z, CHARACTER* c, PART_t* f, int Ty
 		CreateSprite(BITMAP_SHINY + 1, p, fRendomScale - 0.3f, Light, pObject, 90.0f);
 		CreateParticleSync(BITMAP_SPARK + 1, p, pObject->Angle, Light, 11, 2.0f);
 
-		// ÏûîÏÉÅ
+		// ¿‹ªÛ
 		vec3_t vColor;
 		VectorCopy(p, pObject->EyeLeft);
 		Vector(0.f, 0.f, 0.9f, vColor);
@@ -8274,7 +8274,7 @@ void RenderLinkObject(float x, float y, float z, CHARACTER* c, PART_t* f, int Ty
 		Vector(0.8f, 0.8f, 0.2f, vLight);
 		CreateSprite(BITMAP_SHINY + 1, vPos, 1.0f, vLight, Object);
 
-		//ÏûëÏùÄ Íµ¨Ïä¨
+		//¿€¿∫ ±∏ΩΩ
 		for (int i = 1; i < 8; i++)
 		{
 			pModel->TransformByObjectBone(vPos, Object, i);
@@ -12678,7 +12678,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Object.SubType = rand() % 2 + 10;
 		c->Weapon[0].Type = -1;
 		c->Weapon[1].Type = -1;
-		strcpy(c->ID, "aÏúÑÎ≥ë");
+		strcpy(c->ID, "±a¿ß∫¥");
 		break;
 #ifdef ADD_ELF_SUMMON
 	case 276:
@@ -12775,7 +12775,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Weapon[0].Type = MODEL_STAFF;
 		c->Weapon[0].Level = 11;
 		c->Object.Scale = 1.2f;
-		strcpy(c->ID, "ÎßàÎ≤ïÌï¥Í≥®");
+		strcpy(c->ID, "∏∂π˝«ÿ∞Ò");
 		break;
 	case 131:
 		OpenMonsterModel(61);
@@ -12783,7 +12783,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->m_bFixForm = true;
 		c->Object.Scale = 0.8f;
 		c->Object.EnableShadow = false;
-		strcpy(c->ID, "ÏÑ±Î¨∏");
+		strcpy(c->ID, "º∫πÆ");
 		break;
 	case 132:
 		OpenMonsterModel(60);
@@ -12791,7 +12791,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->m_bFixForm = true;
 		c->Object.Scale = 0.8f;
 		c->Object.EnableShadow = false;
-		strcpy(c->ID, "ÏÑ±ÏûêÏùòÏÑùÍ¥Ä");
+		strcpy(c->ID, "º∫¿⁄¿«ºÆ∞¸");
 		break;
 	case 133:
 		OpenMonsterModel(60);
@@ -12799,7 +12799,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->m_bFixForm = true;
 		c->Object.Scale = 0.8f;
 		c->Object.EnableShadow = false;
-		strcpy(c->ID, "ÏÑ±ÏûêÏùòÏÑùÍ¥Ä");
+		strcpy(c->ID, "º∫¿⁄¿«ºÆ∞¸");
 		break;
 	case 134:
 		OpenMonsterModel(60);
@@ -12807,7 +12807,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->m_bFixForm = true;
 		c->Object.Scale = 0.8f;
 		c->Object.EnableShadow = false;
-		strcpy(c->ID, "ÏÑ±ÏûêÏùòÏÑùÍ¥Ä");
+		strcpy(c->ID, "º∫¿⁄¿«ºÆ∞¸");
 		break;
 	case 84:
 	case 90:
@@ -12852,7 +12852,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Weapon[1].Type = MODEL_AXE + 8;
 		c->Weapon[1].Level = 0;
 		c->Object.Scale = 1.0f;
-		strcpy(c->ID, "ÌùëÌï¥Í≥®Ï†ÑÏÇ¨");
+		strcpy(c->ID, "»Ê«ÿ∞Ò¿¸ªÁ");
 		break;
 	case 87:
 	case 93:
@@ -12865,7 +12865,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		OpenMonsterModel(58);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 58, PositionX, PositionY);
 		c->Object.Scale = 0.8f;
-		strcpy(c->ID, "ÏûêÏù¥Ïñ∏Ìä∏Ïò§Ïö∞Í±∞");
+		strcpy(c->ID, "¿⁄¿Ãæ∆Æø¿øÏ∞≈");
 		break;
 	case 88:
 	case 94:
@@ -12885,7 +12885,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 			c->Weapon[0].Level = 0;
 
 		c->Object.Scale = 1.19f;
-		strcpy(c->ID, "Î∂âÏùÄÌï¥Í≥®Í∏∞ÏÇ¨");
+		strcpy(c->ID, "∫”¿∫«ÿ∞Ò±‚ªÁ");
 		break;
 	case 78:
 		OpenMonsterModel(19);
@@ -12893,12 +12893,12 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Weapon[0].Type = MODEL_AXE;
 		c->Weapon[0].Level = 9;
 		c->Object.Scale = 0.8f;
-		strcpy(c->ID, "Í≥†Î∏îÎ¶∞");
+		strcpy(c->ID, "∞Ì∫Ì∏∞");
 		break;
 	case 79:
 		OpenMonsterModel(31);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 31, PositionX, PositionY);
-		strcpy(c->ID, "ÎìúÎûòÍ≥§");
+		strcpy(c->ID, "µÂ∑°∞Ô");
 		c->Object.Scale = 0.9f;
 		break;
 	case 80:
@@ -13062,14 +13062,14 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		OpenMonsterModel(156);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 156, PositionX, PositionY);
 		c->Object.Scale = 0.9f;
-		strcpy(c->ID, "Ï†ÄÏ£ºÎ∞õÏùÄ Í≥†Î∏îÎ¶∞");
+		strcpy(c->ID, "¿˙¡÷πﬁ¿∫ ∞Ì∫Ì∏∞");
 		o = &c->Object;
 		break;
 	case 476:
 		OpenMonsterModel(155);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 155, PositionX, PositionY);
 		c->Object.Scale = 1.7f;
-		strcpy(c->ID, "Ï†ÄÏ£ºÎ∞õÏùÄ ÏÇ∞ÌÉÄ");
+		strcpy(c->ID, "¿˙¡÷πﬁ¿∫ ªÍ≈∏");
 		o = &c->Object;
 		break;
 	case 300:
@@ -13189,32 +13189,32 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 150:
 		OpenMonsterModel(32);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 32, PositionX, PositionY);
-		strcpy(c->ID, "Î∞úÎ¶¨");
+		strcpy(c->ID, "πﬂ∏Æ");
 		c->Object.Scale = 0.12f;
 		break;
 	case 44:
 		OpenMonsterModel(31);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 31, PositionX, PositionY);
-		strcpy(c->ID, "ÎìúÎûòÍ≥§");
+		strcpy(c->ID, "µÂ∑°∞Ô");
 		c->Object.Scale = 0.9f;
 		break;
 	case 43:
 		OpenMonsterModel(2);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 2, PositionX, PositionY);
-		strcpy(c->ID, "Ìô©Í∏àÎ≤ÑÏßÄÎìúÎûòÍ≥§");
+		strcpy(c->ID, "»≤±›πˆ¡ˆµÂ∑°∞Ô");
 		c->Object.Scale = 0.7f;
 		break;
 	case 42:
 		OpenMonsterModel(31);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 31, PositionX, PositionY);
-		strcpy(c->ID, "Ïø§Îëî");
+		strcpy(c->ID, "ƒÔµ–");
 		c->Object.Scale = 1.3f;
 		Vector(200.f, 150.f, 280.f, c->Object.BoundingBoxMax);
 		break;
 	case 41:
 		OpenMonsterModel(30);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 30, PositionX, PositionY);
-		strcpy(c->ID, "Îç∞Ïì∞ Ïπ¥Ïö∞");
+		strcpy(c->ID, "µ•æ≤ ƒ´øÏ");
 		c->Weapon[0].Type = MODEL_MACE + 3;
 		//c->Weapon[0].Type = MODEL_SWORD+14;
 		c->Object.Scale = 1.1f;
@@ -13223,7 +13223,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 40:
 		OpenMonsterModel(29);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 29, PositionX, PositionY);
-		strcpy(c->ID, "Îç∞Ïì∞ ÎÇòÏù¥Ìä∏");
+		strcpy(c->ID, "µ•æ≤ ≥™¿Ã∆Æ");
 		c->Weapon[0].Type = MODEL_SWORD + 15;
 		c->Weapon[0].Type = MODEL_SWORD + 14;
 		//c->Weapon[1].Type = MODEL_SHIELD+8;
@@ -13233,15 +13233,15 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 39:
 		OpenMonsterModel(28);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 28, PositionX, PositionY);
-		strcpy(c->ID, "Ìè¨Ïù¥Ï¶å ÏâêÎèÑÏö∞");
+		strcpy(c->ID, "∆˜¿Ã¡ Ω¶µµøÏ");
 		c->Object.Scale = 1.2f;
 		c->Level = 1;
 		break;
 	case 38:
-	case 67:	//Î∞úÎ°ù2
+	case 67:	//πﬂ∑œ2
 		OpenMonsterModel(27);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 27, PositionX, PositionY);
-		strcpy(c->ID, "Î∞úÎ°ù");
+		strcpy(c->ID, "πﬂ∑œ");
 		c->Weapon[0].Type = MODEL_SPEAR + 9;
 		c->Weapon[0].Level = 9;
 		c->Object.Scale = 1.6f;
@@ -13249,18 +13249,18 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 37:
 		OpenMonsterModel(26);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 26, PositionX, PositionY);
-		strcpy(c->ID, "Îç∞Îπå");
+		strcpy(c->ID, "µ•∫Ù");
 		c->Object.Scale = 1.1f;
 		break;
 	case 36:
 		OpenMonsterModel(28);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 28, PositionX, PositionY);
-		strcpy(c->ID, "ÏâêÎèÑÏö∞");
+		strcpy(c->ID, "Ω¶µµøÏ");
 		c->Object.Scale = 1.2f;
 		break;
 		/*OpenMonsterModel(7);
 		c = CreateCharacter(Key,MODEL_MONSTER01+7,PositionX,PositionY);
-		strcpy(c->ID,"Î∏îÎü¨Îìú Í≥†Ïä§Ìä∏");
+		strcpy(c->ID,"∫Ì∑ØµÂ ∞ÌΩ∫∆Æ");
 		c->Object.AlphaTarget = 0.4f;
 		c->MoveSpeed = 15;
 		c->Blood = true;
@@ -13269,7 +13269,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 35:
 		OpenMonsterModel(11);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 11, PositionX, PositionY);
-		strcpy(c->ID, "Îç∞Ïì∞ Í≥†Î•¥Í≥§");
+		strcpy(c->ID, "µ•æ≤ ∞Ì∏£∞Ô");
 		c->Object.Scale = 1.3f;
 		c->Weapon[0].Type = MODEL_AXE + 8;
 		c->Weapon[1].Type = MODEL_AXE + 8;
@@ -13279,7 +13279,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		break;
 	case 34:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		strcpy(c->ID, "Ï†ÄÏ£ºÎ∞õÏùÄ Î≤ïÏÇ¨");
+		strcpy(c->ID, "¿˙¡÷πﬁ¿∫ π˝ªÁ");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_HELM + 3;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_ARMOR + 3;
 		c->BodyPart[BODYPART_PANTS].Type = MODEL_PANTS + 3;
@@ -13304,7 +13304,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		break;
 		/*OpenMonsterModel(5);
 		c = CreateCharacter(Key,MODEL_MONSTER01+5,PositionX,PositionY);
-		strcpy(c->ID,"ÏûêÏù¥Ïñ∏Ìä∏");
+		strcpy(c->ID,"¿⁄¿Ãæ∆Æ");
 		c->Weapon[0].Type = MODEL_AXE+2;
 		c->Weapon[1].Type = MODEL_AXE+2;
 		c->Object.Scale = 0.7f;
@@ -13317,17 +13317,17 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Weapon[1].Type = MODEL_SHIELD + 1;
 		c->Object.Scale = 1.2f;
 		c->Level = 1;
-		strcpy(c->ID, "Í≥†Î∏îÎ¶∞ ÎåÄÏû•");
+		strcpy(c->ID, "∞Ì∫Ì∏∞ ¥Î¿Â");
 		break;
 	case 32:
 		OpenMonsterModel(25);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 25, PositionX, PositionY);
-		strcpy(c->ID, "ÎèåÍ¥¥Î¨º");
+		strcpy(c->ID, "µπ±´π∞");
 		break;
 	case 31:
 		OpenMonsterModel(24);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 24, PositionX, PositionY);
-		strcpy(c->ID, "ÏïÑÍ≥§");
+		strcpy(c->ID, "æ∆∞Ô");
 		c->Object.Scale = 1.3f;
 		c->Weapon[0].Type = MODEL_SWORD + 8;
 		c->Weapon[1].Type = MODEL_SWORD + 8;
@@ -13335,13 +13335,13 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 30:
 		OpenMonsterModel(23);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 23, PositionX, PositionY);
-		strcpy(c->ID, "Ïà≤ÏùòÍ¥¥Î¨º");
+		strcpy(c->ID, "Ω£¿«±´π∞");
 		c->Object.Scale = 0.75f;
 		break;
 	case 29:
 		OpenMonsterModel(22);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 22, PositionX, PositionY);
-		strcpy(c->ID, "ÌóåÌÑ∞");
+		strcpy(c->ID, "«Â≈Õ");
 		c->Weapon[0].Type = MODEL_BOW + 10;
 		c->Object.Scale = 0.95f;
 		break;
@@ -13350,21 +13350,21 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 21, PositionX, PositionY);
 		c->Weapon[0].Type = MODEL_SPEAR + 1;
 		c->Object.Scale = 0.8f;
-		strcpy(c->ID, "ÌíçÎéÖÏù¥Í¥¥Î¨º");
+		strcpy(c->ID, "«≥µ≠¿Ã±´π∞");
 		c->Object.BlendMesh = 1;
 		break;
 	case 27:
 		OpenMonsterModel(20);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 20, PositionX, PositionY);
 		c->Object.Scale = 1.1f;
-		strcpy(c->ID, "Í≥†Î¶¨Ï†ÑÍ∞à");
+		strcpy(c->ID, "∞Ì∏Æ¿¸∞•");
 		break;
 	case 26:
 		OpenMonsterModel(19);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 19, PositionX, PositionY);
 		c->Weapon[0].Type = MODEL_AXE;
 		c->Object.Scale = 0.8f;
-		strcpy(c->ID, "Í≥†Î∏îÎ¶∞");
+		strcpy(c->ID, "∞Ì∫Ì∏∞");
 		break;
 	case 25:
 		OpenMonsterModel(18);
@@ -13375,12 +13375,12 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Object.Scale = 1.1f;
 		c->Object.LightEnable = false;
 		c->Level = 3;
-		strcpy(c->ID, "ÏïÑÏù¥Ïä§ÌÄ∏");
+		strcpy(c->ID, "æ∆¿ÃΩ∫ƒ˝");
 		break;
 	case 24:
 		OpenMonsterModel(17);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 17, PositionX, PositionY);
-		strcpy(c->ID, "Ïõú");
+		strcpy(c->ID, "ø˙");
 		break;
 	case 23:
 		OpenMonsterModel(16);
@@ -13388,37 +13388,37 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Weapon[0].Type = MODEL_AXE + 7;
 		c->Weapon[1].Type = MODEL_SHIELD + 10;
 		c->Object.Scale = 1.15f;
-		strcpy(c->ID, "Ìò∏Î®∏Îìú");
+		strcpy(c->ID, "»£∏”µÂ");
 		break;
 	case 22:
 		OpenMonsterModel(15);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 15, PositionX, PositionY);
 		c->Object.BlendMesh = 0;
 		c->Object.BlendMeshLight = 1.f;
-		strcpy(c->ID, "ÏñºÏùåÍ¥¥Î¨º");
+		strcpy(c->ID, "æÛ¿Ω±´π∞");
 		break;
 	case 21:
 		OpenMonsterModel(14);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 14, PositionX, PositionY);
 		c->Object.Scale = 0.95f;
-		strcpy(c->ID, "ÏïîÏÇ¥Ïûê");
+		strcpy(c->ID, "æœªÏ¿⁄");
 		break;
 	case 20:
 		OpenMonsterModel(13);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 13, PositionX, PositionY);
-		strcpy(c->ID, "ÏÑ§Ïù∏ ÎåÄÏû•");
+		strcpy(c->ID, "º≥¿Œ ¥Î¿Â");
 		c->Object.Scale = 1.4f;
 		break;
 	case 19:
 		OpenMonsterModel(12);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 12, PositionX, PositionY);
-		strcpy(c->ID, "ÏÑ§Ïù∏");
+		strcpy(c->ID, "º≥¿Œ");
 		c->Object.Scale = 1.1f;
 		break;
 	case 18:
 		OpenMonsterModel(11);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 11, PositionX, PositionY);
-		strcpy(c->ID, "Í≥†Î•¥Í≥§");
+		strcpy(c->ID, "∞Ì∏£∞Ô");
 		c->Object.Scale = 1.5f;
 		c->Weapon[0].Type = MODEL_STAFF + 4;
 		c->Object.BlendMesh = 1;
@@ -13427,13 +13427,13 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 3:
 		OpenMonsterModel(9);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 9, PositionX, PositionY);
-		strcpy(c->ID, "Í±∞ÎØ∏");
+		strcpy(c->ID, "∞≈πÃ");
 		c->Object.Scale = 0.4f;
 		break;
 	case 17:
 		OpenMonsterModel(10);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 10, PositionX, PositionY);
-		strcpy(c->ID, "Ïã∏Ïù¥ÌÅ¨Î°≠Ïä§");
+		strcpy(c->ID, "ΩŒ¿Ã≈©∑”Ω∫");
 		c->Weapon[0].Type = MODEL_AXE + 8;
 		//c->Weapon[1].Type = MODEL_MACE+2;
 		//c->Object.HiddenMesh = 2;
@@ -13447,21 +13447,21 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		if (Type == 0)
 		{
 			c->Object.HiddenMesh = 0;
-			strcpy(c->ID, "ÏÜåÎøîÏ†ÑÏÇ¨");
+			strcpy(c->ID, "º“ª‘¿¸ªÁ");
 			c->Object.Scale = 0.8f;
 			c->Weapon[0].Type = MODEL_AXE + 6;
 		}
 		else if (Type == 4)
 		{
 			c->Weapon[0].Type = MODEL_SPEAR + 7;
-			strcpy(c->ID, "ÏÜåÎøîÏ†ÑÏÇ¨ ÎåÄÏû•");
+			strcpy(c->ID, "º“ª‘¿¸ªÁ ¥Î¿Â");
 			c->Object.Scale = 1.15f;
 			c->Level = 1;
 		}
 		else if (Type == 8)
 		{
 			c->Weapon[0].Type = MODEL_SPEAR + 8;
-			strcpy(c->ID, "Ìè¨Ïù¥Ï¶å ÏÜåÎøîÏ†ÑÏÇ¨");
+			strcpy(c->ID, "∆˜¿Ã¡ º“ª‘¿¸ªÁ");
 			c->Object.Scale = 1.f;
 			c->Level = 2;
 
@@ -13471,7 +13471,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 11:
 		OpenMonsterModel(7);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 7, PositionX, PositionY);
-		strcpy(c->ID, "Í≥†Ïä§Ìä∏");
+		strcpy(c->ID, "∞ÌΩ∫∆Æ");
 		c->Object.AlphaTarget = 0.4f;
 		c->MoveSpeed = 15;
 		c->Blood = true;
@@ -13479,13 +13479,13 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 12:
 		OpenMonsterModel(6);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 6, PositionX, PositionY);
-		strcpy(c->ID, "Ïú†Ï∂©");
+		strcpy(c->ID, "¿Ø√Ê");
 		c->Object.Scale = 0.6f;
 		break;
 	case 13:
 		OpenMonsterModel(8);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 8, PositionX, PositionY);
-		strcpy(c->ID, "Ìó¨Ïä§ÌååÏù¥Îçî");
+		strcpy(c->ID, "«ÔΩ∫∆ƒ¿Ã¥ı");
 		c->Weapon[0].Type = MODEL_STAFF + 2;
 		c->Object.Scale = 1.1f;
 		break;
@@ -13496,7 +13496,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		if (Type == 1)
 		{
 			c->Object.HiddenMesh = 0;
-			strcpy(c->ID, "ÌïòÏö¥Îìú");
+			strcpy(c->ID, "«œøÓµÂ");
 			c->Object.Scale = 0.85f;
 			c->Weapon[0].Type = MODEL_SWORD + 4;
 		}
@@ -13505,7 +13505,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 			c->Object.HiddenMesh = 1;
 			c->Weapon[0].Type = MODEL_SWORD + 7;
 			c->Weapon[1].Type = MODEL_SHIELD + 9;
-			strcpy(c->ID, "Ìó¨ÌïòÏö¥Îìú");
+			strcpy(c->ID, "«Ô«œøÓµÂ");
 			c->Object.Scale = 1.1f;
 			c->Level = 1;
 		}
@@ -13532,13 +13532,13 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 4, PositionX, PositionY);
 		if (Type == 6)
 		{
-			strcpy(c->ID, "Î¶¨Ïπò");
+			strcpy(c->ID, "∏Æƒ°");
 			c->Weapon[0].Type = MODEL_STAFF + 2;
 			c->Object.Scale = 0.85f;
 		}
 		else
 		{
-			strcpy(c->ID, "Ïç¨Îçî Î¶¨Ïπò");
+			strcpy(c->ID, "Ω„¥ı ∏Æƒ°");
 			c->Weapon[0].Type = MODEL_STAFF + 3;
 			c->Level = 1;
 			c->Object.Scale = 1.1f;
@@ -13547,7 +13547,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 7:
 		OpenMonsterModel(5);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 5, PositionX, PositionY);
-		strcpy(c->ID, "ÏûêÏù¥Ïñ∏Ìä∏");
+		strcpy(c->ID, "¿⁄¿Ãæ∆Æ");
 		c->Weapon[0].Type = MODEL_AXE + 2;
 		c->Weapon[1].Type = MODEL_AXE + 2;
 		c->Object.Scale = 1.6f;
@@ -13557,7 +13557,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 55:
 	case 56:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		strcpy(c->ID, "Ìï¥Í≥®Ï†ÑÏÇ¨");
+		strcpy(c->ID, "«ÿ∞Ò¿¸ªÁ");
 		c->Object.SubType = MODEL_SKELETON1;
 		c->Blood = true;
 		if (Type == 14)
@@ -13580,7 +13580,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		break;
 	case 15:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		strcpy(c->ID, "Ìï¥Í≥®Í∂ÅÏàò");
+		strcpy(c->ID, "«ÿ∞Ò±√ºˆ");
 		c->Object.Scale = 1.1f;
 		c->Weapon[1].Type = MODEL_BOW + 2;
 		c->Object.SubType = MODEL_SKELETON2;
@@ -13589,7 +13589,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		break;
 	case 16:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		strcpy(c->ID, "Ìï¥Í≥®Ï†ÑÏÇ¨ ÎåÄÏû•");
+		strcpy(c->ID, "«ÿ∞Ò¿¸ªÁ ¥Î¿Â");
 		c->Object.Scale = 1.2f;
 		c->Weapon[0].Type = MODEL_AXE + 3;
 		c->Weapon[1].Type = MODEL_SHIELD + 6;
@@ -13599,19 +13599,19 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		break;
 	case 372:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		::strcpy(c->ID, "ÏóòÎ¶¨Ìä∏ Ìï¥Í≥®Ï†ÑÏÇ¨");
+		::strcpy(c->ID, "ø§∏Æ∆Æ «ÿ∞Ò¿¸ªÁ");
 		c->Object.Scale = 0.95f;
 		c->Object.SubType = MODEL_SKELETON_PCBANG;
 		break;
 	case 373:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		::strcpy(c->ID, "Ïû≠ Ïò§ÎûúÌÑ¥");
+		::strcpy(c->ID, "¿Ë ø¿∑£≈œ");
 		c->Object.Scale = 0.95f;
 		c->Object.SubType = MODEL_HALLOWEEN;
 		break;
 	case 374:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		::strcpy(c->ID, "ÌÅ¨Î¶¨Ïä§ÎßàÏä§ Í±∏");
+		::strcpy(c->ID, "≈©∏ÆΩ∫∏∂Ω∫ ∞…");
 		c->Object.Scale = 0.85f;
 		c->Object.SubType = MODEL_XMAS_EVENT_CHANGE_GIRL;
 		break;
@@ -13624,7 +13624,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 53:
 		OpenMonsterModel(39);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 39, PositionX, PositionY);
-		strcpy(c->ID, "ÌÉÄÏù¥ÌÉÑ");
+		strcpy(c->ID, "≈∏¿Ã≈∫");
 		c->Object.Scale = 1.8f;
 		c->Object.BlendMesh = 2;
 		c->Object.BlendMeshLight = 1.f;
@@ -13636,7 +13636,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 151:
 		OpenMonsterModel(40);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 40, PositionX, PositionY);
-		strcpy(c->ID, "ÏÜîÏ†∏");
+		strcpy(c->ID, "º÷¡Æ");
 		c->Weapon[1].Type = MODEL_BOW + 14;
 		if (Type == 54)
 			c->Object.Scale = 1.1f;
@@ -13668,26 +13668,26 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 226:
 		OpenNpc(MODEL_NPC_BREEDER);
 		c = CreateCharacter(Key, MODEL_NPC_BREEDER, PositionX, PositionY);
-		strcpy(c->ID, "Ï°∞Î†®ÏÇ¨ NPC");
+		strcpy(c->ID, "¡∂∑√ªÁ NPC");
 		break;
 
 #ifdef _PVP_MURDERER_HERO_ITEM
 	case 227:
 		OpenNpc(MODEL_MASTER);
 		c = CreateCharacter(Key, MODEL_MASTER, PositionX, PositionY);
-		strcpy(c->ID, "ÏÇ¥Ïù∏ÎßàÏÉÅÏ†ê");
+		strcpy(c->ID, "ªÏ¿Œ∏∂ªÛ¡°");
 		break;
 
 	case 228:
 		OpenNpc(MODEL_HERO_SHOP);
 		c = CreateCharacter(Key, MODEL_HERO_SHOP, PositionX, PositionY);
-		strcpy(c->ID, "ÏòÅÏõÖÏÉÅÏ†ê");
+		strcpy(c->ID, "øµøıªÛ¡°");
 		break;
 #endif	// _PVP_MURDERER_HERO_ITEM
 
 	case 229:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		strcpy(c->ID, "ÎßêÎ°†");
+		strcpy(c->ID, "∏ª∑–");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_HELM + 9;
 		c->BodyPart[BODYPART_HELM].Level = 7;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_ARMOR + 9;
@@ -13706,7 +13706,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 230:
 		OpenNpc(MODEL_MERCHANT_MAN);
 		c = CreateCharacter(Key, MODEL_MERCHANT_MAN, PositionX, PositionY);
-		strcpy(c->ID, "Î°úÎûúÏ∂îÍ∞ÄÏÉÅÏù∏");
+		strcpy(c->ID, "∑Œ∑£√ﬂ∞°ªÛ¿Œ");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_MERCHANT_MAN_HEAD;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_MERCHANT_MAN_UPPER + 1;
 		c->BodyPart[BODYPART_GLOVES].Type = MODEL_MERCHANT_MAN_GLOVES + 1;
@@ -13715,7 +13715,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 231:
 		OpenNpc(MODEL_DEVIAS_TRADER);
 		c = CreateCharacter(Key, MODEL_DEVIAS_TRADER, PositionX, PositionY);
-		strcpy(c->ID, "Îç∞ÎπÑÏ∂îÍ∞ÄÏÉÅÏù∏");
+		strcpy(c->ID, "µ•∫Ò√ﬂ∞°ªÛ¿Œ");
 		break;
 
 	case 232:
@@ -13769,7 +13769,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c = CreateCharacter(Key, MODEL_REFINERY_NPC, PositionX, PositionY);
 		o = &c->Object;
 		break;
-	case 370://ÌôòÏõê
+	case 370://»Øø¯
 		OpenNpc(MODEL_RECOVERY_NPC);
 		c = CreateCharacter(Key, MODEL_RECOVERY_NPC, PositionX, PositionY);
 		o = &c->Object;
@@ -13791,24 +13791,24 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 241:
 		OpenNpc(MODEL_MASTER);
 		c = CreateCharacter(Key, MODEL_MASTER, PositionX, PositionY);
-		strcpy(c->ID, "ÎßàÏä§ÌÑ∞");
+		strcpy(c->ID, "∏∂Ω∫≈Õ");
 		break;
 	case 256:
 		OpenNpc(MODEL_NPC_SERBIS);
 		c = CreateCharacter(Key, MODEL_NPC_SERBIS, PositionX, PositionY);
-		strcpy(c->ID, "ÏÑ∏Î•¥ÎπÑÏä§");
+		strcpy(c->ID, "ºº∏£∫ÒΩ∫");
 		break;
 	case 257:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
 		MakeElfHelper(c);
-		strcpy(c->ID, "ÌéòÏù¥ÏïÑ");
+		strcpy(c->ID, "∆‰¿Ãæ∆");
 		o = &c->Object;
 		CreateJoint(BITMAP_FLARE, o->Position, o->Position, o->Angle, 42, o, 15.f);
 		break;
 	case 242:
 		OpenNpc(MODEL_ELF_WIZARD);
 		c = CreateCharacter(Key, MODEL_ELF_WIZARD, PositionX, PositionY);
-		strcpy(c->ID, "ÎùºÎùº ÏöîÏ†ï");
+		strcpy(c->ID, "∂Û∂Û ø‰¡§");
 		o = &c->Object;
 		o->BlendMesh = 1;
 		o->Position[2] = RequestTerrainHeight(o->Position[0], o->Position[1]) + 140.f;
@@ -13816,26 +13816,26 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 243:
 		OpenNpc(MODEL_ELF_MERCHANT);
 		c = CreateCharacter(Key, MODEL_ELF_MERCHANT, PositionX, PositionY);
-		strcpy(c->ID, "Ïû•Ïù∏");
+		strcpy(c->ID, "¿Â¿Œ");
 		break;
 	case 244:
 		OpenNpc(MODEL_SNOW_MERCHANT);
 		c = CreateCharacter(Key, MODEL_SNOW_MERCHANT, PositionX, PositionY);
-		strcpy(c->ID, "Ïà†ÏßëÎßàÎã¥");
+		strcpy(c->ID, "º˙¡˝∏∂¥„");
 		break;
 	case 245:
 		OpenNpc(MODEL_SNOW_WIZARD);
 		c = CreateCharacter(Key, MODEL_SNOW_WIZARD, PositionX, PositionY);
-		strcpy(c->ID, "ÎßàÎ≤ïÏÇ¨");
+		strcpy(c->ID, "∏∂π˝ªÁ");
 		break;
 	case 246:
 		OpenNpc(MODEL_SNOW_SMITH);
 		c = CreateCharacter(Key, MODEL_SNOW_SMITH, PositionX, PositionY);
-		strcpy(c->ID, "Î¨¥Í∏∞ÏÉÅÏù∏");
+		strcpy(c->ID, "π´±‚ªÛ¿Œ");
 		break;
 	case 247:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		strcpy(c->ID, "Í≤ΩÎπÑÎ≥ë");
+		strcpy(c->ID, "∞Ê∫Ò∫¥");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_HELM + 9;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_ARMOR + 9;
 		c->BodyPart[BODYPART_PANTS].Type = MODEL_PANTS + 9;
@@ -13848,7 +13848,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 248:
 		OpenNpc(MODEL_MERCHANT_MAN);
 		c = CreateCharacter(Key, MODEL_MERCHANT_MAN, PositionX, PositionY);
-		strcpy(c->ID, "Îñ†ÎèåÏù¥ ÏÉÅÏù∏");
+		strcpy(c->ID, "∂∞µπ¿Ã ªÛ¿Œ");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_MERCHANT_MAN_HEAD + 1;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_MERCHANT_MAN_UPPER + 1;
 		c->BodyPart[BODYPART_GLOVES].Type = MODEL_MERCHANT_MAN_GLOVES + 1;
@@ -13856,7 +13856,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		break;
 	case 249:
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
-		strcpy(c->ID, "Í≤ΩÎπÑÎ≥ë");
+		strcpy(c->ID, "∞Ê∫Ò∫¥");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_HELM + 9;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_ARMOR + 9;
 		c->BodyPart[BODYPART_PANTS].Type = MODEL_PANTS + 9;
@@ -13868,7 +13868,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 250:
 		OpenNpc(MODEL_MERCHANT_MAN);
 		c = CreateCharacter(Key, MODEL_MERCHANT_MAN, PositionX, PositionY);
-		strcpy(c->ID, "Îñ†ÎèåÏù¥ ÏÉÅÏù∏");
+		strcpy(c->ID, "∂∞µπ¿Ã ªÛ¿Œ");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_MERCHANT_MAN_HEAD;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_MERCHANT_MAN_UPPER;
 		c->BodyPart[BODYPART_GLOVES].Type = MODEL_MERCHANT_MAN_GLOVES;
@@ -13877,13 +13877,13 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 251:
 		OpenNpc(MODEL_SMITH);
 		c = CreateCharacter(Key, MODEL_SMITH, PositionX, PositionY);
-		strcpy(c->ID, "ÎåÄÏû•Ïû•Ïù¥ ÌïúÏä§");
+		strcpy(c->ID, "¥Î¿Â¿Â¿Ã «—Ω∫");
 		c->Object.Scale = 0.95f;
 		break;
 	case 253:
 		OpenNpc(MODEL_MERCHANT_GIRL);
 		c = CreateCharacter(Key, MODEL_MERCHANT_GIRL, PositionX, PositionY);
-		strcpy(c->ID, "Î¨ºÏïΩÌååÎäî ÏÜåÎÖÄ");
+		strcpy(c->ID, "π∞æ‡∆ƒ¥¬ º“≥‡");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_MERCHANT_GIRL_HEAD;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_MERCHANT_GIRL_UPPER;
 		c->BodyPart[BODYPART_PANTS].Type = MODEL_MERCHANT_GIRL_LOWER;
@@ -13891,12 +13891,12 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 254:
 		OpenNpc(MODEL_SCIENTIST);
 		c = CreateCharacter(Key, MODEL_SCIENTIST, PositionX, PositionY);
-		strcpy(c->ID, "ÎßàÎ≤ïÏÇ¨ ÌååÏãú");
+		strcpy(c->ID, "∏∂π˝ªÁ ∆ƒΩ√");
 		break;
 	case 255:
 		OpenNpc(MODEL_MERCHANT_FEMALE);
 		c = CreateCharacter(Key, MODEL_MERCHANT_FEMALE, PositionX, PositionY);
-		strcpy(c->ID, "Ïà†ÏßëÎßàÎã¥ Î¶¨ÏïÑÎ®º");
+		strcpy(c->ID, "º˙¡˝∏∂¥„ ∏Ææ∆∏’");
 		c->BodyPart[BODYPART_HELM].Type = MODEL_MERCHANT_FEMALE_HEAD + 1;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_MERCHANT_FEMALE_UPPER + 1;
 		c->BodyPart[BODYPART_PANTS].Type = MODEL_MERCHANT_FEMALE_LOWER + 1;
@@ -13905,13 +13905,13 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 204:
 		OpenNpc(MODEL_CRYWOLF_STATUE);
 		c = CreateCharacter(Key, MODEL_CRYWOLF_STATUE, PositionX, PositionY);
-		strcpy(c->ID, "ÏÑùÏÉÅ");
+		strcpy(c->ID, "ºÆªÛ");
 		c->Object.Live = false;
 		break;
 	case 205:
 		OpenNpc(MODEL_CRYWOLF_ALTAR1);
 		c = CreateCharacter(Key, MODEL_CRYWOLF_ALTAR1, PositionX, PositionY);
-		strcpy(c->ID, "Ï†úÎã®1");
+		strcpy(c->ID, "¡¶¥‹1");
 		c->Object.Position[2] -= 10.0f;
 		c->Object.HiddenMesh = -2;
 		c->Object.Visible = false;
@@ -13920,7 +13920,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 206:
 		OpenNpc(MODEL_CRYWOLF_ALTAR2);
 		c = CreateCharacter(Key, MODEL_CRYWOLF_ALTAR2, PositionX, PositionY);
-		strcpy(c->ID, "Ï†úÎã®2");
+		strcpy(c->ID, "¡¶¥‹2");
 		c->Object.HiddenMesh = -2;
 		c->Object.Position[2] -= 10.0f;
 		c->Object.Visible = false;
@@ -13929,7 +13929,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 207:
 		OpenNpc(MODEL_CRYWOLF_ALTAR3);
 		c = CreateCharacter(Key, MODEL_CRYWOLF_ALTAR3, PositionX, PositionY);
-		strcpy(c->ID, "Ï†úÎã®3");
+		strcpy(c->ID, "¡¶¥‹3");
 		c->Object.HiddenMesh = -2;
 		c->Object.Position[2] -= 10.0f;
 		c->Object.Visible = false;
@@ -13938,7 +13938,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 208:
 		OpenNpc(MODEL_CRYWOLF_ALTAR4);
 		c = CreateCharacter(Key, MODEL_CRYWOLF_ALTAR4, PositionX, PositionY);
-		strcpy(c->ID, "Ï†úÎã®4");
+		strcpy(c->ID, "¡¶¥‹4");
 		c->Object.HiddenMesh = -2;
 		c->Object.Position[2] -= 10.0f;
 		c->Object.Visible = false;
@@ -13947,7 +13947,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 209:
 		OpenNpc(MODEL_CRYWOLF_ALTAR5);
 		c = CreateCharacter(Key, MODEL_CRYWOLF_ALTAR5, PositionX, PositionY);
-		strcpy(c->ID, "Ï†úÎã®5");
+		strcpy(c->ID, "¡¶¥‹5");
 		c->Object.HiddenMesh = -2;
 		c->Object.Position[2] -= 10.0f;
 		c->Object.Visible = false;
@@ -13956,7 +13956,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 368:
 		OpenNpc(MODEL_SMELTING_NPC);
 		c = CreateCharacter(Key, MODEL_SMELTING_NPC, PositionX + 1, PositionY - 1);
-		strcpy(c->ID, "Ï†úÎ†®ÏùòÌÉëNPC");
+		strcpy(c->ID, "¡¶∑√¿«≈æNPC");
 		c->Object.Scale = 2.5f;
 		c->Object.EnableShadow = false;
 		c->Object.m_bRenderShadow = false;
@@ -14015,7 +14015,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	{
 		OpenNpc(MODEL_BC_NPC1);
 		c = CreateCharacter(Key, MODEL_BC_NPC1, PositionX, PositionY);
-		strcpy(c->ID, "Í≥µÏÑ± NPC");
+		strcpy(c->ID, "∞¯º∫ NPC");
 		c->Object.Scale = 1.0f;
 		c->Object.Angle[2] = 0.f;
 		CreateObject(MODEL_BC_BOX, c->Object.Position, c->Object.Angle);
@@ -14025,7 +14025,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	{
 		OpenNpc(MODEL_BC_NPC2);
 		c = CreateCharacter(Key, MODEL_BC_NPC2, PositionX, PositionY);
-		strcpy(c->ID, "Í≥µÏÑ± NPC");
+		strcpy(c->ID, "∞¯º∫ NPC");
 		c->Object.Scale = 1.0f;
 		c->Object.Angle[2] = 90.f;
 		CreateObject(MODEL_BC_BOX, c->Object.Position, c->Object.Angle);
@@ -14034,18 +14034,18 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 406:
 		OpenNpc(MODEL_NPC_DEVIN);
 		c = CreateCharacter(Key, MODEL_NPC_DEVIN, PositionX, PositionY);
-		strcpy(c->ID, "ÏÇ¨Ï†úÎç∞Îπà");
+		strcpy(c->ID, "ªÁ¡¶µ•∫Û");
 		break;
 	case 407:
 		OpenNpc(MODEL_NPC_QUARREL);
 		c = CreateCharacter(Key, MODEL_NPC_QUARREL, PositionX, PositionY);
-		strcpy(c->ID, "Ïõ®Ïñ¥Ïö∏ÌîÑÏøºÎ†ê");
+		strcpy(c->ID, "ø˛æÓøÔ«¡ƒı∑º");
 		c->Object.Scale = 1.9f;
 		break;
 	case 408:
 		OpenNpc(MODEL_NPC_CASTEL_GATE);
 		c = CreateCharacter(Key, MODEL_NPC_CASTEL_GATE, PositionX, PositionY, 90.f);
-		strcpy(c->ID, "ÏÑ±Î¨∏");
+		strcpy(c->ID, "º∫πÆ");
 		o = &c->Object;
 		o->Position[2] = RequestTerrainHeight(o->Position[0], o->Position[1]) + 240.f;
 		c->Object.Scale = 1.2f;
@@ -14057,7 +14057,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	{
 		OpenMonsterModel(127);
 		c = CreateCharacter(Key, MODEL_MONSTER01 + 127, PositionX, PositionY);
-		strcpy(c->ID, "Îã¨ÌÜ†ÎÅº");
+		strcpy(c->ID, "¥ﬁ≈‰≥¢");
 		c->Object.Scale = 0.8f;
 		c->Weapon[0].Type = -1;
 		c->Weapon[1].Type = -1;
@@ -14079,7 +14079,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Object.m_fEdgeScale = 1.08f;
 		o = &c->Object;
 		o->Position[2] = RequestTerrainHeight(o->Position[0], o->Position[1]) + 170.f;
-		strcpy(c->ID, "Î≤öÍΩÉÏùòÏ†ïÎ†π");
+		strcpy(c->ID, "∫¢≤…¿«¡§∑…");
 	}
 	break;
 	case 451:
@@ -14089,13 +14089,13 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 		c->Object.Scale = 1.0f;
 		c->Object.m_fEdgeScale = 0.0f;
 		c->Object.m_bRenderShadow = false;
-		strcpy(c->ID, "Î≤öÍΩÉÎÇòÎ¨¥");
+		strcpy(c->ID, "∫¢≤…≥™π´");
 	}
 	break;
 	case 579:
 		OpenNpc(MODEL_LUCKYITEM_NPC);
 		c = CreateCharacter(Key, MODEL_LUCKYITEM_NPC, PositionX, PositionY);
-		strcpy(c->ID, "aÎπÑÎìú");
+		strcpy(c->ID, "¥a∫ÒµÂ");
 		c->Object.Scale = 0.95f;
 		c->Object.m_fEdgeScale = 1.2f;
 		gmClientModels->GetModel(MODEL_LUCKYITEM_NPC)->Actions[0].PlaySpeed = 0.45f;
@@ -14106,14 +14106,14 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 452:
 		OpenNpc(MODEL_SEED_MASTER);
 		c = CreateCharacter(Key, MODEL_SEED_MASTER, PositionX, PositionY);
-		strcpy(c->ID, "ÏãúÎìúÎßàÏä§ÌÑ∞");
+		strcpy(c->ID, "Ω√µÂ∏∂Ω∫≈Õ");
 		c->Object.Scale = 1.1f;
 		c->Object.m_fEdgeScale = 1.2f;
 		break;
 	case 453:
 		OpenNpc(MODEL_SEED_INVESTIGATOR);
 		c = CreateCharacter(Key, MODEL_SEED_INVESTIGATOR, PositionX, PositionY);
-		strcpy(c->ID, "ÏãúÎìúÏó∞Íµ¨Í∞Ä");
+		strcpy(c->ID, "Ω√µÂø¨±∏∞°");
 		c->Object.Scale = 0.9f;
 		c->Object.m_fEdgeScale = 1.15f;
 		//gmClientModels->GetModel(MODEL_SEED_INVESTIGATOR)->Actions[0].PlaySpeed = 0.2f;
@@ -14123,7 +14123,7 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	{
 		c = CreateCharacter(Key, MODEL_PLAYER, PositionX, PositionY);
 		//c->Class = 2;
-		strcpy(c->ID, "Ï¥àÍ∏∞Ìôî ÎèÑÏö∞ÎØ∏");
+		strcpy(c->ID, "√ ±‚»≠ µµøÏπÃ");
 
 		c->BodyPart[BODYPART_HELM].Type = MODEL_HELM + 9;
 		c->BodyPart[BODYPART_ARMOR].Type = MODEL_ARMOR + 9;
@@ -14189,13 +14189,13 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	}
 	break;
 	case 478:
-		//Îç∏Í∞ÄÎèÑ
+		//µ®∞°µµ
 		OpenNpc(MODEL_NPC_SERBIS);
 		c = CreateCharacter(Key, MODEL_NPC_SERBIS, PositionX, PositionY);
 		strcpy(c->ID, "Unknown");
 		break;
 	case 479:
-		// Í≤∞Ìà¨Ïû• Î¨∏ÏßÄÍ∏∞ NPC ÌÉÄÏù¥Ìà¨Ïä§
+		// ∞·≈ı¿Â πÆ¡ˆ±‚ NPC ≈∏¿Ã≈ıΩ∫
 		OpenNpc(MODEL_DUEL_NPC_TITUS);
 		c = CreateCharacter(Key, MODEL_DUEL_NPC_TITUS, PositionX, PositionY);
 		strcpy(c->ID, "Unknown");
@@ -14362,20 +14362,20 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 566:
 		OpenNpc(MODEL_TIME_LIMIT_QUEST_NPC_TERSIA);
 		c = CreateCharacter(Key, MODEL_TIME_LIMIT_QUEST_NPC_TERSIA, PositionX, PositionY);
-		strcpy(c->ID, "Í∏∏ÎìúÍ¥ÄÎ¶¨Ïù∏ ÌÖåÎ•¥ÏãúÏïÑ");
+		strcpy(c->ID, "±ÊµÂ∞¸∏Æ¿Œ ≈◊∏£Ω√æ∆");
 		c->Object.Scale = 0.93f;
 		break;
 	case 567:
 		OpenNpc(MODEL_TIME_LIMIT_QUEST_NPC_BENA);
 		c = CreateCharacter(Key, MODEL_TIME_LIMIT_QUEST_NPC_BENA, PositionX, PositionY);
-		strcpy(c->ID, "Ïã†ÎÖÄ Î≤†Ïù¥ÎÇò");
+		strcpy(c->ID, "Ω≈≥‡ ∫£¿Ã≥™");
 		c->Object.Position[2] += 145.0f;
 		break;
 	case 568:
 	{
 		OpenNpc(MODEL_TIME_LIMIT_QUEST_NPC_ZAIRO);
 		c = CreateCharacter(Key, MODEL_TIME_LIMIT_QUEST_NPC_ZAIRO, PositionX, PositionY);
-		strcpy(c->ID, "Îñ†ÎèåÏù¥ÏÉÅÏù∏ ÏûêÏù¥Î°ú");
+		strcpy(c->ID, "∂∞µπ¿ÃªÛ¿Œ ¿⁄¿Ã∑Œ");
 		c->Object.LifeTime = 100;
 		c->Object.Scale = 0.8f;
 		c->Object.m_fEdgeScale = 1.1f;
@@ -14387,14 +14387,14 @@ CHARACTER* CreateMonster(int Type, int PositionX, int PositionY, int Key)
 	case 577:
 		OpenNpc(MODEL_KARUTAN_NPC_REINA);
 		c = CreateCharacter(Key, MODEL_KARUTAN_NPC_REINA, PositionX, PositionY);
-		strcpy(c->ID, "Ïû°ÌôîÏÉÅÏù∏ Î†àÏù¥ÎÇò");
+		strcpy(c->ID, "¿‚»≠ªÛ¿Œ ∑π¿Ã≥™");
 		c->Object.Scale = 1.1f;
 		c->Object.m_fEdgeScale = 1.2f;
 		break;
 	case 578:
 		OpenNpc(MODEL_KARUTAN_NPC_VOLVO);
 		c = CreateCharacter(Key, MODEL_KARUTAN_NPC_VOLVO, PositionX, PositionY);
-		strcpy(c->ID, "Î¨¥Í∏∞ÏÉÅÏù∏ Î≥ºÎ°ú");
+		strcpy(c->ID, "π´±‚ªÛ¿Œ ∫º∑Œ");
 		c->Object.Scale = 0.9f;
 		break;
 	}
