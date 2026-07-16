@@ -165,45 +165,45 @@ void csteady_clock::LoadInformationFps()
 
 std::chrono::steady_clock::time_point csteady_clock::GetthreadTime()
 {
-	auto thread_tick = mainthread;
-	mainthread = std::chrono::high_resolution_clock::now();
-	return thread_tick;
-	//uintmax_t thread_tick = mainthread;
-	//mainthread = GetTickCount64();
-
-	//return thread_tick;
+	// The returned timestamp belongs to the frame that is about to be processed.
+	// The previous implementation returned the prior frame start and made the
+	// limiter react to a stale interval instead of the current frame's work.
+	mainthread = std::chrono::steady_clock::now();
+	return mainthread;
 }
 
-double csteady_clock::thread_sleep(const std::chrono::steady_clock::time_point thread_tick)
+double csteady_clock::thread_sleep(const std::chrono::steady_clock::time_point frameStart)
 {
-	const double frameavg = 1.0 / static_cast<double>(this->GetLimitFps());
-
-	double frame_time = std::chrono::duration<double>(mainthread - thread_tick).count();
-
-	if (frame_time < frameavg)
+	const int limitFps = this->GetLimitFps();
+	if (limitFps <= 0)
 	{
-		double remaining = frameavg - frame_time;
-		double sleepSec = remaining - 0.0015;
-
-		if (sleepSec > 0.0)
-		{
-			int64_t sleepMicros = static_cast<int64_t>(sleepSec * 1000000.0);
-			std::this_thread::sleep_for(std::chrono::microseconds(sleepMicros));
-		}
-
-		auto spin_target = mainthread + std::chrono::duration_cast<
-			std::chrono::steady_clock::duration>(std::chrono::duration<double>(remaining));
-
-		while (std::chrono::high_resolution_clock::now() < spin_target)
-		{
-		}
-
-		frame_time = frameavg;
-		mainthread += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-			std::chrono::duration<double>(remaining));
+		return std::chrono::duration<double, std::milli>(
+			std::chrono::steady_clock::now() - frameStart).count();
 	}
 
-	return frame_time * 1000.0;
+	const auto targetFrameDuration = std::chrono::duration<double>(
+		1.0 / static_cast<double>(limitFps));
+	const auto frameDeadline = frameStart + std::chrono::duration_cast<
+		std::chrono::steady_clock::duration>(targetFrameDuration);
+
+	auto now = std::chrono::steady_clock::now();
+	if (now < frameDeadline)
+	{
+		const auto remaining = frameDeadline - now;
+		const auto spinReserve = std::chrono::microseconds(1500);
+
+		if (remaining > spinReserve)
+		{
+			std::this_thread::sleep_for(remaining - spinReserve);
+		}
+
+		while ((now = std::chrono::steady_clock::now()) < frameDeadline)
+		{
+		}
+	}
+
+	mainthread = now;
+	return std::chrono::duration<double, std::milli>(now - frameStart).count();
 }
 
 bool csteady_clock::rand_calc_check(int fr)
