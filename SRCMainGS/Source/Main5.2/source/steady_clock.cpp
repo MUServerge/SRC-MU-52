@@ -176,9 +176,10 @@ void csteady_clock::normalizefps()
 	}
 
 	auto current_time = std::chrono::steady_clock::now();
+
 	double elapsed_time = std::chrono::duration<double>(current_time - last_check_time).count();
 
-	if (elapsed_time >= 0.04)
+	if (elapsed_time >= (0.04))
 	{
 		normal_check = true;
 		last_check_time = current_time;
