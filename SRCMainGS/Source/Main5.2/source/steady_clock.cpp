@@ -19,6 +19,7 @@ csteady_clock::csteady_clock()
 	normal_check = true;
 
 	frame_limit = 1.f;
+	framePacingMode = FRAME_PACING_SOFTWARE;
 	//mainthread = GetTickCount64();
 
 	mainthread = std::chrono::steady_clock::now();
@@ -80,6 +81,21 @@ double csteady_clock::GetDeltAccumulated()
 int csteady_clock::GetLimitFps()
 {
 	return 60;
+}
+
+void csteady_clock::SetFramePacingMode(FramePacingMode mode)
+{
+	framePacingMode = mode;
+}
+
+FramePacingMode csteady_clock::GetFramePacingMode() const
+{
+	return framePacingMode;
+}
+
+bool csteady_clock::IsSoftwareFrameLimitEnabled() const
+{
+	return framePacingMode == FRAME_PACING_SOFTWARE;
 }
 
 double csteady_clock::Getframe_per_second()
@@ -174,11 +190,19 @@ std::chrono::steady_clock::time_point csteady_clock::GetthreadTime()
 
 double csteady_clock::thread_sleep(const std::chrono::steady_clock::time_point frameStart)
 {
+	auto now = std::chrono::steady_clock::now();
+
+	if (!IsSoftwareFrameLimitEnabled())
+	{
+		mainthread = now;
+		return std::chrono::duration<double, std::milli>(now - frameStart).count();
+	}
+
 	const int limitFps = this->GetLimitFps();
 	if (limitFps <= 0)
 	{
-		return std::chrono::duration<double, std::milli>(
-			std::chrono::steady_clock::now() - frameStart).count();
+		mainthread = now;
+		return std::chrono::duration<double, std::milli>(now - frameStart).count();
 	}
 
 	const auto targetFrameDuration = std::chrono::duration<double>(
@@ -186,7 +210,6 @@ double csteady_clock::thread_sleep(const std::chrono::steady_clock::time_point f
 	const auto frameDeadline = frameStart + std::chrono::duration_cast<
 		std::chrono::steady_clock::duration>(targetFrameDuration);
 
-	auto now = std::chrono::steady_clock::now();
 	if (now < frameDeadline)
 	{
 		const auto remaining = frameDeadline - now;
