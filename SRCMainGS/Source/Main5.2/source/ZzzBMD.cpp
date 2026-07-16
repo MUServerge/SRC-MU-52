@@ -1241,6 +1241,12 @@ void BMD::RenderMeshEffect(int i, int iType, int iSubType, vec3_t Angle, VOID* o
 
 void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float BlendMeshLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, int MeshTexture)
 {
+	RenderMeshInternal(i, RenderFlag, Alpha, BlendMesh, BlendMeshLight,
+		BlendMeshTexCoordU, BlendMeshTexCoordV, MeshTexture, NULL);
+}
+
+void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, float BlendMeshLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, int MeshTexture, ShaderMatrixSnapshot* matrixSnapshot)
+{
 	CRenderProfilerScope profilerScope(RP_BMD_RENDER_MESH);
 	if (i >= 0 && i < NumMeshs)
 	{
@@ -1634,7 +1640,8 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 						// false and we fall through to the legacy immediate-mode draw.
 						g_RenderProfiler.AddCounter(RPC_VBO_DRAW_ATTEMPTED);
 						if (this->RenderMeshVBO(i, m, RenderFlag, renderFlags, Alpha,
-								EnableLight ? 1 : 0, BlendMeshTexCoordU, BlendMeshTexCoordV))
+								EnableLight ? 1 : 0, BlendMeshTexCoordU, BlendMeshTexCoordV,
+								matrixSnapshot))
 						{
 							g_RenderProfiler.AddCounter(RPC_VBO_DRAW_SUCCEEDED);
 							return;
@@ -1772,6 +1779,11 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 
 		this->BeginRender(Alpha);
 
+		// A RenderBody call keeps the fixed-function matrices unchanged across its
+		// mesh loop. Capture lazily on the first successful VBO draw so world and
+		// temporary NewUI preview cameras each receive their own exact snapshot.
+		ShaderMatrixSnapshot matrixSnapshot;
+
 		if (!LightEnable)
 		{
 			if (Alpha < 0.99)
@@ -1793,7 +1805,8 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 					if (m->m_csTScript->getBright())
 						iBlendMesh = i;
 
-					this->RenderMesh(i, Flag, Alpha, iBlendMesh, BlendMeshLight, BlendMeshTexCoordU, BlendMeshTexCoordV, Texture);
+					this->RenderMeshInternal(i, Flag, Alpha, iBlendMesh, BlendMeshLight,
+						BlendMeshTexCoordU, BlendMeshTexCoordV, Texture, &matrixSnapshot);
 
 					BYTE shadowType = m->m_csTScript->getShadowMesh();
 
@@ -1805,7 +1818,8 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 						else
 							glColor3f(0.f, 0.f, 0.f);
 
-						this->RenderMesh(i, RENDER_COLOR | RENDER_SHADOWMAP, Alpha, iBlendMesh, BlendMeshLight, BlendMeshTexCoordU, BlendMeshTexCoordV);
+						this->RenderMeshInternal(i, RENDER_COLOR | RENDER_SHADOWMAP, Alpha, iBlendMesh,
+							BlendMeshLight, BlendMeshTexCoordU, BlendMeshTexCoordV, -1, &matrixSnapshot);
 						glColor3f(1.f, 1.f, 1.f);
 					}
 					else if (shadowType == SHADOW_RENDER_TEXTURE)
@@ -1816,14 +1830,16 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 						else
 							glColor3f(0.f, 0.f, 0.f);
 
-						this->RenderMesh(i, RENDER_TEXTURE | RENDER_SHADOWMAP, Alpha, iBlendMesh, BlendMeshLight, BlendMeshTexCoordU, BlendMeshTexCoordV);
+						this->RenderMeshInternal(i, RENDER_TEXTURE | RENDER_SHADOWMAP, Alpha, iBlendMesh,
+							BlendMeshLight, BlendMeshTexCoordU, BlendMeshTexCoordV, -1, &matrixSnapshot);
 						glColor3f(1.f, 1.f, 1.f);
 					}
 				}
 			}
 			else if (i != HiddenMesh)
 			{
-				this->RenderMesh(i, Flag, Alpha, BlendMesh, BlendMeshLight, BlendMeshTexCoordU, BlendMeshTexCoordV, Texture);
+				this->RenderMeshInternal(i, Flag, Alpha, BlendMesh, BlendMeshLight,
+					BlendMeshTexCoordU, BlendMeshTexCoordV, Texture, &matrixSnapshot);
 			}
 		}
 		this->EndRender();
@@ -3611,7 +3627,7 @@ void BMD::CreateVertexBuffer(int i, Mesh_t& mesh)
 // the fixed-function stack so the result lines up 1:1 with the legacy draw; the
 // texture is already bound by the caller. Returns false (drawing nothing) when
 // the required program is unavailable, so the caller falls back to legacy.
-bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float Alpha, int EnableLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV)
+bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float Alpha, int EnableLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, ShaderMatrixSnapshot* matrixSnapshot)
 {
 #ifdef SHADER_VERSION_TEST
 	CRenderProfilerScope profilerScope(RP_BMD_RENDER_MESH_VBO);
@@ -3655,11 +3671,31 @@ bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float
 	if (!gShaderGL->UseVBO(prog, &prevProgram))
 		return false; // program unavailable -> caller falls back to legacy
 
-	float view[16], proj[16];
-	glGetFloatv(GL_MODELVIEW_MATRIX, view);
-	glGetFloatv(GL_PROJECTION_MATRIX, proj);
-	gShaderGL->vboSetMat4("uView", view);
-	gShaderGL->vboSetMat4("uProj", proj);
+	float localModelView[16];
+	float localProjection[16];
+	const float* modelView = localModelView;
+	const float* projection = localProjection;
+
+	if (matrixSnapshot != NULL)
+	{
+		if (!matrixSnapshot->Captured)
+		{
+			glGetFloatv(GL_MODELVIEW_MATRIX, matrixSnapshot->ModelView);
+			glGetFloatv(GL_PROJECTION_MATRIX, matrixSnapshot->Projection);
+			matrixSnapshot->Captured = true;
+		}
+		modelView = matrixSnapshot->ModelView;
+		projection = matrixSnapshot->Projection;
+	}
+	else
+	{
+		// Direct RenderMesh callers keep the original per-draw query behavior.
+		glGetFloatv(GL_MODELVIEW_MATRIX, localModelView);
+		glGetFloatv(GL_PROJECTION_MATRIX, localProjection);
+	}
+
+	gShaderGL->vboSetMat4("uView", modelView);
+	gShaderGL->vboSetMat4("uProj", projection);
 
 	// Upload only THIS model's bones. The source (o->BoneTransform) is allocated
 	// as vec34_t[NumBones] (w_ObjectInfo.cpp), so reading MAX_BONES*3 vec4 would
