@@ -64,6 +64,15 @@ public:
 	GLuint GetTrackedProgram() const { return m_BoundProgram; }
 	GLuint GetProgram(eShaderSProgram program) const;
 
+	// Shared active-path compiler/linker. File discovery remains with each public
+	// adapter, while object creation and diagnostics have one implementation.
+	static GLuint BuildProgram(const char* vertexSource, const char* fragmentSource, const char* tag);
+
+	// Uniform locations are immutable after a successful link. Cache both valid
+	// and missing locations per program and invalidate them before deletion.
+	GLint GetUniformLocation(GLuint program, const char* name) const;
+	void ForgetProgram(GLuint program);
+
 	// Uniform setters operate on the currently bound program.
 	void SetInt  (const char* name, int value) const;
 	void SetFloat(const char* name, float value) const;
@@ -77,13 +86,32 @@ private:
 	static GLuint LinkProgram(GLuint vs, GLuint fs, const char* tag);
 	static std::string ReadShaderFile(const char* name);
 	void SynchronizeSceneProgram(GLuint program);
+	void ClearUniformCache();
 
 	static const int PROGRAM_STACK_CAPACITY = 16;
+	static const int PROGRAM_UNIFORM_CACHE_CAPACITY = 24;
+	static const int UNIFORMS_PER_PROGRAM = 16;
+	static const int UNIFORM_NAME_CAPACITY = 48;
+
+	struct UniformCacheEntry
+	{
+		char Name[UNIFORM_NAME_CAPACITY];
+		GLint Location;
+	};
+
+	struct ProgramUniformCache
+	{
+		GLuint Program;
+		int Count;
+		UniformCacheEntry Uniforms[UNIFORMS_PER_PROGRAM];
+	};
+
 	GLuint m_Program[eShaderS_MaxValue];
 	GLint  m_CurrentProgram; // bound scene-program enum, -1 for external/legacy
 	GLuint m_BoundProgram;   // synchronized actual GL program, including external VBO programs
 	GLuint m_ProgramStack[PROGRAM_STACK_CAPACITY];
 	int    m_ProgramStackDepth;
+	mutable ProgramUniformCache m_UniformCache[PROGRAM_UNIFORM_CACHE_CAPACITY];
 	bool   m_Ready;
 };
 
