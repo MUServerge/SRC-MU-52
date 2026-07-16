@@ -14,12 +14,37 @@ CShaderGL::CShaderGL()
 
 CShaderGL::~CShaderGL()
 {
-	RenderProfilerDeleteProgram(shader_id);
+	Release();
+}
+
+void CShaderGL::Release()
+{
+	bool hasPrograms = (shader_id != 0);
+	for (int i = 0; i < eVBO_Max; ++i)
+		hasPrograms = hasPrograms || (m_VBOProgram[i] != 0);
+
+	if (!hasPrograms)
+	{
+		m_CurrentVBOProgram = 0;
+		return;
+	}
+
+	// The normal shutdown path calls this before KillGLWindow. If a late static
+	// destructor reaches it without a current context, invalidate the stale names
+	// without issuing context-dependent GL calls.
+	const bool canDelete = (wglGetCurrentContext() != NULL && glDeleteProgram != NULL);
+	if (canDelete && shader_id != 0)
+		RenderProfilerDeleteProgram(shader_id);
+	shader_id = 0;
+
 	for (int i = 0; i < eVBO_Max; ++i)
 	{
-		if (m_VBOProgram[i] != 0)
+		if (canDelete && m_VBOProgram[i] != 0)
 			RenderProfilerDeleteProgram(m_VBOProgram[i]);
+		m_VBOProgram[i] = 0;
 	}
+
+	m_CurrentVBOProgram = 0;
 }
 
 void CShaderGL::Init()

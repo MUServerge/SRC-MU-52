@@ -10,6 +10,8 @@
 #include "NewUISystem.h"
 #include "ConnectVersionHex.h"
 #include "WINHANDLE.h"
+#include "CShaderGL.h"
+#include "CShaderScene.h"
 
 static RECT GetWindowTargetWorkArea(HWND hWnd)
 {
@@ -164,13 +166,30 @@ HWND CWINHANDLE::Create(HINSTANCE hCurrentInst, mu_uint32 RenderSizeX, mu_uint32
 
 void CWINHANDLE::Destroyer()
 {
+	// WM_CLOSE and WM_DESTROY can both reach this path, and WinMain calls it once
+	// more after the message loop. Release the process-owned resources exactly
+	// once while the WGL context is still current.
+	static bool s_Destroyed = false;
+	if (s_Destroyed)
+		return;
+	s_Destroyed = true;
+
 	DestroyImGuiWindow();
 
 #ifdef SHUTDOWN_SCALEFORM_INFO
 	gfxinit->runtime_disconnect();
 #endif // SHUTDOWN_SCALEFORM_INFO
 
+	// This releases characters, models, textures and their BMD-owned GPU buffers.
 	DestroyWindow();
+
+#ifdef SHADER_PIPELINE
+	gShaderScene.Release();
+#endif // SHADER_PIPELINE
+
+#ifdef SHADER_VERSION_TEST
+	gShaderGL->Release();
+#endif // SHADER_VERSION_TEST
 
 #ifdef MAX_INSTANCE_GAME
 	GMProtect->runtime_delete_mutex();
@@ -613,15 +632,28 @@ LONG CWINHANDLE::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_CLOSE:
 	case WM_DESTROY:
 	{
-		Destroy = true;
-		SocketClient.Close();
-		DestroySound();
-		KillGLWindow();
-		CloseMainExe();
-		GMConnectHex->OpenUpdater();
-		PostQuitMessage(0);
+		// WM_CLOSE normally causes a nested WM_DESTROY. Keep the entire shutdown
+		// sequence idempotent and release every GL owner before KillGLWindow clears
+		// and deletes the current context.
+		static bool s_ShutdownStarted = false;
+		if (!s_ShutdownStarted)
+		{
+			s_ShutdownStarted = true;
+			Destroy = true;
+			SocketClient.Close();
+			DestroySound();
+			gwinhandle->Destroyer();
+			KillGLWindow();
+			CloseMainExe();
+			GMConnectHex->OpenUpdater();
+		}
+
+		if (msg == WM_CLOSE && IsWindow(hwnd))
+			::DestroyWindow(hwnd);
+		else
+			PostQuitMessage(0);
+		return 0;
 	}
-	break;
 	case WM_SETCURSOR:
 		ShowCursor(false);
 		break;

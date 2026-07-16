@@ -2412,6 +2412,62 @@ void BlurShadow()
 
 void BMD::Release()
 {
+#ifdef SHADER_VERSION_TEST
+	if (Meshs != NULL)
+	{
+		const bool hasCurrentContext = (wglGetCurrentContext() != NULL);
+		const bool canDeleteBuffers = hasCurrentContext && (glDeleteBuffers != NULL);
+		const bool canDeleteVertexArrays = hasCurrentContext && (glDeleteVertexArrays != NULL);
+
+		for (int i = 0; i < NumMeshs; ++i)
+		{
+			Mesh_t* mesh = &Meshs[i];
+			GLuint buffers[] =
+			{
+				mesh->VBO_Vertices,
+				mesh->VBO_Normals,
+				mesh->VBO_TexCoords,
+				mesh->VBO_Colors,
+				mesh->VBO_Bones,
+				mesh->EBO,
+			};
+
+			if (canDeleteBuffers)
+			{
+				int bufferCount = 0;
+				for (int j = 0; j < (int)(sizeof(buffers) / sizeof(buffers[0])); ++j)
+				{
+					if (buffers[j] != 0)
+						++bufferCount;
+				}
+
+				if (bufferCount > 0)
+				{
+					glDeleteBuffers((GLsizei)(sizeof(buffers) / sizeof(buffers[0])), buffers);
+					g_RenderProfiler.ResourceDeleted(RPR_BUFFER, bufferCount);
+				}
+			}
+
+			if (canDeleteVertexArrays && mesh->VAO != 0)
+			{
+				glDeleteVertexArrays(1, &mesh->VAO);
+				g_RenderProfiler.ResourceDeleted(RPR_VAO);
+			}
+
+			// Handles are owned by this mesh. They must never survive Release(), even
+			// when a late teardown has no context and the driver owns final reclamation.
+			mesh->VAO = 0;
+			mesh->VBO_Vertices = 0;
+			mesh->VBO_Normals = 0;
+			mesh->VBO_TexCoords = 0;
+			mesh->VBO_Colors = 0;
+			mesh->VBO_Bones = 0;
+			mesh->EBO = 0;
+			mesh->VBO_ElementCount = 0;
+		}
+	}
+#endif // SHADER_VERSION_TEST
+
 	for (int i = 0; i < NumBones; i++)
 	{
 		Bone_t* b = &Bones[i];
