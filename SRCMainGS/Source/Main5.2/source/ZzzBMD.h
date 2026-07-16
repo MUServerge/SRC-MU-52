@@ -265,11 +265,21 @@ public:
 	void CreateBoundingBox();
 	struct ShaderMatrixSnapshot
 	{
+		static const int MATRIX_PROGRAM_CAPACITY = 16;
+
 		bool Captured;
 		float ModelView[16];
 		float Projection[16];
+		GLuint UploadedMatrixPrograms[MATRIX_PROGRAM_CAPACITY];
+		int UploadedMatrixProgramCount;
 
-		ShaderMatrixSnapshot() : Captured(false) {}
+		ShaderMatrixSnapshot()
+			: Captured(false)
+			, UploadedMatrixProgramCount(0)
+		{
+			for (int i = 0; i < MATRIX_PROGRAM_CAPACITY; ++i)
+				UploadedMatrixPrograms[i] = 0;
+		}
 	};
 
 	void CreateVertexBuffer(int i, Mesh_t& mesh);

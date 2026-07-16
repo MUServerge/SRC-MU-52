@@ -6,6 +6,15 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 5: reused uView/uProj uniform values once per VBO program
+  inside the Phase 4 per-RenderBody matrix snapshot. Bone, light, material and
+  sampler uniforms remain on their original per-mesh update path. Tracking is a
+  fixed 16-program array with no heap allocation; capacity exhaustion falls back
+  to the original matrix uploads. Direct RenderMesh calls, shader selection,
+  draw order and visual intent are unchanged. Static review only; Windows
+  build/runtime validation and measured comparison remain pending.
+  (ZzzBMD.cpp/.h)
+
 - Client renderer Phase 4: scoped fixed-function model-view/projection snapshots
   to one BMD::RenderBody mesh loop. The first successful VBO mesh captures the
   exact current matrices and sibling meshes reuse them; direct RenderMesh calls
