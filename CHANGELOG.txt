@@ -6,6 +6,20 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client FPS Phase 4A: completed the active timing-consumer inventory and
+  removed the dormant fps_new_system experiment. Its two conditional animation
+  branches were byte-for-byte equivalent and its remaining assignments were
+  no-ops, so the client now follows the same existing PlayAnimation calls
+  without carrying a misleading compile-time path. Documented the separate
+  timing domains (absolute WorldTime, continuous timefac/timeNormalizer,
+  discrete CheckNormalizer pulses, and standlimit/MoveSceneFrame compatibility)
+  plus the consumer-by-consumer migration order and rollback rules. No cadence,
+  animation speed, gameplay, rendering, FPS target, VSync or scheduler behavior
+  changed. Static source verification only; Windows build and runtime parity
+  checks remain pending.
+  (CSParts.cpp, w_BasePet.cpp, ZzzCharacter.cpp, Defined_Global.h,
+  docs/FPS_TIMING_CONSUMER_AUDIT_2026-07-16.md)
+
 - Client FPS Phase 3: replaced the inactive MainScene accumulator scaffold
   with one bounded 25 Hz compatibility scheduler owned by csteady_clock. It
   carries fractional time between render frames, emits up to five fixed steps

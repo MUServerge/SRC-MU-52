@@ -58,7 +58,6 @@
 #define SHUTDOWN_SCALEFORM_INFO
 
 //#define KERNEL_KEY
-//#define fps_new_system
 
 
 #if MAIN_UPDATE==903
