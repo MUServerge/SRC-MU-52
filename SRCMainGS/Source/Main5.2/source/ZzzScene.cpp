@@ -2809,6 +2809,7 @@ void MoveClientManager()
 
 void MainScene(HDC hDC)
 {
+	const auto thread_tick = gsteady_clock->GetthreadTime();
 	const double fixedDeltaTime = gsteady_clock->Getframe_per_second();
 
 	static double accumulatedTime = fixedDeltaTime;
@@ -2962,8 +2963,6 @@ void MainScene(HDC hDC)
 
 
 	bool Success = false;
-
-	auto thread_tick = gsteady_clock->GetthreadTime();
 
 	{
 		CRenderProfilerScope renderProfilerScope(RP_RENDER_SCENE);

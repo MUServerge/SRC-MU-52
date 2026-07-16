@@ -6,6 +6,18 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client FPS Phase 1: corrected the existing 60 FPS software pacer to time
+  the complete current MainScene frame against its own monotonic deadline.
+  The previous path sampled immediately before rendering, returned the prior
+  frame timestamp and derived sleep from a stale frame-start interval, which
+  could produce oscillating or uneven pacing. The limiter now uses
+  std::chrono::steady_clock consistently, performs the existing hybrid
+  sleep/spin against the current frame deadline and returns the measured full
+  frame duration. The 60 FPS target, VSync policy, gameplay/update frequency,
+  rendering order, GLEW, shaders and visual logic are unchanged. Static source
+  verification only; Windows build, frame-time capture and runtime parity remain
+  pending. (steady_clock.cpp, ZzzScene.cpp)
+
 - Client renderer Phase 11: introduced an explicit, conservative deferred CPU
   transform contract for the standard world-object render path. VBO-ready,
   unscaled MAIN_SCENE objects may postpone the shared CPU vertex/normal transform;
