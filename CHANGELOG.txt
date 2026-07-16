@@ -6,6 +6,18 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 9: removed dormant shader/VBO experiments from the
+  production runtime after resolving their intent and preserving the useful
+  architecture as an explicit migration specification. The client now owns only
+  the active Terrain, Character and VBO Model programs; removed duplicate Default,
+  unowned Glow/Colorize/text prototypes, the obsolete dynamic VBO adapter and the
+  unreachable per-material VBO programs. Chrome/Metal/Oil legacy UV equations and
+  the validated std140 bone-palette concept are documented for future integration
+  into the single active BMD technique. Active VBO eligibility, legacy fallback,
+  render order, game timing, packets and assets used by current draws are unchanged.
+  Static source review only; Windows build and runtime performance/visual validation
+  remain pending.
+
 - Client renderer Phase 8: consolidated active shader file loading through
   CShaderScene and changed program creation to demand-driven ownership. Terrain,
   Character and the currently eligible VBO Model technique are preloaded; Default,
