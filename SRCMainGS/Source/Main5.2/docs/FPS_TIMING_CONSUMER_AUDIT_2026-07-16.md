@@ -26,7 +26,7 @@ runtime cadence measurements remain pending.
 
 | Symbol/domain | Active source files | Observed uses | Classification |
 | --- | ---: | ---: | --- |
-| `CheckNormalizer` | 10 | 23 | Remaining discrete 25 Hz compatibility pulse |
+| `CheckNormalizer` | 9 | 21 | Remaining discrete 25 Hz compatibility pulse |
 | `timefac` | 35 | 1772 | Continuous elapsed-time scaling |
 | `timeNormalizer` | 3 | 4 | Continuous normalization helper |
 | `standlimit` | 6 | 55 | Mixed lifetime/modulo compatibility |
@@ -36,10 +36,10 @@ runtime cadence measurements remain pending.
 | `frame_scene_desplace` | 2 | project-local | Scene displacement compatibility |
 | `MacroTime` | 2 | project-local | Render-frame counter |
 
-The `CheckNormalizer` call sites are in pet, boid, minimap/UI and effect
+The remaining `CheckNormalizer` call sites are in pet, boid, minimap and effect
 specializations, including `CSPetSystem.cpp`, `GMHellas.cpp`, `GOBoid.cpp`,
 `NewUIMiniMap.cpp`, `ZzzEffect.cpp`,
-`ZzzEffectBlurSpark.cpp`, `ZzzEffectFireLeave.cpp`,
+`ZzzEffectBlurSpark.cpp`,
 `ZzzEffectJoint.cpp` and `ZzzEffectParticle.cpp`. A commented
 `GMEmpireGuardian4.cpp` reference is not an active consumer.
 
@@ -66,6 +66,21 @@ silently losing UI time. These counters affect presentation only.
 `Hero->Movement`, `SendMove` and auto-movement notice creation. It is a
 gameplay/network-adjacent consumer and requires separate packet/cadence review.
 
+### Phase 4B-2: deterministic weather counters
+
+`MoveLeaves()` is an active scene-update consumer. Its rain-intensity convergence
+and rain-position wrap now consume every bounded 25 Hz scheduler step. The
+per-step operations remain identical: `RainCurrent` moves one unit toward
+`RainTarget`, while `RainPosition` advances by 20 and wraps at 2000. No random
+number generation, leaf allocation, per-frame movement, `WorldTime` oscillation
+or map selection changed.
+
+The blur ageing candidates were not edited. `MoveBlurs()` and
+`MoveObjectBlurs()` are defined and declared, but repository-wide symbol search
+found no active caller while `RenderBlurs()` is called by the scene. That is a
+dormant or incomplete lifecycle path, not a safe optimization target. It needs a
+separate decision to reconnect or remove it after Windows runtime evidence.
+
 Phase 4A removes only those duplicate/no-op branches and the obsolete commented
 define. The surviving statements are the exact calls previously compiled by the
 default path. No animation formula, velocity, order or ownership changes.
@@ -88,11 +103,12 @@ Do not globally replace these systems:
 
 1. Completed: migrate deterministic caret/notice blink counters in `UIControls.cpp`.
 2. Review minimap auto-movement separately; it has gameplay/network authority.
-3. Migrate deterministic effect lifetime and blur consumers while preserving
-   emitted counts and visible duration.
-4. Migrate random pet/boid/Hellas emitters only with explicit stall and RNG rules.
-5. Review `standlimit` and `MoveSceneFrame` owners last.
-6. Remove a legacy helper only after active calls, callbacks, macros and runtime
+3. Completed: migrate active rain intensity/position counters in `MoveLeaves()`.
+4. Decide whether the dormant blur-move lifecycle must be reconnected or removed.
+5. Review remaining active deterministic effect counters one family at a time.
+6. Migrate random pet/boid/Hellas emitters only with explicit stall and RNG rules.
+7. Review `standlimit` and `MoveSceneFrame` owners last.
+8. Remove a legacy helper only after active calls, callbacks, macros and runtime
    lookups are all proven absent.
 
 Each group is a separate rollback point and requires a Release Win32 build plus
