@@ -3649,14 +3649,10 @@ bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float
 		// RENDER_CHROME8 is excluded by the caller (no matching shader) -> legacy.
 	}
 
-	// Remember the program the scene had bound (CShaderScene's terrain/character
-	// program, or 0). We restore it afterwards instead of forcing 0, so meshes
-	// drawn on the legacy path right after us keep their intended shader.
-	GLint prevProgram = 0;
-	g_RenderProfiler.AddCounter(RPC_CURRENT_PROGRAM_QUERIES);
-	glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
-
-	if (!gShaderGL->UseVBO(prog))
+	// The authoritative shader-state owner returns the exact predecessor so this
+	// nested material draw can restore a scene shader or the legacy program 0.
+	GLuint prevProgram = 0;
+	if (!gShaderGL->UseVBO(prog, &prevProgram))
 		return false; // program unavailable -> caller falls back to legacy
 
 	float view[16], proj[16];
@@ -3702,7 +3698,7 @@ bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float
 	RenderProfilerBindBuffer(GL_ARRAY_BUFFER, 0);
 	RenderProfilerBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-	RenderProfilerUseProgram((GLuint)prevProgram); // restore the scene's program, not 0
+	gShaderGL->RestoreProgram(prevProgram); // restore the scene's program, not 0
 	return true;
 #else
 	return false;
@@ -3733,11 +3729,13 @@ void BMD::RenderVertexBuffer(int i, Mesh_t* m, int vertex_index, vec3_t* vertice
 			RenderProfilerBindBuffer(GL_ARRAY_BUFFER, 0);
 		}
 
-		RenderProfilerUseProgram(shader_id);
+		GLuint previousProgram = 0;
+		if (!gShaderGL->UseLegacy(&previousProgram))
+			return;
 		RenderProfilerBindVertexArray(m->VAO);
 		glDrawElements(GL_TRIANGLES, vertex_index, GL_UNSIGNED_SHORT, 0);
 		RenderProfilerBindVertexArray(0);
-		RenderProfilerUseProgram(0);
+		gShaderGL->RestoreProgram(previousProgram);
 	}
 	else
 	{
