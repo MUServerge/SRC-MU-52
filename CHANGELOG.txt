@@ -10,12 +10,12 @@
   with one bounded 25 Hz compatibility scheduler owned by csteady_clock. It
   carries fractional time between render frames, emits up to five fixed steps
   per frame, reports discarded whole steps after long stalls and exposes a
-  0..1 interpolation alpha for later consumers. CheckNormalizer now reflects
-  whether the scheduler emitted at least one step instead of using a reset-to-now
-  40 ms wall-clock check whose effective cadence varied with render FPS. The
-  water texture sequence consumes the full emitted step count; other existing
-  compatibility consumers retain the boolean view until their Phase 4 audit.
-  Removed the commented-out while loop, render-FPS-sized pseudo fixed delta and
+  0..1 interpolation alpha for later consumers. The water texture sequence
+  consumes the full emitted step count. Existing CheckNormalizer consumers keep
+  their prior 40 ms compatibility cadence until their Phase 4 audit, avoiding an
+  unreviewed simultaneous timing change across pets, effects, minimap and map
+  specializations. Removed the commented-out while loop, render-FPS-sized pseudo
+  fixed delta and
   unused post-frame accumulator. Added opt-in RenderProfiler counters for emitted
   and dropped fixed steps. MoveMainScene, input, UI, physics, gameplay logic,
   render FPS, frame-pacing policy and GLEW are unchanged. Static source review
