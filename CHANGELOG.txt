@@ -17,7 +17,8 @@
   uploads and UBO binds. VBO eligibility, shader lighting/material math, draw
   order, CPU transforms, gameplay timing and packets are unchanged. Static source
   verification only; Windows build, visual parity and performance measurements
-  remain pending.
+  remain pending. Runtime validation can force `MU_BONE_TRANSPORT=ubo`,
+  `uniform` or `legacy`; the variable is absent by default.
 
 - Client renderer Phase 9: removed dormant shader/VBO experiments from the
   production runtime after resolving their intent and preserving the useful
