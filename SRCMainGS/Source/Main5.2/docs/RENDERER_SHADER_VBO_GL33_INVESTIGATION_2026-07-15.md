@@ -546,6 +546,22 @@ The current VBO path still executes CPU vertex/normal transformation because `Ne
 The largest plausible CPU improvement comes only after consumer-specific proof allows CPU transforms to be skipped for an explicitly safe draw contract. UBO bone transport primarily improves portability and may reduce upload/driver overhead; both require the existing profiler and identical runtime scenes before any performance claim.
 
 
+### Phase 10 implementation: capability-selected bone transport
+
+The active `Data\\Effect\\VBO\\Model.vs` source now declares its 600-vec4 palette through one compile-time ownership seam:
+
+- preferred: `MU_USE_BONE_UBO` selects a std140 `BoneBlock`;
+- fallback: the same source retains the previous plain `u_Bones[600]` array;
+- final fallback: a rejected program, block, buffer, capacity or upload leaves the existing legacy BMD draw authoritative.
+
+`CShaderScene::BuildProgramFromFiles` inserts the internal capability define immediately after `#version`; no duplicated Model shader asset or second shader manager is introduced. `CShaderGL` owns the selected program, transport, binding point 0 and one 9,600-byte-or-larger streaming buffer. Initialization validates the OpenGL 3.1/ARB capability, every required entry point, maximum block size, available binding count, active `BoneBlock` size and actual allocated buffer size before enabling UBO transport.
+
+Each draw uploads only `NumBones * 3 * vec4` bytes. BMD indices and the linked capacity are still validated before binding. The generic `GL_UNIFORM_BUFFER` binding is restored after initialization and uploads; the indexed binding point is reserved by the single BMD shader owner for its lifetime. Release deletes the buffer while the context is current and participates in existing resource counters.
+
+The profiler distinguishes uniform-array palette uploads, UBO palette uploads and uniform-buffer binds. This phase improves the bone-limit portability contract and removes dependence on the non-guaranteed 2,400-component vertex-uniform capacity when UBO is selected. It does not yet remove the duplicated CPU transform and makes no FPS claim without the runtime baseline matrix.
+
+Runtime validation can deterministically select each path without changing the production default: `MU_BONE_TRANSPORT=ubo` requires UBO or falls to legacy, `MU_BONE_TRANSPORT=uniform` bypasses UBO, and `MU_BONE_TRANSPORT=legacy` disables the GPU BMD draw. With the variable absent, automatic UBO-first selection remains active.
+
 ## 19. Questions that require runtime evidence
 
 1. What color/alpha/depth/stencil/sample values does `DescribePixelFormat` report on each supported machine and remote/virtual environment?

@@ -6,6 +6,20 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 10: added capability-selected BMD bone transport to
+  the single active VBO Model shader. The same Model.vs source is compiled with a
+  validated std140 9,600-byte BoneBlock when OpenGL 3.1/ARB UBO support, required
+  entry points, binding capacity, linked block size and buffer allocation pass;
+  otherwise it recompiles through the previous uniform-array contract, with the
+  legacy BMD draw remaining the final fallback. CShaderGL now owns and releases
+  the UBO under the current context, BMD rejects failed palette uploads before
+  drawing, and RenderProfiler distinguishes UBO versus uniform-array palette
+  uploads and UBO binds. VBO eligibility, shader lighting/material math, draw
+  order, CPU transforms, gameplay timing and packets are unchanged. Static source
+  verification only; Windows build, visual parity and performance measurements
+  remain pending. Runtime validation can force `MU_BONE_TRANSPORT=ubo`,
+  `uniform` or `legacy`; the variable is absent by default.
+
 - Client renderer Phase 9: removed dormant shader/VBO experiments from the
   production runtime after resolving their intent and preserving the useful
   architecture as an explicit migration specification. The client now owns only

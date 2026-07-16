@@ -707,6 +707,11 @@ namespace
 		WriteEntryPointDiagnostic("glCreateProgram/attach/link", glCreateProgram != NULL && glAttachShader != NULL && glLinkProgram != NULL);
 		WriteEntryPointDiagnostic("glGetProgramiv/info log", glGetProgramiv != NULL && glGetProgramInfoLog != NULL);
 		WriteEntryPointDiagnostic("glGetActiveUniform (bone contract)", glGetActiveUniform != NULL);
+		WriteEntryPointDiagnostic("glGetUniformBlockIndex", glGetUniformBlockIndex != NULL);
+		WriteEntryPointDiagnostic("glGetActiveUniformBlockiv", glGetActiveUniformBlockiv != NULL);
+		WriteEntryPointDiagnostic("glUniformBlockBinding", glUniformBlockBinding != NULL);
+		WriteEntryPointDiagnostic("glBindBufferBase", glBindBufferBase != NULL);
+		WriteEntryPointDiagnostic("glGetBufferParameteriv", glGetBufferParameteriv != NULL);
 		WriteEntryPointDiagnostic("glUseProgram/delete", glUseProgram != NULL && glDeleteProgram != NULL);
 		WriteEntryPointDiagnostic("glGetUniformLocation", glGetUniformLocation != NULL);
 		WriteEntryPointDiagnostic("uniform upload functions", uniformEntries);
@@ -720,7 +725,8 @@ namespace
 		const bool timerQuerySupport =
 			(versionParsed && IsOpenGLVersionAtLeast(major, minor, 3, 3)) || GLEW_ARB_timer_query || GLEW_EXT_timer_query;
 		const bool uboSupport = uniformBufferCapability && glGetUniformBlockIndex != NULL &&
-			glUniformBlockBinding != NULL && glBindBufferBase != NULL;
+			glGetActiveUniformBlockiv != NULL && glUniformBlockBinding != NULL &&
+			glBindBufferBase != NULL && glGetBufferParameteriv != NULL;
 		const bool textureBufferSupport = textureBufferCapability && glTexBuffer != NULL;
 
 		g_ErrorReport.Write("<Renderer capability summary>\r\n");

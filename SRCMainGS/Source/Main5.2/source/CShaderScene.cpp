@@ -139,9 +139,10 @@ GLuint CShaderScene::BuildProgram(const char* vertexSource, const char* fragment
 	return LinkProgram(vs, fs, safeTag);
 }
 
-GLuint CShaderScene::BuildProgramFromFiles(const char* vertexPath, const char* fragmentPath, const char* tag)
+GLuint CShaderScene::BuildProgramFromFiles(const char* vertexPath, const char* fragmentPath,
+	const char* tag, const char* vertexDefine)
 {
-	const std::string vertexSource = ReadTextFile(vertexPath);
+	std::string vertexSource = ReadTextFile(vertexPath);
 	const std::string fragmentSource = ReadTextFile(fragmentPath);
 	if (vertexSource.empty() || fragmentSource.empty())
 	{
@@ -149,6 +150,25 @@ GLuint CShaderScene::BuildProgramFromFiles(const char* vertexPath, const char* f
 			vertexPath != NULL ? vertexPath : "<null>",
 			fragmentPath != NULL ? fragmentPath : "<null>");
 		return 0;
+	}
+
+	if (vertexDefine != NULL && vertexDefine[0] != '\0')
+	{
+		// GLSL requires #version to remain the first directive. Insert the one
+		// internal capability define after its complete line instead of prepending it.
+		const size_t versionOffset = vertexSource.find("#version");
+		const size_t versionEnd = versionOffset == std::string::npos
+			? std::string::npos
+			: vertexSource.find('\n', versionOffset);
+		if (versionOffset == std::string::npos || versionEnd == std::string::npos)
+		{
+			g_ErrorReport.Write("> [Shader] Cannot specialize '%s': missing #version line.\r\n",
+				tag != NULL ? tag : "unnamed");
+			return 0;
+		}
+
+		const std::string defineLine = std::string("#define ") + vertexDefine + " 1\n";
+		vertexSource.insert(versionEnd + 1, defineLine);
 	}
 
 	return BuildProgram(vertexSource.c_str(), fragmentSource.c_str(), tag);

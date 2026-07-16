@@ -5,8 +5,22 @@
 #ifdef SHADER_VERSION_TEST
 #include "Utilities/Log/muConsoleDebug.h"
 
+namespace
+{
+	const int kBoneCapacity = 200;
+	const int kVec4PerBone = 3;
+	const int kBoneVec4Capacity = kBoneCapacity * kVec4PerBone;
+	const int kBonePaletteBytes = kBoneVec4Capacity * 4 * sizeof(float);
+	const GLuint kBoneBlockBindingPoint = 0;
+	const char* const kBoneBlockName = "BoneBlock";
+	const char* const kBoneUboDefine = "MU_USE_BONE_UBO";
+}
+
 CShaderGL::CShaderGL()
 	: m_MaxVertexUniformComponents(0)
+	, m_MaxUniformBlockSize(0)
+	, m_BoneUniformBuffer(0)
+	, m_BoneTransport(eVBOBoneTransport_None)
 {
 	for (int i = 0; i < eVBO_Max; ++i)
 	{
@@ -20,15 +34,34 @@ CShaderGL::~CShaderGL()
 	Release();
 }
 
+void CShaderGL::ReleaseUniformBuffer(bool canDelete)
+{
+	if (m_BoneUniformBuffer == 0)
+		return;
+
+	if (canDelete && glDeleteBuffers != NULL)
+	{
+		if (glBindBufferBase != NULL)
+			glBindBufferBase(GL_UNIFORM_BUFFER, kBoneBlockBindingPoint, 0);
+		g_RenderProfiler.ResourceDeleted(RPR_BUFFER);
+		glDeleteBuffers(1, &m_BoneUniformBuffer);
+	}
+
+	m_BoneUniformBuffer = 0;
+}
+
 void CShaderGL::Release()
 {
 	bool hasPrograms = false;
 	for (int i = 0; i < eVBO_Max; ++i)
 		hasPrograms = hasPrograms || (m_VBOProgram[i] != 0);
 
-	if (!hasPrograms)
+	const bool hasResources = hasPrograms || m_BoneUniformBuffer != 0;
+	if (!hasResources)
 	{
 		m_MaxVertexUniformComponents = 0;
+		m_MaxUniformBlockSize = 0;
+		m_BoneTransport = eVBOBoneTransport_None;
 		for (int i = 0; i < eVBO_Max; ++i)
 			m_VBOBoneCapacity[i] = 0;
 		return;
@@ -45,6 +78,8 @@ void CShaderGL::Release()
 	if (canDelete && ownsBoundProgram)
 		RestoreProgram(0);
 
+	ReleaseUniformBuffer(canDelete);
+
 	for (int i = 0; i < eVBO_Max; ++i)
 	{
 		if (m_VBOProgram[i] != 0)
@@ -56,6 +91,8 @@ void CShaderGL::Release()
 	}
 
 	m_MaxVertexUniformComponents = 0;
+	m_MaxUniformBlockSize = 0;
+	m_BoneTransport = eVBOBoneTransport_None;
 }
 
 void CShaderGL::Init()
@@ -63,25 +100,26 @@ void CShaderGL::Init()
 	InitVBOShaders();
 }
 
-GLuint CShaderGL::LoadVBOProgram(const char* baseName)
+GLuint CShaderGL::LoadVBOProgram(const char* baseName, const char* vertexDefine)
 {
 	const std::string vertexPath =
 		std::string("Data\\Effect\\VBO\\") + baseName + ".vs";
 	const std::string fragmentPath =
 		std::string("Data\\Effect\\VBO\\") + baseName + ".fs";
+	const char* tag = vertexDefine != NULL ? "Model UBO" : "Model UniformArray";
 
 	const GLuint program = CShaderScene::BuildProgramFromFiles(
-		vertexPath.c_str(), fragmentPath.c_str(), baseName);
+		vertexPath.c_str(), fragmentPath.c_str(), tag, vertexDefine);
 	if (program == 0)
 	{
 		g_ConsoleDebug->Write(5,
-			"[VBO Shader] program unavailable for '%s'; legacy mesh fallback remains active",
-			baseName);
+			"[VBO Shader] program unavailable for '%s'; another bone transport or legacy fallback will be tried",
+			tag);
 	}
 	return program;
 }
 
-int CShaderGL::InspectVBOBoneCapacity(GLuint program, const char* tag) const
+int CShaderGL::InspectUniformArrayBoneCapacity(GLuint program, const char* tag) const
 {
 	if (program == 0 || glGetProgramiv == NULL || glGetActiveUniform == NULL)
 		return 0;
@@ -105,7 +143,7 @@ int CShaderGL::InspectVBOBoneCapacity(GLuint program, const char* tag) const
 		if (!isBoneArray)
 			continue;
 
-		if (uniformType != GL_FLOAT_VEC4 || uniformSize < 3)
+		if (uniformType != GL_FLOAT_VEC4 || uniformSize < kVec4PerBone)
 		{
 			g_ConsoleDebug->Write(5,
 				"[VBO Shader] '%s' has incompatible u_Bones type/size (type=0x%X size=%d)",
@@ -122,10 +160,10 @@ int CShaderGL::InspectVBOBoneCapacity(GLuint program, const char* tag) const
 			return 0;
 		}
 
-		const int boneCapacity = uniformSize / 3;
+		const int boneCapacity = uniformSize / kVec4PerBone;
 		g_ConsoleDebug->Write(5,
-			"[VBO Shader] '%s' verified bone capacity: %d bones (vec4 count=%d, HW components=%d)",
-			tag, boneCapacity, uniformSize, m_MaxVertexUniformComponents);
+			"[VBO Shader] '%s' verified uniform-array capacity: %d bones",
+			tag, boneCapacity);
 		return boneCapacity;
 	}
 
@@ -133,19 +171,159 @@ int CShaderGL::InspectVBOBoneCapacity(GLuint program, const char* tag) const
 	return 0;
 }
 
+bool CShaderGL::CanUseUniformBuffer() const
+{
+	const bool capability = GLEW_VERSION_3_1 || GLEW_ARB_uniform_buffer_object;
+	return capability &&
+		glGetUniformBlockIndex != NULL &&
+		glGetActiveUniformBlockiv != NULL &&
+		glUniformBlockBinding != NULL &&
+		glBindBufferBase != NULL &&
+		glGenBuffers != NULL &&
+		glBindBuffer != NULL &&
+		glBufferData != NULL &&
+		glBufferSubData != NULL &&
+		glGetBufferParameteriv != NULL &&
+		glDeleteBuffers != NULL;
+}
+
+bool CShaderGL::ConfigureUniformBuffer(GLuint program, const char* tag)
+{
+	if (program == 0 || !CanUseUniformBuffer())
+		return false;
+
+	GLint maxBindings = 0;
+	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &maxBindings);
+	glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &m_MaxUniformBlockSize);
+	if (maxBindings <= (GLint)kBoneBlockBindingPoint ||
+		m_MaxUniformBlockSize < kBonePaletteBytes)
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] '%s' UBO limits insufficient (bindings=%d block=%d required=%d)",
+			tag, maxBindings, m_MaxUniformBlockSize, kBonePaletteBytes);
+		return false;
+	}
+
+	const GLuint blockIndex = glGetUniformBlockIndex(program, kBoneBlockName);
+	if (blockIndex == GL_INVALID_INDEX)
+	{
+		g_ConsoleDebug->Write(5, "[VBO Shader] '%s' has no active %s block", tag, kBoneBlockName);
+		return false;
+	}
+
+	GLint blockSize = 0;
+	glGetActiveUniformBlockiv(program, blockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &blockSize);
+	if (blockSize < kBonePaletteBytes || blockSize > m_MaxUniformBlockSize)
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] '%s' incompatible BoneBlock size=%d required=%d max=%d",
+			tag, blockSize, kBonePaletteBytes, m_MaxUniformBlockSize);
+		return false;
+	}
+
+	GLuint buffer = 0;
+	RenderProfilerGenBuffers(1, &buffer);
+	if (buffer == 0)
+		return false;
+
+	GLint previousBuffer = 0;
+	glGetIntegerv(GL_UNIFORM_BUFFER_BINDING, &previousBuffer);
+	RenderProfilerBindBuffer(GL_UNIFORM_BUFFER, buffer);
+	glBufferData(GL_UNIFORM_BUFFER, blockSize, NULL, GL_STREAM_DRAW);
+
+	GLint allocatedSize = 0;
+	glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_SIZE, &allocatedSize);
+	if (allocatedSize < blockSize)
+	{
+		RenderProfilerBindBuffer(GL_UNIFORM_BUFFER, (GLuint)previousBuffer);
+		g_RenderProfiler.ResourceDeleted(RPR_BUFFER);
+		glDeleteBuffers(1, &buffer);
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] '%s' failed to allocate BoneBlock buffer (%d/%d bytes)",
+			tag, allocatedSize, blockSize);
+		return false;
+	}
+
+	glUniformBlockBinding(program, blockIndex, kBoneBlockBindingPoint);
+	glBindBufferBase(GL_UNIFORM_BUFFER, kBoneBlockBindingPoint, buffer);
+	RenderProfilerBindBuffer(GL_UNIFORM_BUFFER, (GLuint)previousBuffer);
+
+	m_BoneUniformBuffer = buffer;
+	m_BoneTransport = eVBOBoneTransport_UniformBuffer;
+	m_VBOBoneCapacity[eVBO_Model] = kBoneCapacity;
+	g_ConsoleDebug->Write(5,
+		"[VBO Shader] '%s' selected UBO bone transport: %d bones, %d-byte block, binding %u",
+		tag, kBoneCapacity, blockSize, kBoneBlockBindingPoint);
+	return true;
+}
+
 void CShaderGL::InitVBOShaders()
 {
 	m_MaxVertexUniformComponents = 0;
+	m_MaxUniformBlockSize = 0;
+	m_BoneTransport = eVBOBoneTransport_None;
 	for (int i = 0; i < eVBO_Max; ++i)
 	{
 		m_VBOProgram[i] = 0;
 		m_VBOBoneCapacity[i] = 0;
 	}
 
+	char requestedTransport[16] = { 0 };
+	const DWORD requestedLength = GetEnvironmentVariableA(
+		"MU_BONE_TRANSPORT", requestedTransport, sizeof(requestedTransport));
+	const bool hasTransportOverride =
+		requestedLength > 0 && requestedLength < sizeof(requestedTransport);
+	const bool forceLegacy = hasTransportOverride &&
+		_stricmp(requestedTransport, "legacy") == 0;
+	const bool forceUniformArray = hasTransportOverride &&
+		_stricmp(requestedTransport, "uniform") == 0;
+	const bool forceUniformBuffer = hasTransportOverride &&
+		_stricmp(requestedTransport, "ubo") == 0;
+
+	if (forceLegacy)
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] MU_BONE_TRANSPORT=legacy; GPU BMD draw disabled for validation");
+		return;
+	}
+
+	// Prefer the portable std140 block. The same source is recompiled without
+	// the define when UBO capability, linking, block introspection or allocation
+	// fails, so no duplicate shader asset or manager is introduced.
+	if (!forceUniformArray && CanUseUniformBuffer())
+	{
+		m_VBOProgram[eVBO_Model] = LoadVBOProgram("Model", kBoneUboDefine);
+		if (m_VBOProgram[eVBO_Model] != 0 &&
+			ConfigureUniformBuffer(m_VBOProgram[eVBO_Model], "Model UBO"))
+		{
+			return;
+		}
+
+		if (m_VBOProgram[eVBO_Model] != 0)
+		{
+			gShaderScene.ForgetProgram(m_VBOProgram[eVBO_Model]);
+			RenderProfilerDeleteProgram(m_VBOProgram[eVBO_Model]);
+			m_VBOProgram[eVBO_Model] = 0;
+		}
+		ReleaseUniformBuffer(true);
+	}
+	else
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] UBO transport unavailable or bypassed; trying uniform-array fallback");
+	}
+
+	if (forceUniformBuffer)
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] MU_BONE_TRANSPORT=ubo failed; legacy mesh fallback active");
+		return;
+	}
+
 	if (!GLEW_VERSION_2_0 || glGetActiveUniform == NULL)
 	{
 		g_ConsoleDebug->Write(5,
-			"[VBO Shader] uniform introspection unavailable; GPU skinning disabled, legacy fallback active");
+			"[VBO Shader] uniform-array introspection unavailable; legacy mesh fallback active");
 		return;
 	}
 
@@ -154,7 +332,7 @@ void CShaderGL::InitVBOShaders()
 	if (m_MaxVertexUniformComponents <= 0)
 	{
 		g_ConsoleDebug->Write(5,
-			"[VBO Shader] invalid GL_MAX_VERTEX_UNIFORM_COMPONENTS=%d; GPU skinning disabled",
+			"[VBO Shader] invalid GL_MAX_VERTEX_UNIFORM_COMPONENTS=%d; legacy mesh fallback active",
 			m_MaxVertexUniformComponents);
 		return;
 	}
@@ -164,9 +342,14 @@ void CShaderGL::InitVBOShaders()
 		return;
 
 	m_VBOBoneCapacity[eVBO_Model] =
-		InspectVBOBoneCapacity(m_VBOProgram[eVBO_Model], "Model");
+		InspectUniformArrayBoneCapacity(m_VBOProgram[eVBO_Model], "Model UniformArray");
 	if (m_VBOBoneCapacity[eVBO_Model] > 0)
+	{
+		m_BoneTransport = eVBOBoneTransport_UniformArray;
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] selected uniform-array bone transport fallback");
 		return;
+	}
 
 	gShaderScene.ForgetProgram(m_VBOProgram[eVBO_Model]);
 	RenderProfilerDeleteProgram(m_VBOProgram[eVBO_Model]);
@@ -238,7 +421,7 @@ GLint CShaderGL::GetUniformLocation(GLuint program, const char* name) const
 bool CShaderGL::UseVBO(eVBOShader shader, GLuint* previousProgram)
 {
 	const GLuint program = GetVBOProgram(shader);
-	if (program == 0)
+	if (program == 0 || m_BoneTransport == eVBOBoneTransport_None)
 		return false;
 
 	const GLuint previous = BindTrackedProgram(program);
@@ -252,6 +435,44 @@ bool CShaderGL::UseVBO(eVBOShader shader, GLuint* previousProgram)
 void CShaderGL::RestoreProgram(GLuint program)
 {
 	BindTrackedProgram(program);
+}
+
+bool CShaderGL::UploadBones(const float* data, int boneCount) const
+{
+	const GLuint program = GetBoundVBOProgram();
+	if (program == 0 || data == NULL || boneCount <= 0 ||
+		boneCount > m_VBOBoneCapacity[eVBO_Model])
+	{
+		return false;
+	}
+
+	const int vec4Count = boneCount * kVec4PerBone;
+	if (m_BoneTransport == eVBOBoneTransport_UniformBuffer)
+	{
+		if (m_BoneUniformBuffer == 0 || glBufferSubData == NULL)
+			return false;
+
+		GLint previousBuffer = 0;
+		glGetIntegerv(GL_UNIFORM_BUFFER_BINDING, &previousBuffer);
+		RenderProfilerBindBuffer(GL_UNIFORM_BUFFER, m_BoneUniformBuffer);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0,
+			vec4Count * 4 * sizeof(float), data);
+		RenderProfilerBindBuffer(GL_UNIFORM_BUFFER, (GLuint)previousBuffer);
+		g_RenderProfiler.AddCounter(RPC_BONE_PALETTE_UPLOAD_UBO);
+		return true;
+	}
+
+	if (m_BoneTransport == eVBOBoneTransport_UniformArray)
+	{
+		const GLint location = GetUniformLocation(program, "u_Bones");
+		if (location < 0)
+			return false;
+		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_BONE);
+		glUniform4fv(location, vec4Count, data);
+		return true;
+	}
+
+	return false;
 }
 
 void CShaderGL::vboSetInt(const char* name, int value) const
@@ -275,18 +496,6 @@ void CShaderGL::vboSetVec4(const char* name, float x, float y, float z, float w)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 		glUniform4f(loc, x, y, z, w);
-	}
-}
-
-void CShaderGL::vboSetVec4Array(const char* name, const float* data, int vec4Count) const
-{
-	const GLuint program = GetBoundVBOProgram();
-	if (program == 0) return;
-	const GLint loc = GetUniformLocation(program, name);
-	if (loc >= 0)
-	{
-		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_BONE);
-		glUniform4fv(loc, vec4Count, data);
 	}
 }
 
