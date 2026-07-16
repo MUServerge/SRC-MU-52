@@ -6,6 +6,22 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client FPS Phase 4B-4: migrated the deterministic pet fly-effect spark gate
+  in CSPetSystem.cpp from CheckNormalizer to the bounded 25 Hz non-burst emission
+  policy (ShouldRunFixedVisualEmission), matching Phase 4B-3. The flying-pet spark
+  particle now receives one emission opportunity per render frame (~25/second)
+  instead of the legacy boolean pulse, and is never replayed as a burst after a
+  stall. The gate condition carries no random term and the body creates only
+  client visual particles, so this is a deterministic-cadence visual gate; the
+  remaining rand()-gated pet/boid/Hellas emitters are deliberately left for the
+  RNG-aware migration. Gameplay, packets, per-opportunity RNG consumption, frame
+  pacing and rendering order are unchanged. Static verification only; Windows
+  build and runtime cadence checks remain pending.
+  (CSPetSystem.cpp, docs/FPS_TIMING_CONSUMER_AUDIT_2026-07-16.md)
+------------------------------------------------------------
+ 2026-07-16
+------------------------------------------------------------
+
 - Client FPS Phase 4B-3: added one explicit non-burst fixed visual
   emission policy to csteady_clock and migrated CreateEffectSync,
   CreateJointSync and CreateParticleSync away from CheckNormalizer. A render

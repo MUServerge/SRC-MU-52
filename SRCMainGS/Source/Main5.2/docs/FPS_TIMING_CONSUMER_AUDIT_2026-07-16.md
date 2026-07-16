@@ -26,7 +26,7 @@ runtime cadence measurements remain pending.
 
 | Symbol/domain | Active source files | Observed uses | Classification |
 | --- | ---: | ---: | --- |
-| `CheckNormalizer` | 8 | 18 | Remaining discrete 25 Hz compatibility pulse |
+| `CheckNormalizer` | 7 | 17 | Remaining discrete 25 Hz compatibility pulse |
 | `timefac` | 35 | 1772 | Continuous elapsed-time scaling |
 | `timeNormalizer` | 3 | 4 | Continuous normalization helper |
 | `standlimit` | 6 | 55 | Mixed lifetime/modulo compatibility |
@@ -36,8 +36,8 @@ runtime cadence measurements remain pending.
 | `frame_scene_desplace` | 2 | project-local | Scene displacement compatibility |
 | `MacroTime` | 2 | project-local | Render-frame counter |
 
-The remaining `CheckNormalizer` call sites are in pet, boid, minimap and effect
-specializations, including `CSPetSystem.cpp`, `GMHellas.cpp`, `GOBoid.cpp`,
+The remaining `CheckNormalizer` call sites are in boid, minimap and effect
+specializations, including `GMHellas.cpp`, `GOBoid.cpp`,
 `NewUIMiniMap.cpp`, `ZzzEffect.cpp`,
 `ZzzEffectBlurSpark.cpp`,
 `ZzzEffectJoint.cpp` and `ZzzEffectParticle.cpp`. A commented
@@ -98,6 +98,23 @@ machine, so replacing each boolean increment independently would either burst
 tail creation or delay a state transition. That path requires a dedicated
 fixed-step update stage rather than arithmetic substitution.
 
+### Phase 4B-4: deterministic pet fly-effect spark
+
+`CSPetSystem.cpp` emits a purely visual spark for flying pets
+(`CreateParticle(BITMAP_SPARK + 1, ...)`) once per legacy pulse, gated by
+`!eBuff_Cloaking && CheckNormalizer`. That gate is now
+`!eBuff_Cloaking && ShouldRunFixedVisualEmission()`, the same non-burst policy
+used by the three Sync wrappers in Phase 4B-3: one emission opportunity per
+render frame, approximately 25 per second, never replayed as a burst after a
+stall. The condition carries no random term and the body creates only client
+visual particles, so this is a deterministic-cadence visual gate, not a random
+emitter. The pet's random per-emission bone selection (`rand() % 66`) is inside
+the body and runs once per opportunity exactly as before.
+
+The remaining `CSPetSystem` / `GOBoid` / `GMHellas` sites are **not** migrated:
+their conditions are `rand() % N == 0 && CheckNormalizer` (random emitters), so
+they fall under separation rule 3 and require explicit stall/RNG handling.
+
 Phase 4A removes only those duplicate/no-op branches and the obsolete commented
 define. The surviving statements are the exact calls previously compiled by the
 default path. No animation formula, velocity, order or ownership changes.
@@ -123,11 +140,12 @@ Do not globally replace these systems:
 3. Completed: migrate active rain intensity/position counters in `MoveLeaves()`.
 4. Decide whether the dormant blur-move lifecycle must be reconnected or removed.
 5. Completed: migrate the three Sync wrappers to a non-burst emission gate.
-6. Design a dedicated fixed-step state update for joint tail-generation counters.
-7. Migrate random pet/boid/Hellas emitters only with explicit stall and RNG rules.
-8. Review `standlimit` and `MoveSceneFrame` owners last.
-9. Remove a legacy helper only after active calls, callbacks, macros and runtime
-   lookups are all proven absent.
+6. Completed: migrate the deterministic pet fly-effect spark gate in `CSPetSystem.cpp`.
+7. Design a dedicated fixed-step state update for joint tail-generation counters.
+8. Migrate random pet/boid/Hellas emitters only with explicit stall and RNG rules.
+9. Review `standlimit` and `MoveSceneFrame` owners last.
+10. Remove a legacy helper only after active calls, callbacks, macros and runtime
+    lookups are all proven absent.
 
 Each group is a separate rollback point and requires a Release Win32 build plus
 60/120 FPS visual/cadence comparison before performance conclusions.
