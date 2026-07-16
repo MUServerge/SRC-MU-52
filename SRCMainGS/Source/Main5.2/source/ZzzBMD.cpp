@@ -3719,9 +3719,14 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight,
 		}
 	}
 
-	// Upload only THIS model's verified bone range. The source
-	// (o->BoneTransform) is vec34_t[NumBones], so boneCount*3 vec4 is exact.
-	gShaderGL->vboSetVec4Array("u_Bones", (const float*)g_pShaderBoneMatrix, boneCount * 3);
+	// Upload only THIS model's verified bone range. CShaderGL owns the selected
+	// UBO or uniform-array transport. A rejected upload restores the predecessor
+	// program and lets the caller execute the authoritative legacy draw.
+	if (!gShaderGL->UploadBones((const float*)g_pShaderBoneMatrix, boneCount))
+	{
+		gShaderGL->RestoreProgram(prevProgram);
+		return false;
+	}
 	g_RenderProfiler.AddCounter(RPC_GPU_UPLOADED_BONES, boneCount);
 
 	gShaderGL->vboSetVec4("u_bodyLight", BodyLight[0], BodyLight[1], BodyLight[2], Alpha);
