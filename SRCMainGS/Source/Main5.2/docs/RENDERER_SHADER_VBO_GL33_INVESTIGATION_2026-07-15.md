@@ -560,6 +560,8 @@ Each draw uploads only `NumBones * 3 * vec4` bytes. BMD indices and the linked c
 
 The profiler distinguishes uniform-array palette uploads, UBO palette uploads and uniform-buffer binds. This phase improves the bone-limit portability contract and removes dependence on the non-guaranteed 2,400-component vertex-uniform capacity when UBO is selected. It does not yet remove the duplicated CPU transform and makes no FPS claim without the runtime baseline matrix.
 
+Runtime validation can deterministically select each path without changing the production default: `MU_BONE_TRANSPORT=ubo` requires UBO or falls to legacy, `MU_BONE_TRANSPORT=uniform` bypasses UBO, and `MU_BONE_TRANSPORT=legacy` disables the GPU BMD draw. With the variable absent, automatic UBO-first selection remains active.
+
 ## 19. Questions that require runtime evidence
 
 1. What color/alpha/depth/stencil/sample values does `DescribePixelFormat` report on each supported machine and remote/virtual environment?
