@@ -706,6 +706,7 @@ namespace
 		WriteEntryPointDiagnostic("glGetShaderiv/info log", glGetShaderiv != NULL && glGetShaderInfoLog != NULL);
 		WriteEntryPointDiagnostic("glCreateProgram/attach/link", glCreateProgram != NULL && glAttachShader != NULL && glLinkProgram != NULL);
 		WriteEntryPointDiagnostic("glGetProgramiv/info log", glGetProgramiv != NULL && glGetProgramInfoLog != NULL);
+		WriteEntryPointDiagnostic("glGetActiveUniform (bone contract)", glGetActiveUniform != NULL);
 		WriteEntryPointDiagnostic("glUseProgram/delete", glUseProgram != NULL && glDeleteProgram != NULL);
 		WriteEntryPointDiagnostic("glGetUniformLocation", glGetUniformLocation != NULL);
 		WriteEntryPointDiagnostic("uniform upload functions", uniformEntries);
@@ -731,10 +732,11 @@ namespace
 		g_ErrorReport.Write("Texture-buffer support\t: %s\r\n", textureBufferSupport ? "yes" : "no");
 
 		const bool activeVboEntries = vaoEntries && bufferEntries && attributeEntries &&
-			integerAttributeEntry && shaderEntries && programEntries && uniformEntries;
+			integerAttributeEntry && shaderEntries && programEntries && uniformEntries &&
+			glGetActiveUniform != NULL;
 		g_ErrorReport.Write("Active VBO entry set\t: %s\r\n", activeVboEntries ? "complete" : "INCOMPLETE");
 		if (!activeVboEntries)
-			g_ErrorReport.Write("WARNING: draw selection is unchanged in Phase 0; continuing with missing VBO entry points remains unsafe.\r\n");
+			g_ErrorReport.Write("WARNING: unsafe VBO programs remain disabled; the CPU/legacy mesh fallback stays active.\r\n");
 	}
 }
 

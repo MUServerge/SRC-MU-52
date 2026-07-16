@@ -49,9 +49,10 @@ public:
 	// --- Data\Effect\VBO material programs (VBO / GPU-skinning path) ----------
 	// Compile+link every pair in Data\Effect\VBO. Safe to call once after glewInit.
 	void InitVBOShaders();
-	// True once at least the base "Model" program linked (path usable this run).
-	bool IsReadyVBO() const { return m_VBOProgram[eVBO_Model] != 0; }
+	// True once the base program linked and its active u_Bones contract was verified.
+	bool IsReadyVBO() const { return m_VBOProgram[eVBO_Model] != 0 && m_VBOBoneCapacity[eVBO_Model] > 0; }
 	GLuint GetVBOProgram(eVBOShader s) const;
+	int GetVBOBoneCapacity(eVBOShader s) const;
 	// Bind a program; returns false (binds nothing) when unavailable so the
 	// caller can fall back to the legacy immediate-mode draw.
 	bool UseVBO(eVBOShader s, GLuint* previousProgram = NULL);
@@ -75,6 +76,7 @@ public:
 	static CShaderGL* Instance();
 private:
 	GLuint loadVBOProgram(const char* baseName);
+	int InspectVBOBoneCapacity(GLuint program, const char* tag) const;
 	GLuint BindTrackedProgram(GLuint program) const;
 	GLuint GetTrackedProgram() const;
 	GLuint GetBoundVBOProgram() const;
@@ -82,6 +84,8 @@ private:
 
 	GLuint shader_id;
 	GLuint m_VBOProgram[eVBO_Max];
+	int m_VBOBoneCapacity[eVBO_Max];
+	int m_MaxVertexUniformComponents;
 };
 
 #define gShaderGL				(CShaderGL::Instance())

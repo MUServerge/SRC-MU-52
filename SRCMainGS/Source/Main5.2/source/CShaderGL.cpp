@@ -8,8 +8,12 @@
 CShaderGL::CShaderGL()
 {
 	shader_id = 0;
+	m_MaxVertexUniformComponents = 0;
 	for (int i = 0; i < eVBO_Max; ++i)
+	{
 		m_VBOProgram[i] = 0;
+		m_VBOBoneCapacity[i] = 0;
+	}
 }
 
 CShaderGL::~CShaderGL()
@@ -24,7 +28,12 @@ void CShaderGL::Release()
 		hasPrograms = hasPrograms || (m_VBOProgram[i] != 0);
 
 	if (!hasPrograms)
+	{
+		m_MaxVertexUniformComponents = 0;
+		for (int i = 0; i < eVBO_Max; ++i)
+			m_VBOBoneCapacity[i] = 0;
 		return;
+	}
 
 	// The normal shutdown path calls this before KillGLWindow. If a late static
 	// destructor reaches it without a current context, invalidate the stale names
@@ -54,8 +63,10 @@ void CShaderGL::Release()
 		if (canDelete && m_VBOProgram[i] != 0)
 			RenderProfilerDeleteProgram(m_VBOProgram[i]);
 		m_VBOProgram[i] = 0;
+		m_VBOBoneCapacity[i] = 0;
 	}
 
+	m_MaxVertexUniformComponents = 0;
 }
 
 void CShaderGL::Init()
@@ -163,10 +174,99 @@ GLuint CShaderGL::loadVBOProgram(const char* baseName)
 #endif // SHADER_PIPELINE
 }
 
+int CShaderGL::InspectVBOBoneCapacity(GLuint program, const char* tag) const
+{
+	if (program == 0 || glGetProgramiv == NULL || glGetActiveUniform == NULL)
+		return 0;
+
+	GLint activeUniformCount = 0;
+	glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &activeUniformCount);
+
+	for (GLint uniformIndex = 0; uniformIndex < activeUniformCount; ++uniformIndex)
+	{
+		char uniformName[128] = { 0 };
+		GLsizei uniformNameLength = 0;
+		GLint uniformSize = 0;
+		GLenum uniformType = 0;
+		glGetActiveUniform(program, (GLuint)uniformIndex, sizeof(uniformName) - 1,
+			&uniformNameLength, &uniformSize, &uniformType, uniformName);
+		uniformName[sizeof(uniformName) - 1] = '\0';
+
+		const bool isBoneArray =
+			strcmp(uniformName, "u_Bones") == 0 ||
+			strncmp(uniformName, "u_Bones[", 8) == 0;
+		if (!isBoneArray)
+			continue;
+
+		if (uniformType != GL_FLOAT_VEC4 || uniformSize < 3)
+		{
+			g_ConsoleDebug->Write(5,
+				"[VBO Shader] '%s' has incompatible u_Bones type/size (type=0x%X size=%d)",
+				tag, uniformType, uniformSize);
+			return 0;
+		}
+
+		const int requiredComponents = uniformSize * 4;
+		if (m_MaxVertexUniformComponents <= 0 || requiredComponents > m_MaxVertexUniformComponents)
+		{
+			g_ConsoleDebug->Write(5,
+				"[VBO Shader] '%s' u_Bones requires %d components; hardware reports %d",
+				tag, requiredComponents, m_MaxVertexUniformComponents);
+			return 0;
+		}
+
+		const int boneCapacity = uniformSize / 3;
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] '%s' verified bone capacity: %d bones (vec4 count=%d, HW components=%d)",
+			tag, boneCapacity, uniformSize, m_MaxVertexUniformComponents);
+		return boneCapacity;
+	}
+
+	g_ConsoleDebug->Write(5, "[VBO Shader] '%s' has no active u_Bones array", tag);
+	return 0;
+}
+
 void CShaderGL::InitVBOShaders()
 {
+	m_MaxVertexUniformComponents = 0;
 	for (int i = 0; i < eVBO_Max; ++i)
+	{
+		m_VBOProgram[i] = 0;
+		m_VBOBoneCapacity[i] = 0;
+	}
+
+	if (!GLEW_VERSION_2_0 || glGetActiveUniform == NULL)
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] uniform introspection unavailable; GPU skinning disabled, legacy fallback active");
+		return;
+	}
+
+	glGetIntegerv(GL_MAX_VERTEX_UNIFORM_COMPONENTS, &m_MaxVertexUniformComponents);
+	if (m_MaxVertexUniformComponents <= 0)
+	{
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] invalid GL_MAX_VERTEX_UNIFORM_COMPONENTS=%d; GPU skinning disabled",
+			m_MaxVertexUniformComponents);
+		return;
+	}
+
+	for (int i = 0; i < eVBO_Max; ++i)
+	{
 		m_VBOProgram[i] = loadVBOProgram(s_VBOShaderName[i]);
+		if (m_VBOProgram[i] == 0)
+			continue;
+
+		m_VBOBoneCapacity[i] = InspectVBOBoneCapacity(m_VBOProgram[i], s_VBOShaderName[i]);
+		if (m_VBOBoneCapacity[i] > 0)
+			continue;
+
+#ifdef SHADER_PIPELINE
+		gShaderScene.ForgetProgram(m_VBOProgram[i]);
+#endif // SHADER_PIPELINE
+		RenderProfilerDeleteProgram(m_VBOProgram[i]);
+		m_VBOProgram[i] = 0;
+	}
 }
 
 GLuint CShaderGL::GetVBOProgram(eVBOShader s) const
@@ -174,6 +274,13 @@ GLuint CShaderGL::GetVBOProgram(eVBOShader s) const
 	if (s < 0 || s >= eVBO_Max)
 		return 0;
 	return m_VBOProgram[s];
+}
+
+int CShaderGL::GetVBOBoneCapacity(eVBOShader s) const
+{
+	if (s < 0 || s >= eVBO_Max)
+		return 0;
+	return m_VBOBoneCapacity[s];
 }
 
 GLuint CShaderGL::BindTrackedProgram(GLuint program) const

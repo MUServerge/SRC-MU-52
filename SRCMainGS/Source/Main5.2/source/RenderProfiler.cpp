@@ -34,6 +34,7 @@ namespace
 		case RPC_VBO_DRAW_ATTEMPTED: return "VBODrawAttempted";
 		case RPC_VBO_DRAW_SUCCEEDED: return "VBODrawSucceeded";
 		case RPC_VBO_DRAW_REJECTED: return "VBODrawRejected";
+		case RPC_VBO_BONE_CAPACITY_REJECTED: return "VBOBoneCapacityRejected";
 		case RPC_RENDERED_VERTICES_KNOWN: return "SubmittedVerticesKnown";
 		case RPC_RENDERED_INDICES: return "SubmittedIndices";
 		case RPC_RENDERED_TRIANGLES_KNOWN: return "SubmittedTrianglesKnown";
