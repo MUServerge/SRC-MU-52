@@ -23,10 +23,14 @@ namespace
 
 CShaderScene::CShaderScene()
 	: m_CurrentProgram(-1)
+	, m_BoundProgram(0)
+	, m_ProgramStackDepth(0)
 	, m_Ready(false)
 {
 	for (int i = 0; i < eShaderS_MaxValue; ++i)
 		m_Program[i] = 0;
+	for (int i = 0; i < PROGRAM_STACK_CAPACITY; ++i)
+		m_ProgramStack[i] = 0;
 }
 
 CShaderScene::~CShaderScene()
@@ -162,26 +166,72 @@ GLuint CShaderScene::GetProgram(eShaderSProgram program) const
 	return m_Program[program];
 }
 
+void CShaderScene::SynchronizeSceneProgram(GLuint program)
+{
+	m_CurrentProgram = -1;
+	for (int i = 0; i < eShaderS_MaxValue; ++i)
+	{
+		if (m_Program[i] == program && program != 0)
+		{
+			m_CurrentProgram = i;
+			break;
+		}
+	}
+}
+
+GLuint CShaderScene::BindProgram(GLuint program)
+{
+	if (wglGetCurrentContext() == NULL || glUseProgram == NULL)
+	{
+		m_BoundProgram = 0;
+		SynchronizeSceneProgram(0);
+		return 0;
+	}
+
+	GLint actualProgram = 0;
+	g_RenderProfiler.AddCounter(RPC_CURRENT_PROGRAM_QUERIES);
+	glGetIntegerv(GL_CURRENT_PROGRAM, &actualProgram);
+	const GLuint previousProgram = (GLuint)actualProgram;
+
+	if (previousProgram != program)
+		RenderProfilerUseProgram(program);
+	else
+		g_RenderProfiler.RecordProgramBind(program);
+
+	m_BoundProgram = program;
+	SynchronizeSceneProgram(program);
+	return previousProgram;
+}
+
 bool CShaderScene::Use(eShaderSProgram program)
 {
 	const GLuint id = GetProgram(program);
-	if (id == 0)
+	if (id == 0 || m_ProgramStackDepth >= PROGRAM_STACK_CAPACITY)
+	{
+		if (m_ProgramStackDepth >= PROGRAM_STACK_CAPACITY)
+			g_ErrorReport.Write("> [Shader] Program binding stack overflow.\r\n");
+		return false;
+	}
+
+	const GLuint previousProgram = BindProgram(id);
+	if (m_BoundProgram != id)
 		return false;
 
-	RenderProfilerUseProgram(id);
-	m_CurrentProgram = program;
+	m_ProgramStack[m_ProgramStackDepth++] = previousProgram;
 	return true;
 }
 
 void CShaderScene::Unuse()
 {
-	RenderProfilerUseProgram(0);
-	m_CurrentProgram = -1;
+	GLuint previousProgram = 0;
+	if (m_ProgramStackDepth > 0)
+		previousProgram = m_ProgramStack[--m_ProgramStackDepth];
+	BindProgram(previousProgram);
 }
 
 void CShaderScene::SetInt(const char* name, int value) const
 {
-	if (m_CurrentProgram < 0) return;
+	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	const GLint loc = glGetUniformLocation(m_Program[m_CurrentProgram], name);
 	if (loc >= 0)
@@ -193,7 +243,7 @@ void CShaderScene::SetInt(const char* name, int value) const
 
 void CShaderScene::SetFloat(const char* name, float value) const
 {
-	if (m_CurrentProgram < 0) return;
+	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	const GLint loc = glGetUniformLocation(m_Program[m_CurrentProgram], name);
 	if (loc >= 0)
@@ -205,7 +255,7 @@ void CShaderScene::SetFloat(const char* name, float value) const
 
 void CShaderScene::SetVec3(const char* name, float x, float y, float z) const
 {
-	if (m_CurrentProgram < 0) return;
+	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	const GLint loc = glGetUniformLocation(m_Program[m_CurrentProgram], name);
 	if (loc >= 0)
@@ -217,18 +267,25 @@ void CShaderScene::SetVec3(const char* name, float x, float y, float z) const
 
 void CShaderScene::Release()
 {
-	if (glDeleteProgram != NULL)
+	const bool canDelete = (wglGetCurrentContext() != NULL && glDeleteProgram != NULL);
+	bool ownsBoundProgram = false;
+	for (int i = 0; i < eShaderS_MaxValue; ++i)
+		ownsBoundProgram = ownsBoundProgram || (m_Program[i] != 0 && m_Program[i] == m_BoundProgram);
+
+	if (canDelete && ownsBoundProgram)
+		BindProgram(0);
+
+	for (int i = 0; i < eShaderS_MaxValue; ++i)
 	{
-		for (int i = 0; i < eShaderS_MaxValue; ++i)
-		{
-			if (m_Program[i] != 0)
-			{
-				RenderProfilerDeleteProgram(m_Program[i]);
-				m_Program[i] = 0;
-			}
-		}
+		if (canDelete && m_Program[i] != 0)
+			RenderProfilerDeleteProgram(m_Program[i]);
+		m_Program[i] = 0;
 	}
+
 	m_CurrentProgram = -1;
+	if (!canDelete)
+		m_BoundProgram = 0;
+	m_ProgramStackDepth = 0;
 	m_Ready = false;
 }
 #endif // SHADER_PIPELINE

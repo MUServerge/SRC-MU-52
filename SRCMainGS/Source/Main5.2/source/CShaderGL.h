@@ -54,7 +54,9 @@ public:
 	GLuint GetVBOProgram(eVBOShader s) const;
 	// Bind a program; returns false (binds nothing) when unavailable so the
 	// caller can fall back to the legacy immediate-mode draw.
-	bool UseVBO(eVBOShader s);
+	bool UseVBO(eVBOShader s, GLuint* previousProgram = NULL);
+	bool UseLegacy(GLuint* previousProgram = NULL);
+	void RestoreProgram(GLuint program);
 	// Uniform setters operate on the currently bound VBO program.
 	void vboSetInt(const char* name, int value) const;
 	void vboSetVec4(const char* name, float x, float y, float z, float w) const;
@@ -73,10 +75,12 @@ public:
 	static CShaderGL* Instance();
 private:
 	GLuint loadVBOProgram(const char* baseName);
+	GLuint BindTrackedProgram(GLuint program) const;
+	GLuint GetTrackedProgram() const;
+	GLuint GetBoundVBOProgram() const;
 
 	GLuint shader_id;
 	GLuint m_VBOProgram[eVBO_Max];
-	GLuint m_CurrentVBOProgram; // currently bound Effect\VBO program, 0 = none
 };
 
 #define gShaderGL				(CShaderGL::Instance())

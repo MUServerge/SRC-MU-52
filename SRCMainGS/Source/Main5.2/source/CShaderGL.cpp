@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CShaderGL.h"
+#include "CShaderScene.h"
 
 #ifdef SHADER_VERSION_TEST
 #include "Utilities/Log/muConsoleDebug.h"
@@ -7,7 +8,6 @@
 CShaderGL::CShaderGL()
 {
 	shader_id = 0;
-	m_CurrentVBOProgram = 0;
 	for (int i = 0; i < eVBO_Max; ++i)
 		m_VBOProgram[i] = 0;
 }
@@ -24,15 +24,19 @@ void CShaderGL::Release()
 		hasPrograms = hasPrograms || (m_VBOProgram[i] != 0);
 
 	if (!hasPrograms)
-	{
-		m_CurrentVBOProgram = 0;
 		return;
-	}
 
 	// The normal shutdown path calls this before KillGLWindow. If a late static
 	// destructor reaches it without a current context, invalidate the stale names
 	// without issuing context-dependent GL calls.
 	const bool canDelete = (wglGetCurrentContext() != NULL && glDeleteProgram != NULL);
+	const GLuint boundProgram = GetTrackedProgram();
+	bool ownsBoundProgram = (shader_id != 0 && shader_id == boundProgram);
+	for (int i = 0; i < eVBO_Max; ++i)
+		ownsBoundProgram = ownsBoundProgram || (m_VBOProgram[i] != 0 && m_VBOProgram[i] == boundProgram);
+	if (canDelete && ownsBoundProgram)
+		RestoreProgram(0);
+
 	if (canDelete && shader_id != 0)
 		RenderProfilerDeleteProgram(shader_id);
 	shader_id = 0;
@@ -44,7 +48,6 @@ void CShaderGL::Release()
 		m_VBOProgram[i] = 0;
 	}
 
-	m_CurrentVBOProgram = 0;
 }
 
 void CShaderGL::Init()
@@ -154,22 +157,80 @@ GLuint CShaderGL::GetVBOProgram(eVBOShader s) const
 	return m_VBOProgram[s];
 }
 
-bool CShaderGL::UseVBO(eVBOShader s)
+GLuint CShaderGL::BindTrackedProgram(GLuint program) const
 {
-	GLuint id = GetVBOProgram(s);
+#ifdef SHADER_PIPELINE
+	return gShaderScene.BindProgram(program);
+#else
+	GLint previousProgram = 0;
+	g_RenderProfiler.AddCounter(RPC_CURRENT_PROGRAM_QUERIES);
+	glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
+	RenderProfilerUseProgram(program);
+	return (GLuint)previousProgram;
+#endif // SHADER_PIPELINE
+}
+
+GLuint CShaderGL::GetTrackedProgram() const
+{
+#ifdef SHADER_PIPELINE
+	return gShaderScene.GetTrackedProgram();
+#else
+	GLint currentProgram = 0;
+	g_RenderProfiler.AddCounter(RPC_CURRENT_PROGRAM_QUERIES);
+	glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+	return (GLuint)currentProgram;
+#endif // SHADER_PIPELINE
+}
+
+GLuint CShaderGL::GetBoundVBOProgram() const
+{
+	const GLuint currentProgram = GetTrackedProgram();
+	for (int i = 0; i < eVBO_Max; ++i)
+	{
+		if (m_VBOProgram[i] != 0 && m_VBOProgram[i] == currentProgram)
+			return currentProgram;
+	}
+	return 0;
+}
+
+bool CShaderGL::UseVBO(eVBOShader s, GLuint* previousProgram)
+{
+	const GLuint id = GetVBOProgram(s);
 	if (id == 0)
 		return false;
 
-	RenderProfilerUseProgram(id);
-	m_CurrentVBOProgram = id;
+	const GLuint previous = BindTrackedProgram(id);
+	if (GetTrackedProgram() != id)
+		return false;
+	if (previousProgram != NULL)
+		*previousProgram = previous;
 	return true;
+}
+
+bool CShaderGL::UseLegacy(GLuint* previousProgram)
+{
+	if (shader_id == 0)
+		return false;
+
+	const GLuint previous = BindTrackedProgram(shader_id);
+	if (GetTrackedProgram() != shader_id)
+		return false;
+	if (previousProgram != NULL)
+		*previousProgram = previous;
+	return true;
+}
+
+void CShaderGL::RestoreProgram(GLuint program)
+{
+	BindTrackedProgram(program);
 }
 
 void CShaderGL::vboSetInt(const char* name, int value) const
 {
-	if (m_CurrentVBOProgram == 0) return;
+	const GLuint program = GetBoundVBOProgram();
+	if (program == 0) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
-	GLint loc = glGetUniformLocation(m_CurrentVBOProgram, name);
+	GLint loc = glGetUniformLocation(program, name);
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -179,9 +240,10 @@ void CShaderGL::vboSetInt(const char* name, int value) const
 
 void CShaderGL::vboSetVec4(const char* name, float x, float y, float z, float w) const
 {
-	if (m_CurrentVBOProgram == 0) return;
+	const GLuint program = GetBoundVBOProgram();
+	if (program == 0) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
-	GLint loc = glGetUniformLocation(m_CurrentVBOProgram, name);
+	GLint loc = glGetUniformLocation(program, name);
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -191,9 +253,10 @@ void CShaderGL::vboSetVec4(const char* name, float x, float y, float z, float w)
 
 void CShaderGL::vboSetVec4Array(const char* name, const float* data, int vec4Count) const
 {
-	if (m_CurrentVBOProgram == 0) return;
+	const GLuint program = GetBoundVBOProgram();
+	if (program == 0) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
-	GLint loc = glGetUniformLocation(m_CurrentVBOProgram, name);
+	GLint loc = glGetUniformLocation(program, name);
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_BONE);
@@ -203,9 +266,10 @@ void CShaderGL::vboSetVec4Array(const char* name, const float* data, int vec4Cou
 
 void CShaderGL::vboSetMat4(const char* name, const float* m16) const
 {
-	if (m_CurrentVBOProgram == 0) return;
+	const GLuint program = GetBoundVBOProgram();
+	if (program == 0) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
-	GLint loc = glGetUniformLocation(m_CurrentVBOProgram, name);
+	GLint loc = glGetUniformLocation(program, name);
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATRIX);
@@ -215,10 +279,7 @@ void CShaderGL::vboSetMat4(const char* name, const float* m16) const
 
 void CShaderGL::RenderShader()
 {
-	if (this->CheckedShader())
-	{
-		RenderProfilerUseProgram(shader_id);
-	}
+	UseLegacy();
 }
 
 bool CShaderGL::CheckedShader()
@@ -275,9 +336,9 @@ GLuint CShaderGL::run_shader(const char* shader_text, GLenum type)
 
 void CShaderGL::run_projection()
 {
-	if (shader_id != 0)
+	GLuint previousProgram = 0;
+	if (UseLegacy(&previousProgram))
 	{
-		RenderProfilerUseProgram(shader_id);
 
 		glm::mat4 view = glm::mat4(1.0f);
 		glm::mat4 model = glm::mat4(1.0f);
@@ -298,24 +359,25 @@ void CShaderGL::run_projection()
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 		glUniform1i(glGetUniformLocation(shader_id, "texture1"), 0);
 
-		RenderProfilerUseProgram(0);
+		RestoreProgram(previousProgram);
 	}
 }
 
 void CShaderGL::SetPerspective(float Fov, float Aspect, float ZNear, float ZFar)
 {
-	if (shader_id != 0)
+	GLuint previousProgram = 0;
+	if (UseLegacy(&previousProgram))
 	{
-		RenderProfilerUseProgram(shader_id);
 		glm::mat4 projection = glm::perspective(glm::radians(Fov), Aspect, ZNear, ZFar);
 		this->setMat4("projection", projection);
-		RenderProfilerUseProgram(0);
+		RestoreProgram(previousProgram);
 	}
 }
 
 // Funciones para establecer uniforms
 void CShaderGL::setBool(const char* name, bool value) const
 {
+	if (shader_id == 0 || GetTrackedProgram() != shader_id) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 	glUniform1i(glGetUniformLocation(shader_id, name), (int)value);
@@ -323,6 +385,7 @@ void CShaderGL::setBool(const char* name, bool value) const
 
 void CShaderGL::setInt(const char* name, int value) const
 {
+	if (shader_id == 0 || GetTrackedProgram() != shader_id) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 	glUniform1i(glGetUniformLocation(shader_id, name), value);
@@ -330,6 +393,7 @@ void CShaderGL::setInt(const char* name, int value) const
 
 void CShaderGL::setFloat(const char* name, float value) const
 {
+	if (shader_id == 0 || GetTrackedProgram() != shader_id) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 	glUniform1f(glGetUniformLocation(shader_id, name), value);
@@ -337,6 +401,7 @@ void CShaderGL::setFloat(const char* name, float value) const
 
 void CShaderGL::setVec2(const char* name, float x, float y) const
 {
+	if (shader_id == 0 || GetTrackedProgram() != shader_id) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 	glUniform2f(glGetUniformLocation(shader_id, name), x, y);
@@ -344,6 +409,7 @@ void CShaderGL::setVec2(const char* name, float x, float y) const
 
 void CShaderGL::setVec3(const char* name, float x, float y, float z) const
 {
+	if (shader_id == 0 || GetTrackedProgram() != shader_id) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 	glUniform3f(glGetUniformLocation(shader_id, name), x, y, z);
@@ -351,6 +417,7 @@ void CShaderGL::setVec3(const char* name, float x, float y, float z) const
 
 void CShaderGL::setVec4(const char* name, float x, float y, float z, float w) const
 {
+	if (shader_id == 0 || GetTrackedProgram() != shader_id) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 	glUniform4f(glGetUniformLocation(shader_id, name), x, y, z, w);
@@ -358,6 +425,7 @@ void CShaderGL::setVec4(const char* name, float x, float y, float z, float w) co
 
 void CShaderGL::setMat4(const char* name, glm::mat4& matrix) const
 {
+	if (shader_id == 0 || GetTrackedProgram() != shader_id) return;
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_LOCATION_QUERIES);
 	g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATRIX);
 	glUniformMatrix4fv(glGetUniformLocation(shader_id, name), 1, GL_FALSE, glm::value_ptr(matrix));

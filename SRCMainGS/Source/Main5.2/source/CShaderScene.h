@@ -57,6 +57,11 @@ public:
 	bool Use(eShaderSProgram program);
 	void Unuse();
 
+	// Authoritative binding boundary for every client GLSL owner. BindProgram
+	// verifies GL_CURRENT_PROGRAM, binds only when needed, synchronizes the scene
+	// technique view, and returns the exact predecessor for nested restoration.
+	GLuint BindProgram(GLuint program);
+	GLuint GetTrackedProgram() const { return m_BoundProgram; }
 	GLuint GetProgram(eShaderSProgram program) const;
 
 	// Uniform setters operate on the currently bound program.
@@ -71,9 +76,14 @@ private:
 	static GLuint CompileShader(GLenum type, const std::string& src, const char* tag);
 	static GLuint LinkProgram(GLuint vs, GLuint fs, const char* tag);
 	static std::string ReadShaderFile(const char* name);
+	void SynchronizeSceneProgram(GLuint program);
 
+	static const int PROGRAM_STACK_CAPACITY = 16;
 	GLuint m_Program[eShaderS_MaxValue];
-	GLint  m_CurrentProgram; // currently bound program enum, -1 = none
+	GLint  m_CurrentProgram; // bound scene-program enum, -1 for external/legacy
+	GLuint m_BoundProgram;   // synchronized actual GL program, including external VBO programs
+	GLuint m_ProgramStack[PROGRAM_STACK_CAPACITY];
+	int    m_ProgramStackDepth;
 	bool   m_Ready;
 };
 
