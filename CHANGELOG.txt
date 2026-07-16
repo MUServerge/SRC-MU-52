@@ -6,6 +6,21 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client FPS Phase 4B-3: added one explicit non-burst fixed visual
+  emission policy to csteady_clock and migrated CreateEffectSync,
+  CreateJointSync and CreateParticleSync away from CheckNormalizer. A render
+  frame with one or more bounded 25 Hz steps grants one emission opportunity;
+  recovered multi-step frames never replay particles/joints/effects in a burst.
+  At the authored 25 Hz cadence the wrappers remain enabled every step. Direct
+  effect creation, RNG, gameplay, packets, frame pacing and rendering order are
+  unchanged. BITMAP_FLARE_FORCE state counters were audited but left untouched
+  because they drive next-frame tail generation and need a dedicated state
+  update, not independent arithmetic replacement. Static source verification
+  only; Windows build and 60/120 FPS effect-density checks remain pending.
+  (steady_clock.cpp/.h, ZzzEffect.cpp, ZzzEffectJoint.cpp,
+  ZzzEffectParticle.cpp,
+  docs/FPS_TIMING_CONSUMER_AUDIT_2026-07-16.md)
+
 - Client FPS Phase 4B-2: migrated the active deterministic weather
   cadence in MoveLeaves from the lossy CheckNormalizer boolean to the bounded
   25 Hz scheduler step count. RainCurrent still moves one unit toward its target
