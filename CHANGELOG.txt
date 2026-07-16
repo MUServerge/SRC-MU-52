@@ -6,6 +6,25 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client build fix: repaired three compile/link breakages left by earlier
+  build-unverified refactor commits so the client compiles again.
+  * ZzzScene.cpp: removed 'TimeRemain = accumulatedTime;' at the end of MainScene;
+    FPS Phase 3 deleted the accumulatedTime accumulator but left this one dangling
+    reference (undeclared identifier). TimeRemain is never read, so dropping the
+    write is behaviour-neutral.
+  * ZzzOpenglUtil.cpp (gluPerspective2): removed the obsolete
+    gShaderGL->SetPerspective() call; the shader consolidation removed
+    CShaderGL::SetPerspective, and projection is now uploaded per-draw by the VBO
+    path, so the global call was both dangling and redundant.
+  * Main.vcxproj: removed the unused 'glprocs.lib' linker input (both Win32
+    configs); no source includes glprocs or calls its functions, and the .lib is
+    not shipped, which caused LNK1104 'cannot open input file glprocs.lib'.
+  Behaviour and game mechanics are unchanged. (ZzzScene.cpp, ZzzOpenglUtil.cpp,
+  Main.vcxproj)
+------------------------------------------------------------
+ 2026-07-16
+------------------------------------------------------------
+
 - Client FPS Phase 4B-4/4B-5: completed the CheckNormalizer visual-emission
   migration. The pet fly-effect spark (CSPetSystem.cpp) and the remaining ambient
   visual emitters now use the bounded 25 Hz non-burst policy

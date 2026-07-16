@@ -205,9 +205,9 @@ void gluPerspective2(float Fov, float Aspect, float ZNear, float ZFar)
 {
 	gluPerspective(Fov, Aspect, ZNear, ZFar);
 
-#ifdef SHADER_VERSION_TEST
-	gShaderGL->SetPerspective(Fov, Aspect, ZNear, ZFar);
-#endif // SHADER_VERSION_TEST
+	// Projection is uploaded per-draw by the VBO path (CShaderGL::UseVBO);
+	// the legacy CShaderGL::SetPerspective global upload was removed in the
+	// shader consolidation and is no longer needed here.
 
 
 	ScreenCenterX = OpenglWindowX + OpenglWindowWidth / 2;
