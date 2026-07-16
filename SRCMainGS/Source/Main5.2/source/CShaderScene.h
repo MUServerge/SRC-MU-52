@@ -60,7 +60,10 @@ public:
 	// Shared active-path loader/compiler/linker for every client GLSL adapter.
 	// Exact-path loading is used by VBO programs; scene techniques retain their
 	// Shaders/ then Data/Shaders/ compatibility search.
-	static GLuint BuildProgramFromFiles(const char* vertexPath, const char* fragmentPath, const char* tag);
+	// vertexDefine is inserted immediately after #version. It lets one owned
+	// shader source provide capability-selected variants without duplicated files.
+	static GLuint BuildProgramFromFiles(const char* vertexPath, const char* fragmentPath,
+		const char* tag, const char* vertexDefine = NULL);
 	static GLuint BuildProgram(const char* vertexSource, const char* fragmentSource, const char* tag);
 
 	// Uniform locations are immutable after a successful link. Cache both valid
