@@ -13,6 +13,7 @@
 #include "ZzzTexture.h"
 #include "ZzzOpenData.h"
 #include "ZzzScene.h"
+#include "steady_clock.h"
 #include "ZzzBMD.h"
 #include "ZzzInfomation.h"
 #include "ZzzObject.h"
@@ -1380,12 +1381,58 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLin
 	g_ErrorReport.AddSeparator();
 
 #ifdef V_SYNCRONIZE
+	gsteady_clock->SetFramePacingMode(FRAME_PACING_SOFTWARE);
 	InitVSync();
 
-	if (IsVSyncAvailable())
+	const int targetFps = gsteady_clock->GetLimitFps();
+	const int displayRefreshHz = GetFPSLimit();
+	const bool refreshRateKnown = displayRefreshHz >= 20 && displayRefreshHz <= 1000;
+	const bool refreshMatchesTarget = refreshRateKnown &&
+		displayRefreshHz >= targetFps - 1 && displayRefreshHz <= targetFps + 1;
+
+	bool vsyncEnableAttempted = false;
+	bool vsyncActive = false;
+	bool swapControlDisabled = false;
+	if (IsVSyncAvailable() && refreshMatchesTarget)
 	{
+		vsyncEnableAttempted = true;
 		EnableVSync();
-		//SetTargetFps(-1); // unlimited
+		vsyncActive = IsVSyncEnabled();
+		if (vsyncActive)
+		{
+			gsteady_clock->SetFramePacingMode(FRAME_PACING_VSYNC);
+		}
+	}
+	else if (IsVSyncAvailable())
+	{
+		DisableVSync();
+		swapControlDisabled = !IsVSyncEnabled();
+	}
+
+	if (gsteady_clock->GetFramePacingMode() == FRAME_PACING_VSYNC)
+	{
+		g_ErrorReport.Write("> Frame pacing: VSync is authoritative (target %d FPS, display %d Hz).\r\n",
+			targetFps, displayRefreshHz);
+	}
+	else
+	{
+		const char* swapControlState = "unavailable";
+		if (IsVSyncAvailable())
+		{
+			if (vsyncEnableAttempted)
+				swapControlState = "enable failed";
+			else
+				swapControlState = swapControlDisabled ? "disabled" : "disable failed";
+		}
+
+		g_ErrorReport.Write("> Frame pacing: software limiter is authoritative (target %d FPS, display %s, swap control %s).\r\n",
+			targetFps,
+			refreshRateKnown ? "reported" : "unavailable",
+			swapControlState);
+		if (refreshRateKnown)
+		{
+			g_ErrorReport.Write("> Frame pacing display refresh: %d Hz.\r\n", displayRefreshHz);
+		}
 	}
 #endif // V_SINCRONIZE
 
