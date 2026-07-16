@@ -21,8 +21,8 @@ csteady_clock::csteady_clock()
 	frame_limit = 1.f;
 	//mainthread = GetTickCount64();
 
-	mainthread = std::chrono::high_resolution_clock::now();
-	last_check_time = std::chrono::high_resolution_clock::now();
+	mainthread = std::chrono::steady_clock::now();
+	last_check_time = std::chrono::steady_clock::now();
 
 	threadTime = new CTimer();
 }
@@ -95,7 +95,7 @@ void csteady_clock::normalizefps()
 		return;
 	}
 
-	auto current_time = std::chrono::high_resolution_clock::now();
+	auto current_time = std::chrono::steady_clock::now();
 
 	double elapsed_time = std::chrono::duration<double>(current_time - last_check_time).count();
 
@@ -120,7 +120,7 @@ void csteady_clock::LoadInformationFps()
 		counterframe = 0;
 		frame_limit = 1.0;
 		FPS = this->GetLimitFps();
-		mainthread = std::chrono::high_resolution_clock::now();
+		mainthread = std::chrono::steady_clock::now();
 		save_time = threadTime->GetTimeElapsed();
 	}
 
