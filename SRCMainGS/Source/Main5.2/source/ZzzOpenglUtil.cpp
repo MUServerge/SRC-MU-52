@@ -2207,45 +2207,90 @@ void CollisionDetectRotate(float centerX, float centerY, float angle, float& x, 
 
 #ifdef V_SYNCRONIZE
 
-
 #include "wglext.h"
 
 bool _isVSyncEnabled = false;
 bool _isVSyncAvailable = false;
 PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = nullptr;
 
-bool WGLExtensionSupported(const char* extension_name)
+namespace
 {
-	// this is pointer to function which returns pointer to string with list of all wgl extensions
-	PFNWGLGETEXTENSIONSSTRINGEXTPROC _wglGetExtensionsStringEXT = reinterpret_cast<PFNWGLGETEXTENSIONSSTRINGEXTPROC>(wglGetProcAddress("wglGetExtensionsStringEXT"));
-
-	if (strstr(_wglGetExtensionsStringEXT(), extension_name) == nullptr)
+	bool IsValidWGLProcAddress(PROC address)
 	{
-		// string was not found
-		return false;
+		const INT_PTR value = reinterpret_cast<INT_PTR>(address);
+		return value != 0 && value != 1 && value != 2 && value != 3 && value != -1;
 	}
 
-	// extension is supported
-	return true;
+	bool HasWGLExtension(const char* extensions, const char* extensionName)
+	{
+		if (extensions == nullptr || extensionName == nullptr || extensionName[0] == '\0' || strchr(extensionName, ' ') != nullptr)
+		{
+			return false;
+		}
+
+		const size_t extensionLength = strlen(extensionName);
+		const char* match = extensions;
+		while ((match = strstr(match, extensionName)) != nullptr)
+		{
+			const bool validStart = match == extensions || match[-1] == ' ';
+			const char endCharacter = match[extensionLength];
+			const bool validEnd = endCharacter == '\0' || endCharacter == ' ';
+			if (validStart && validEnd)
+			{
+				return true;
+			}
+			match += extensionLength;
+		}
+
+		return false;
+	}
+}
+
+bool WGLExtensionSupported(const char* extensionName)
+{
+	const char* extensions = nullptr;
+
+	const PROC arbAddress = wglGetProcAddress("wglGetExtensionsStringARB");
+	if (IsValidWGLProcAddress(arbAddress))
+	{
+		const PFNWGLGETEXTENSIONSSTRINGARBPROC getExtensionsStringARB =
+			reinterpret_cast<PFNWGLGETEXTENSIONSSTRINGARBPROC>(arbAddress);
+		extensions = getExtensionsStringARB(wglGetCurrentDC());
+	}
+
+	if (extensions == nullptr)
+	{
+		const PROC extAddress = wglGetProcAddress("wglGetExtensionsStringEXT");
+		if (IsValidWGLProcAddress(extAddress))
+		{
+			const PFNWGLGETEXTENSIONSSTRINGEXTPROC getExtensionsStringEXT =
+				reinterpret_cast<PFNWGLGETEXTENSIONSSTRINGEXTPROC>(extAddress);
+			extensions = getExtensionsStringEXT();
+		}
+	}
+
+	return HasWGLExtension(extensions, extensionName);
 }
 
 void InitVSync()
 {
-	_isVSyncAvailable = WGLExtensionSupported("WGL_EXT_swap_control");
+	_isVSyncEnabled = false;
+	_isVSyncAvailable = false;
+	wglSwapIntervalEXT = nullptr;
 
-	if (_isVSyncAvailable)
+	if (!WGLExtensionSupported("WGL_EXT_swap_control"))
 	{
-		// Extension is supported, init pointers.
-		wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-
-		// this is another function from WGL_EXT_swap_control extension
-		// wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)wglGetProcAddress("wglGetSwapIntervalEXT");
+		return;
 	}
 
-	if (wglSwapIntervalEXT == nullptr)
+	const PROC swapIntervalAddress = wglGetProcAddress("wglSwapIntervalEXT");
+	if (!IsValidWGLProcAddress(swapIntervalAddress))
 	{
-		_isVSyncAvailable = false;
+		return;
 	}
+
+	wglSwapIntervalEXT = reinterpret_cast<PFNWGLSWAPINTERVALEXTPROC>(swapIntervalAddress);
+	_isVSyncAvailable = true;
 }
 
 bool IsVSyncAvailable()
@@ -2260,29 +2305,30 @@ bool IsVSyncEnabled()
 
 void EnableVSync()
 {
-	if (!_isVSyncAvailable)
+	if (!_isVSyncAvailable || wglSwapIntervalEXT == nullptr)
 	{
+		_isVSyncEnabled = false;
 		return;
 	}
 
-	wglSwapIntervalEXT(1);
-	_isVSyncEnabled = true;
+	_isVSyncEnabled = wglSwapIntervalEXT(1) == TRUE;
 }
 
 void DisableVSync()
 {
-	if (!_isVSyncAvailable)
+	if (!_isVSyncAvailable || wglSwapIntervalEXT == nullptr)
 	{
+		_isVSyncEnabled = false;
 		return;
 	}
 
-	wglSwapIntervalEXT(0);
-	_isVSyncEnabled = false;
+	const bool disabled = wglSwapIntervalEXT(0) == TRUE;
+	_isVSyncEnabled = !disabled;
 }
 
 int GetFPSLimit()
 {
-	return GetDeviceCaps(g_hDC, VREFRESH);
+	return g_hDC != nullptr ? GetDeviceCaps(g_hDC, VREFRESH) : 0;
 }
 
 #endif // V_SYNCRONIZE

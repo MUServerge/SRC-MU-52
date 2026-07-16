@@ -6,6 +6,19 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client FPS Phase 2: introduced one explicit frame-pacing authority while
+  preserving the current 60 FPS safety limit. At startup, a display reporting
+  approximately 60 Hz uses VSync only when WGL swap-control initialization and
+  interval activation both succeed; other, unknown or higher refresh rates use
+  only the software limiter and request swap interval zero. The software limiter
+  now bypasses sleep when VSync owns pacing. WGL extension discovery validates
+  ARB/EXT query entry points and swap-interval return values instead of calling
+  unchecked pointers, and startup logs the selected authority, target, refresh
+  and fallback state. Gameplay/update timing, rendering order, GLEW, shaders,
+  assets and the 60 FPS target are unchanged. Static source verification only;
+  Windows build and runtime pacing/tearing checks remain pending.
+  (Winmain.cpp, ZzzOpenglUtil.cpp, steady_clock.cpp/.h)
+
 - Client FPS Phase 1: corrected the existing 60 FPS software pacer to time
   the complete current MainScene frame against its own monotonic deadline.
   The previous path sampled immediately before rendering, returned the prior

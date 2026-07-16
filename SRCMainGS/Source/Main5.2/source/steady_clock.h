@@ -220,6 +220,12 @@ public:
 
 class CTimer;
 
+enum FramePacingMode
+{
+	FRAME_PACING_SOFTWARE = 0,
+	FRAME_PACING_VSYNC
+};
+
 class csteady_clock
 {
 public:
@@ -248,6 +254,9 @@ public:
 	void LoadInformationFps();
 	std::chrono::steady_clock::time_point GetthreadTime();
 	double thread_sleep(const std::chrono::steady_clock::time_point thread_tick);
+	void SetFramePacingMode(FramePacingMode mode);
+	FramePacingMode GetFramePacingMode() const;
+	bool IsSoftwareFrameLimitEnabled() const;
 
 	bool rand_calc_check(int fr);
 	void runtime_send_ping();
@@ -264,6 +273,7 @@ private:
 	double speedNormalizer;
 	double deltaAccumulated;
 	CheckerTime frame_limit;
+	FramePacingMode framePacingMode;
 	std::chrono::steady_clock::time_point mainthread;
 
 	double save_time;
