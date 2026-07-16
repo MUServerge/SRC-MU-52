@@ -3,6 +3,18 @@
 ============================================================
 
 ------------------------------------------------------------
+ 2026-07-16
+------------------------------------------------------------
+
+- Client renderer Phase 1: made shutdown idempotent and moved ImGui, model,
+  texture and shader teardown ahead of WGL context destruction. BMD::Release now
+  deletes and clears every mesh-owned VAO/VBO/EBO while a context is current;
+  CShaderGL now exposes an explicit idempotent Release path. Shader selection,
+  render order, skinning, pixel format and UI behavior are unchanged. Static
+  review only; Windows build and runtime shutdown/reload tests remain pending.
+  (WINHANDLE.cpp, CShaderGL.cpp/.h, ZzzBMD.cpp)
+
+------------------------------------------------------------
  2026-07-15
 ------------------------------------------------------------
 
