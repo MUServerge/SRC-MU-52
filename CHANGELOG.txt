@@ -6,6 +6,18 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 8: consolidated active shader file loading through
+  CShaderScene and changed program creation to demand-driven ownership. Terrain,
+  Character and the currently eligible VBO Model technique are preloaded; Default,
+  Glow, Colorize and the ten gated VBO material variants remain available but are
+  compiled only on their first real request. Failed lazy loads are remembered so
+  render loops do not retry file I/O or compilation every frame. Removed startup
+  compilation of CShaderGL's duplicate legacy Shaders/shader.vs/fs program; its
+  unreferenced adapter retains the existing client-array fallback. Shader assets,
+  VBO eligibility, draw order, material formulas, gameplay and GL context behavior
+  are unchanged. Static review only; Windows build/runtime validation remains
+  pending. (CShaderScene.cpp/.h, CShaderGL.cpp/.h)
+
 - Client renderer Phase 7: audited the uploaded Client/Shaders,
   Client/Data/Effect/VBO and Client/Data/Effect/shader GLSL assets against the
   active loaders, then tightened BMD VBO creation validation. Models with an

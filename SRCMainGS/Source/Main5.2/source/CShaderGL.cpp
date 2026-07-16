@@ -13,6 +13,7 @@ CShaderGL::CShaderGL()
 	{
 		m_VBOProgram[i] = 0;
 		m_VBOBoneCapacity[i] = 0;
+		m_VBOLoadAttempted[i] = false;
 	}
 }
 
@@ -31,7 +32,10 @@ void CShaderGL::Release()
 	{
 		m_MaxVertexUniformComponents = 0;
 		for (int i = 0; i < eVBO_Max; ++i)
+		{
 			m_VBOBoneCapacity[i] = 0;
+			m_VBOLoadAttempted[i] = false;
+		}
 		return;
 	}
 
@@ -64,6 +68,7 @@ void CShaderGL::Release()
 			RenderProfilerDeleteProgram(m_VBOProgram[i]);
 		m_VBOProgram[i] = 0;
 		m_VBOBoneCapacity[i] = 0;
+		m_VBOLoadAttempted[i] = false;
 	}
 
 	m_MaxVertexUniformComponents = 0;
@@ -71,52 +76,11 @@ void CShaderGL::Release()
 
 void CShaderGL::Init()
 {
-	// Load the per-material Data\Effect\VBO programs (VBO / GPU-skinning path)
-	// first, so it is independent of the legacy single-program load below.
+	// The old Shaders\shader.vs/fs program duplicated CShaderScene's Default
+	// assets and its RenderVertexBuffer adapter has no repository call site.
+	// Keep shader_id == 0 so that dormant adapter retains its client-array
+	// fallback, while active VBO programs use the shared scene loader/state owner.
 	InitVBOShaders();
-
-	std::string vertex_shader;
-
-	if (!readshader("Shaders\\shader.vs", vertex_shader))
-	{
-		return;
-	}
-
-	std::string frgmen_shader;
-
-	if (!readshader("Shaders\\shader.fs", frgmen_shader))
-	{
-		return;
-	}
-
-#ifdef SHADER_PIPELINE
-	shader_id = CShaderScene::BuildProgram(vertex_shader.c_str(), frgmen_shader.c_str(), "legacy shader");
-	if (shader_id == 0)
-		g_ConsoleDebug->Write(5, "[Shader] legacy program unavailable; fixed-function fallback remains active");
-#else
-	GLuint shader_vertex = run_shader(vertex_shader.c_str(), GL_VERTEX_SHADER);
-	GLuint shader_frgmen = run_shader(frgmen_shader.c_str(), GL_FRAGMENT_SHADER);
-
-	shader_id = RenderProfilerCreateProgram();
-	glAttachShader(shader_id, shader_vertex);
-	glAttachShader(shader_id, shader_frgmen);
-	glLinkProgram(shader_id);
-
-	int success;
-	glGetProgramiv(shader_id, GL_LINK_STATUS, &success);
-	g_RenderProfiler.RecordProgramLink(success != 0);
-
-	if (!success)
-	{
-		char infoLog[512];
-		glGetProgramInfoLog(shader_id, 512, NULL, infoLog);
-		g_ConsoleDebug->Write(5, "Error al enlazar el Shader Program:");
-		g_ConsoleDebug->Write(5, infoLog);
-	}
-
-	RenderProfilerDeleteShader(shader_vertex);
-	RenderProfilerDeleteShader(shader_frgmen);
-#endif // SHADER_PIPELINE
 }
 
 // One .vs/.fs pair per material, matching the Data\Effect\VBO folder layout.
@@ -129,23 +93,23 @@ static const char* const s_VBOShaderName[eVBO_Max] =
 
 GLuint CShaderGL::loadVBOProgram(const char* baseName)
 {
+	const std::string vsPath = std::string("Data\\Effect\\VBO\\") + baseName + ".vs";
+	const std::string fsPath = std::string("Data\\Effect\\VBO\\") + baseName + ".fs";
+
+#ifdef SHADER_PIPELINE
+	const GLuint program = CShaderScene::BuildProgramFromFiles(
+		vsPath.c_str(), fsPath.c_str(), baseName);
+	if (program == 0)
+		g_ConsoleDebug->Write(5, "[VBO Shader] program unavailable for '%s'; legacy mesh fallback remains active", baseName);
+	return program;
+#else
 	std::string vsSrc, fsSrc;
-
-	std::string vsPath = std::string("Data\\Effect\\VBO\\") + baseName + ".vs";
-	std::string fsPath = std::string("Data\\Effect\\VBO\\") + baseName + ".fs";
-
 	if (!readshader(vsPath.c_str(), vsSrc) || !readshader(fsPath.c_str(), fsSrc))
 	{
 		g_ConsoleDebug->Write(5, "[VBO Shader] missing file for '%s'", baseName);
 		return 0;
 	}
 
-#ifdef SHADER_PIPELINE
-	const GLuint program = CShaderScene::BuildProgram(vsSrc.c_str(), fsSrc.c_str(), baseName);
-	if (program == 0)
-		g_ConsoleDebug->Write(5, "[VBO Shader] program unavailable for '%s'; legacy mesh fallback remains active", baseName);
-	return program;
-#else
 	GLuint vs = run_shader(vsSrc.c_str(), GL_VERTEX_SHADER);
 	GLuint fs = run_shader(fsSrc.c_str(), GL_FRAGMENT_SHADER);
 
@@ -233,6 +197,7 @@ void CShaderGL::InitVBOShaders()
 	{
 		m_VBOProgram[i] = 0;
 		m_VBOBoneCapacity[i] = 0;
+		m_VBOLoadAttempted[i] = false;
 	}
 
 	if (!GLEW_VERSION_2_0 || glGetActiveUniform == NULL)
@@ -251,22 +216,36 @@ void CShaderGL::InitVBOShaders()
 		return;
 	}
 
-	for (int i = 0; i < eVBO_Max; ++i)
-	{
-		m_VBOProgram[i] = loadVBOProgram(s_VBOShaderName[i]);
-		if (m_VBOProgram[i] == 0)
-			continue;
+	// Model is the only material admitted by the current VBO eligibility gate.
+	// Optional material variants are compiled once when a future caller requests them.
+	EnsureVBOProgram(eVBO_Model);
+}
 
-		m_VBOBoneCapacity[i] = InspectVBOBoneCapacity(m_VBOProgram[i], s_VBOShaderName[i]);
-		if (m_VBOBoneCapacity[i] > 0)
-			continue;
+bool CShaderGL::EnsureVBOProgram(eVBOShader shader)
+{
+	if (shader < 0 || shader >= eVBO_Max || m_MaxVertexUniformComponents <= 0)
+		return false;
+	if (m_VBOProgram[shader] != 0 && m_VBOBoneCapacity[shader] > 0)
+		return true;
+	if (m_VBOLoadAttempted[shader])
+		return false;
+
+	m_VBOLoadAttempted[shader] = true;
+	m_VBOProgram[shader] = loadVBOProgram(s_VBOShaderName[shader]);
+	if (m_VBOProgram[shader] == 0)
+		return false;
+
+	m_VBOBoneCapacity[shader] =
+		InspectVBOBoneCapacity(m_VBOProgram[shader], s_VBOShaderName[shader]);
+	if (m_VBOBoneCapacity[shader] > 0)
+		return true;
 
 #ifdef SHADER_PIPELINE
-		gShaderScene.ForgetProgram(m_VBOProgram[i]);
+	gShaderScene.ForgetProgram(m_VBOProgram[shader]);
 #endif // SHADER_PIPELINE
-		RenderProfilerDeleteProgram(m_VBOProgram[i]);
-		m_VBOProgram[i] = 0;
-	}
+	RenderProfilerDeleteProgram(m_VBOProgram[shader]);
+	m_VBOProgram[shader] = 0;
+	return false;
 }
 
 GLuint CShaderGL::GetVBOProgram(eVBOShader s) const
@@ -276,9 +255,9 @@ GLuint CShaderGL::GetVBOProgram(eVBOShader s) const
 	return m_VBOProgram[s];
 }
 
-int CShaderGL::GetVBOBoneCapacity(eVBOShader s) const
+int CShaderGL::GetVBOBoneCapacity(eVBOShader s)
 {
-	if (s < 0 || s >= eVBO_Max)
+	if (!EnsureVBOProgram(s))
 		return 0;
 	return m_VBOBoneCapacity[s];
 }
@@ -333,6 +312,9 @@ GLint CShaderGL::GetUniformLocation(GLuint program, const char* name) const
 
 bool CShaderGL::UseVBO(eVBOShader s, GLuint* previousProgram)
 {
+	if (!EnsureVBOProgram(s))
+		return false;
+
 	const GLuint id = GetVBOProgram(s);
 	if (id == 0)
 		return false;

@@ -45,8 +45,9 @@ public:
 	CShaderScene();
 	~CShaderScene();
 
-	// Compile + link every shader pair. Safe to call once after glewInit().
-	// Returns true only if every program linked successfully.
+	// Preload the scene programs used by current draw call sites. Other declared
+	// techniques are loaded once on first Use(), preserving future adapters
+	// without compiling unused programs at startup.
 	bool Init();
 
 	// True if at least one program is usable this run.
@@ -64,8 +65,10 @@ public:
 	GLuint GetTrackedProgram() const { return m_BoundProgram; }
 	GLuint GetProgram(eShaderSProgram program) const;
 
-	// Shared active-path compiler/linker. File discovery remains with each public
-	// adapter, while object creation and diagnostics have one implementation.
+	// Shared active-path loader/compiler/linker for every client GLSL adapter.
+	// Exact-path loading is used by VBO programs; scene techniques retain their
+	// Shaders/ then Data/Shaders/ compatibility search.
+	static GLuint BuildProgramFromFiles(const char* vertexPath, const char* fragmentPath, const char* tag);
 	static GLuint BuildProgram(const char* vertexSource, const char* fragmentSource, const char* tag);
 
 	// Uniform locations are immutable after a successful link. Cache both valid
@@ -81,9 +84,11 @@ public:
 	void Release();
 
 private:
+	bool EnsureProgram(eShaderSProgram program);
 	GLuint LoadProgram(const char* baseName);
 	static GLuint CompileShader(GLenum type, const std::string& src, const char* tag);
 	static GLuint LinkProgram(GLuint vs, GLuint fs, const char* tag);
+	static std::string ReadTextFile(const char* path);
 	static std::string ReadShaderFile(const char* name);
 	void SynchronizeSceneProgram(GLuint program);
 	void ClearUniformCache();
@@ -107,6 +112,7 @@ private:
 	};
 
 	GLuint m_Program[eShaderS_MaxValue];
+	bool   m_ProgramLoadAttempted[eShaderS_MaxValue];
 	GLint  m_CurrentProgram; // bound scene-program enum, -1 for external/legacy
 	GLuint m_BoundProgram;   // synchronized actual GL program, including external VBO programs
 	GLuint m_ProgramStack[PROGRAM_STACK_CAPACITY];
