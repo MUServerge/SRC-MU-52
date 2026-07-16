@@ -78,6 +78,7 @@ private:
 	GLuint BindTrackedProgram(GLuint program) const;
 	GLuint GetTrackedProgram() const;
 	GLuint GetBoundVBOProgram() const;
+	GLint GetUniformLocation(GLuint program, const char* name) const;
 
 	GLuint shader_id;
 	GLuint m_VBOProgram[eVBO_Max];
