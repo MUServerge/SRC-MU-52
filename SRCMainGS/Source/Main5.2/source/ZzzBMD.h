@@ -7,6 +7,12 @@
 #define MAX_MESH     50
 #define MAX_VERTICES 15000
 
+enum BMDTransformPolicy
+{
+	BMD_TRANSFORM_CPU_REQUIRED = 0,
+	BMD_TRANSFORM_DEFER_CPU
+};
+
 #define RENDER_COLOR        0x00000001
 #define RENDER_TEXTURE      0x00000002
 #define RENDER_CHROME       0x00000004
@@ -289,7 +295,10 @@ public:
 	void Animation(float(*BoneTransform)[3][4], float AnimationFrame, float PriorAnimationFrame, unsigned short PriorAction, vec3_t Angle, vec3_t HeadAngle, bool Parent = false, bool Translate = true);
 	void InterpolationTrans(float(*Mat1)[4], float(*TransMat2)[4], float _Scale);
 	void Transform(float(*BoneMatrix)[3][4], vec3_t BoundingBoxMin, vec3_t BoundingBoxMax, OBB_t* OBB, bool Translate = false, float _Scale = 0.0f);
-	bool NeedsCpuVertexTransform(bool Translate, float _Scale) const;
+	void Transform(float(*BoneMatrix)[3][4], vec3_t BoundingBoxMin, vec3_t BoundingBoxMax, OBB_t* OBB, bool Translate, float _Scale, BMDTransformPolicy policy);
+	void EnsureCpuTransforms();
+	void MaterializeCpuTransforms(float(*BoneMatrix)[3][4], const vec3_t LightPosition, bool Translate, float _Scale, bool lightEnable, float boneScale, float* dynamicBoundingMin, float* dynamicBoundingMax);
+	bool NeedsCpuVertexTransform(bool Translate, float _Scale, BMDTransformPolicy policy) const;
 	bool NeedsCpuNormalTransform(bool needsCpuVertexTransform) const;
 	void TransformByObjectBone(vec3_t vResultPosition, OBJECT* pObject, int iBoneNumber, vec3_t vRelativePosition = NULL);
 	void TransformByBoneMatrix(vec3_t vResultPosition, float(*BoneMatrix)[4], vec3_t vWorldPosition = NULL, vec3_t vRelativePosition = NULL);

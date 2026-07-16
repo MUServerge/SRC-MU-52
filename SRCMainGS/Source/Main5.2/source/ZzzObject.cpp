@@ -448,11 +448,13 @@ bool Calc_RenderObject(OBJECT* o, bool Translate, int Select, int ExtraMon)
 
 	if (o->EnableBoneMatrix)
 	{
-		b->Transform(o->BoneTransform, o->BoundingBoxMin, o->BoundingBoxMax, &o->OBB, Translate);
+		b->Transform(o->BoneTransform, o->BoundingBoxMin, o->BoundingBoxMax, &o->OBB,
+			Translate, 0.f, BMD_TRANSFORM_DEFER_CPU);
 	}
 	else
 	{
-		b->Transform(BoneTransform, o->BoundingBoxMin, o->BoundingBoxMax, &o->OBB, Translate);
+		b->Transform(BoneTransform, o->BoundingBoxMin, o->BoundingBoxMax, &o->OBB,
+			Translate, 0.f, BMD_TRANSFORM_DEFER_CPU);
 	}
 
 	return true;

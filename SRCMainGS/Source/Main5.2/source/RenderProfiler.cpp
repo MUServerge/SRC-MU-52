@@ -57,6 +57,8 @@ namespace
 		case RPC_CPU_VERTEX_TRANSFORM_SKIPPED: return "CPUVertexTransformSkipped";
 		case RPC_CPU_NORMAL_TRANSFORM_REQUIRED: return "CPUNormalTransformRequired";
 		case RPC_CPU_NORMAL_TRANSFORM_SKIPPED: return "CPUNormalTransformSkipped";
+		case RPC_CPU_TRANSFORM_DEFERRED: return "CPUTransformDeferred";
+		case RPC_CPU_TRANSFORM_DEFERRED_MATERIALIZED: return "CPUTransformDeferredMaterialized";
 		case RPC_GPU_SKINNED_MESHES: return "GPUSkinnedMeshes";
 		case RPC_GPU_UPLOADED_BONES: return "GPUUploadedBones";
 		case RPC_SHADER_CREATED: return "ShaderCreated";

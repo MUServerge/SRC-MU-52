@@ -576,3 +576,34 @@ Runtime validation can deterministically select each path without changing the p
 10. Which shaders/assets in `Client\Data\Data\Shaders`, `Client\Shaders\skin.*`, and `Client\Data\Effect\Shader` are consumed by launchers, packers, tools, or alternate working directories?
 11. Does an explicit 3.3 Compatibility context preserve every map, event, UI, font, effect, and capture/tool integration on the supported hardware set?
 12. Which stable terrain data actually benefits from GPU residency after draw count, upload cost, and dynamic light/wind/water behavior are measured?
+
+
+## Phase 11 implementation — deferred CPU BMD transforms (2026-07-16)
+
+The CPU/GPU duplication seam is now explicit rather than inferred globally.
+
+- Existing `BMD::Transform` callers remain CPU-required by default.
+- The standard `Calc_RenderObject -> Draw_RenderObject` world-object path opts
+  into deferred CPU transforms only when the scene, transform and every populated
+  mesh are VBO-capable.
+- The authoritative legacy consumers call `EnsureCpuTransforms()` before reading
+  the shared transformed arrays: legacy/special mesh rendering, chrome UV
+  generation, translated rendering, mesh effects, collision/light-map work,
+  model shadows and physics cloth.
+- A failed VBO program/bone upload therefore materializes the original CPU data
+  and follows the existing legacy draw. The fallback is not a second permanent
+  renderer architecture; it is the existing compatibility path behind one
+  demand-driven transform boundary.
+- The global deferred context intentionally mirrors the existing global
+  `VertexTransform` ownership. A later `Transform` invalidates the earlier
+  context exactly where the old shared arrays would also have been overwritten.
+- Profiler interpretation: `CPUTransformDeferred` counts opt-in candidates and
+  `CPUTransformDeferredMaterialized` counts candidates that later required a
+  CPU consumer. Their difference is the number of object transforms that remained
+  GPU-only in the reporting window.
+
+Static review proves the default-call safety and consumer guards. Runtime parity
+and the actual CPU saving must still be verified with `MU_RENDER_PROFILER=1`
+across normal objects, special materials, shadows, effects, collision/picking,
+cloth, map transition and reconnect before extending opt-in to characters or
+equipment parts.
