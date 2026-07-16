@@ -57,6 +57,20 @@ static float (*g_pShaderBoneMatrix)[3][4] = NULL;
 static bool   g_bShaderGPUEligible = false;
 static vec3_t g_ShaderLightPos = { 0.f, 0.f, 0.f };
 
+struct DeferredCpuTransformContext
+{
+	BMD* Model;
+	float (*BoneMatrix)[3][4];
+	vec3_t LightPosition;
+	bool Pending;
+	bool Translate;
+	bool LightEnable;
+	float Scale;
+	float BoneScale;
+};
+
+static DeferredCpuTransformContext g_DeferredCpuTransform = {};
+
 static bool IsVboSceneEnabled()
 {
 	return SceneFlag == MAIN_SCENE;
@@ -291,11 +305,14 @@ bool BMD::PlayAnimation(float* AnimationFrame, float* PriorAnimationFrame, unsig
 	return Loop;
 }
 
-bool BMD::NeedsCpuVertexTransform(bool Translate, float _Scale) const
+bool BMD::NeedsCpuVertexTransform(bool Translate, float _Scale, BMDTransformPolicy policy) const
 {
 #ifndef SHADER_VERSION_TEST
 	return true;
 #else
+	if (policy != BMD_TRANSFORM_DEFER_CPU)
+		return true;
+
 	if (!IsVboSceneEnabled())
 		return true;
 
@@ -312,10 +329,7 @@ bool BMD::NeedsCpuVertexTransform(bool Translate, float _Scale) const
 			return true;
 	}
 
-	// VertexTransform is still consumed by RenderBodyShadow, RenderMeshEffect,
-	// SideHair and several effect attachment paths. Keep the CPU path required
-	// until those render callers explicitly opt in to GPU-only transforms.
-	return true;
+	return false;
 #endif
 }
 
@@ -324,18 +338,116 @@ bool BMD::NeedsCpuNormalTransform(bool needsCpuVertexTransform) const
 	if (needsCpuVertexTransform)
 		return true;
 
-	return LightEnable;
+	return false;
+}
+
+void BMD::MaterializeCpuTransforms(float(*BoneMatrix)[3][4], const vec3_t LightPosition, bool Translate, float _Scale, bool lightEnable, float boneScale, float* dynamicBoundingMin, float* dynamicBoundingMax)
+{
+	{
+		CRenderProfilerScope vertexProfilerScope(RP_BMD_TRANSFORM_VERTICES);
+		for (int i = 0; i < NumMeshs; i++)
+		{
+			Mesh_t* m = &Meshs[i];
+			for (int j = 0; j < m->NumVertices; j++)
+			{
+				Vertex_t* v = &m->Vertices[j];
+				float* vp = VertexTransform[i][j];
+
+				if (boneScale == 1.f)
+				{
+#ifdef PBG_ADD_NEWCHAR_MONK_ITEM
+					if (_Scale)
+					{
+						vec3_t Position;
+						VectorCopy(v->Position, Position);
+						VectorScale(Position, _Scale, Position);
+						VectorTransform(Position, BoneMatrix[v->Node], vp);
+					}
+					else
+#endif //PBG_ADD_NEWCHAR_MONK_ITEM
+						VectorTransform(v->Position, BoneMatrix[v->Node], vp);
+					if (Translate)
+						VectorScale(vp, BodyScale, vp);
+				}
+				else
+				{
+					VectorRotate(v->Position, BoneMatrix[v->Node], vp);
+					vp[0] = vp[0] * boneScale + BoneMatrix[v->Node][0][3];
+					vp[1] = vp[1] * boneScale + BoneMatrix[v->Node][1][3];
+					vp[2] = vp[2] * boneScale + BoneMatrix[v->Node][2][3];
+					if (Translate)
+						VectorScale(vp, BodyScale, vp);
+				}
+				if (dynamicBoundingMin != NULL && dynamicBoundingMax != NULL)
+				{
+					for (int k = 0; k < 3; ++k)
+					{
+						if (vp[k] < dynamicBoundingMin[k]) dynamicBoundingMin[k] = vp[k];
+						if (vp[k] > dynamicBoundingMax[k]) dynamicBoundingMax[k] = vp[k];
+					}
+				}
+				if (Translate)
+					VectorAdd(vp, BodyOrigin, vp);
+			}
+		}
+	}
+
+	{
+		CRenderProfilerScope normalProfilerScope(RP_BMD_TRANSFORM_NORMALS);
+		for (int i = 0; i < NumMeshs; i++)
+		{
+			Mesh_t* m = &Meshs[i];
+			for (int j = 0; j < m->NumNormals; j++)
+			{
+				Normal_t* sn = &m->Normals[j];
+				float* tn = NormalTransform[i][j];
+				VectorRotate(sn->Normal, BoneMatrix[sn->Node], tn);
+				if (lightEnable)
+				{
+					float Luminosity = DotProduct(tn, LightPosition) * 0.8f + 0.4f;
+					if (Luminosity < 0.2f)
+						Luminosity = 0.2f;
+					IntensityTransform[i][j] = Luminosity;
+				}
+			}
+		}
+	}
+}
+
+void BMD::EnsureCpuTransforms()
+{
+#ifdef SHADER_VERSION_TEST
+	if (!g_DeferredCpuTransform.Pending || g_DeferredCpuTransform.Model != this)
+		return;
+
+	float(*BoneMatrix)[3][4] = g_DeferredCpuTransform.BoneMatrix;
+	vec3_t LightPosition;
+	VectorCopy(g_DeferredCpuTransform.LightPosition, LightPosition);
+	const bool Translate = g_DeferredCpuTransform.Translate;
+	const bool lightEnable = g_DeferredCpuTransform.LightEnable;
+	const float Scale = g_DeferredCpuTransform.Scale;
+	const float boneScale = g_DeferredCpuTransform.BoneScale;
+
+	g_DeferredCpuTransform.Pending = false;
+	g_RenderProfiler.AddCounter(RPC_CPU_TRANSFORM_DEFERRED_MATERIALIZED);
+	MaterializeCpuTransforms(BoneMatrix, LightPosition, Translate, Scale, lightEnable, boneScale, NULL, NULL);
+#endif
 }
 
 void BMD::Transform(float(*BoneMatrix)[3][4], vec3_t BoundingBoxMin, vec3_t BoundingBoxMax, OBB_t* OBB, bool Translate, float _Scale)
 {
+	Transform(BoneMatrix, BoundingBoxMin, BoundingBoxMax, OBB, Translate, _Scale, BMD_TRANSFORM_CPU_REQUIRED);
+}
+
+void BMD::Transform(float(*BoneMatrix)[3][4], vec3_t BoundingBoxMin, vec3_t BoundingBoxMax, OBB_t* OBB, bool Translate, float _Scale, BMDTransformPolicy policy)
+{
 	CRenderProfilerScope profilerScope(RP_BMD_TRANSFORM);
 	vec3_t LightPosition;
+	Vector(0.f, 0.f, 0.f, LightPosition);
 
 	if (LightEnable)
 	{
 		vec3_t Position;
-
 		float Matrix[3][4];
 		if (HighLight)
 		{
@@ -356,7 +468,9 @@ void BMD::Transform(float(*BoneMatrix)[3][4], vec3_t BoundingBoxMin, vec3_t Boun
 	}
 
 #ifdef SHADER_VERSION_TEST
-	// Capture this object's context for a possible GPU-skinned draw of its meshes.
+	g_DeferredCpuTransform.Pending = false;
+	g_DeferredCpuTransform.Model = NULL;
+
 	g_pShaderBoneMatrix = BoneMatrix;
 	g_bShaderGPUEligible = (Translate == false && BoneScale == 1.f && _Scale == 0.f);
 	if (LightEnable)
@@ -365,114 +479,55 @@ void BMD::Transform(float(*BoneMatrix)[3][4], vec3_t BoundingBoxMin, vec3_t Boun
 
 	vec3_t BoundingMin;
 	vec3_t BoundingMax;
-	Vector(0.0, 0.0, 0.0, BoundingMin);
-	Vector(0.0, 0.0, 0.0, BoundingMax);
-
-	const bool needsCpuVertexTransform = NeedsCpuVertexTransform(Translate, _Scale);
-	const bool needsCpuNormalTransform = NeedsCpuNormalTransform(needsCpuVertexTransform);
-	g_RenderProfiler.AddCounter(needsCpuVertexTransform ? RPC_CPU_VERTEX_TRANSFORM_REQUIRED : RPC_CPU_VERTEX_TRANSFORM_SKIPPED);
-	g_RenderProfiler.AddCounter(needsCpuNormalTransform ? RPC_CPU_NORMAL_TRANSFORM_REQUIRED : RPC_CPU_NORMAL_TRANSFORM_SKIPPED);
-
-#ifdef _DEBUG
-#else
+	Vector(0.f, 0.f, 0.f, BoundingMin);
+	Vector(0.f, 0.f, 0.f, BoundingMax);
 	if (EditFlag == 2)
-#endif
 	{
 		Vector(999999.f, 999999.f, 999999.f, BoundingMin);
 		Vector(-999999.f, -999999.f, -999999.f, BoundingMax);
 	}
+
+	const bool needsCpuVertexTransform = NeedsCpuVertexTransform(Translate, _Scale, policy);
+	const bool needsCpuNormalTransform = NeedsCpuNormalTransform(needsCpuVertexTransform);
+	g_RenderProfiler.AddCounter(needsCpuVertexTransform ? RPC_CPU_VERTEX_TRANSFORM_REQUIRED : RPC_CPU_VERTEX_TRANSFORM_SKIPPED);
+	g_RenderProfiler.AddCounter(needsCpuNormalTransform ? RPC_CPU_NORMAL_TRANSFORM_REQUIRED : RPC_CPU_NORMAL_TRANSFORM_SKIPPED);
+
 	if (needsCpuVertexTransform)
 	{
-		CRenderProfilerScope vertexProfilerScope(RP_BMD_TRANSFORM_VERTICES);
-		for (int i = 0; i < NumMeshs; i++)
-		{
-			Mesh_t* m = &Meshs[i];
-			for (int j = 0; j < m->NumVertices; j++)
-			{
-				Vertex_t* v = &m->Vertices[j];
-				float* vp = VertexTransform[i][j];
-
-				if (BoneScale == 1.f)
-				{
-#ifdef PBG_ADD_NEWCHAR_MONK_ITEM
-					if (_Scale)
-					{
-						vec3_t Position;
-						VectorCopy(v->Position, Position);
-						VectorScale(Position, _Scale, Position);
-						VectorTransform(Position, BoneMatrix[v->Node], vp);
-					}
-					else
-#endif //PBG_ADD_NEWCHAR_MONK_ITEM
-						VectorTransform(v->Position, BoneMatrix[v->Node], vp);
-				if (Translate)
-					VectorScale(vp, BodyScale, vp);
-				}
-				else
-				{
-					VectorRotate(v->Position, BoneMatrix[v->Node], vp);
-					vp[0] = vp[0] * BoneScale + BoneMatrix[v->Node][0][3];
-					vp[1] = vp[1] * BoneScale + BoneMatrix[v->Node][1][3];
-					vp[2] = vp[2] * BoneScale + BoneMatrix[v->Node][2][3];
-					if (Translate)
-						VectorScale(vp, BodyScale, vp);
-				}
-#ifdef _DEBUG
-#else
-				if (EditFlag == 2)
-#endif
-				{
-					for (int k = 0; k < 3; k++)
-					{
-						if (vp[k] < BoundingMin[k]) BoundingMin[k] = vp[k];
-						if (vp[k] > BoundingMax[k]) BoundingMax[k] = vp[k];
-					}
-				}
-				if (Translate)
-					VectorAdd(vp, BodyOrigin, vp);
-			}
-		}
+		MaterializeCpuTransforms(BoneMatrix, LightPosition, Translate, _Scale, LightEnable, BoneScale,
+			EditFlag == 2 ? BoundingMin : NULL, EditFlag == 2 ? BoundingMax : NULL);
 	}
-
-	if (needsCpuNormalTransform)
+#ifdef SHADER_VERSION_TEST
+	else
 	{
-		CRenderProfilerScope normalProfilerScope(RP_BMD_TRANSFORM_NORMALS);
-		for (int i = 0; i < NumMeshs; i++)
-		{
-			Mesh_t* m = &Meshs[i];
-			for (int j = 0; j < m->NumNormals; j++)
-			{
-				Normal_t* sn = &m->Normals[j];
-				float* tn = NormalTransform[i][j];
-				VectorRotate(sn->Normal, BoneMatrix[sn->Node], tn);
-				if (LightEnable)
-				{
-					float Luminosity;
-					Luminosity = DotProduct(tn, LightPosition) * 0.8f + 0.4f;
-
-					if (Luminosity < 0.2f) Luminosity = 0.2f;
-					IntensityTransform[i][j] = Luminosity;
-				}
-			}
-		}
+		g_DeferredCpuTransform.Model = this;
+		g_DeferredCpuTransform.BoneMatrix = BoneMatrix;
+		VectorCopy(LightPosition, g_DeferredCpuTransform.LightPosition);
+		g_DeferredCpuTransform.Translate = Translate;
+		g_DeferredCpuTransform.LightEnable = LightEnable;
+		g_DeferredCpuTransform.Scale = _Scale;
+		g_DeferredCpuTransform.BoneScale = BoneScale;
+		g_DeferredCpuTransform.Pending = true;
+		g_RenderProfiler.AddCounter(RPC_CPU_TRANSFORM_DEFERRED);
 	}
+#endif
+
 	if (EditFlag == 2)
 	{
 		VectorCopy(BoundingMin, OBB->StartPos);
-		OBB->XAxis[0] = (BoundingMax[0] - BoundingMin[0]);
-		OBB->YAxis[1] = (BoundingMax[1] - BoundingMin[1]);
-		OBB->ZAxis[2] = (BoundingMax[2] - BoundingMin[2]);
+		OBB->XAxis[0] = BoundingMax[0] - BoundingMin[0];
+		OBB->YAxis[1] = BoundingMax[1] - BoundingMin[1];
+		OBB->ZAxis[2] = BoundingMax[2] - BoundingMin[2];
 	}
 	else
 	{
 		VectorCopy(BoundingBoxMin, OBB->StartPos);
-		OBB->XAxis[0] = (BoundingBoxMax[0] - BoundingBoxMin[0]);
-		OBB->YAxis[1] = (BoundingBoxMax[1] - BoundingBoxMin[1]);
-		OBB->ZAxis[2] = (BoundingBoxMax[2] - BoundingBoxMin[2]);
+		OBB->XAxis[0] = BoundingBoxMax[0] - BoundingBoxMin[0];
+		OBB->YAxis[1] = BoundingBoxMax[1] - BoundingBoxMin[1];
+		OBB->ZAxis[2] = BoundingBoxMax[2] - BoundingBoxMin[2];
 	}
 	fTransformedSize = max(max(BoundingMax[0] - BoundingMin[0], BoundingMax[1] - BoundingMin[1]), BoundingMax[2] - BoundingMin[2]);
 
-	//fTransformedSize *= 0.3f;
 	VectorAdd(OBB->StartPos, BodyOrigin, OBB->StartPos);
 	OBB->XAxis[1] = 0.f;
 	OBB->XAxis[2] = 0.f;
@@ -872,6 +927,7 @@ void SmoothBitmap(int Width, int Height, unsigned char* Buffer)
 
 bool BMD::CollisionDetectLineToMesh(vec3_t Position, vec3_t Target, bool Collision, int Mesh, int Triangle)
 {
+	EnsureCpuTransforms();
 	int i, j;
 	for (i = 0; i < NumMeshs; i++)
 	{
@@ -899,6 +955,7 @@ bool BMD::CollisionDetectLineToMesh(vec3_t Position, vec3_t Target, bool Collisi
 
 void BMD::CreateLightMapSurface(Light_t* lp, Mesh_t* m, int i, int j, int MapWidth, int MapHeight, int MapWidthMax, int MapHeightMax, vec3_t BoundingMin, vec3_t BoundingMax, int Axis)
 {
+	EnsureCpuTransforms();
 	int k, l;
 	Triangle_t* tp = &m->Triangles[j];
 	float* np = NormalTransform[i][tp->NormalIndex[0]];
@@ -1076,6 +1133,7 @@ bool BMD::runtime_render_effect(OBJECT* pObject, float Alpha, int RenderType, in
 
 void BMD::RenderMeshEffect(int i, int iType, int iSubType, vec3_t Angle, VOID* obj)
 {
+	EnsureCpuTransforms();
 	if (i >= NumMeshs || i < 0)
 		return;
 
@@ -1346,13 +1404,6 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						glColor3fv(BodyLight);
 						EnableLight = false;
 					}
-					else if (EnableLight)
-					{
-						for (int j = 0; j < m->NumNormals; j++)
-						{
-							VectorScale(BodyLight, IntensityTransform[i][j], LightTransform[i][j]);
-						}
-					}
 
 					int renderFlags = RenderFlag;
 
@@ -1400,6 +1451,7 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						if ((m->m_csTScript && m->m_csTScript->getNoneBlendMesh()) || m->NoneBlendMesh)
 							return;
 
+						EnsureCpuTransforms();
 						renderFlags = RENDER_CHROME;
 						if (RenderFlag & RENDER_CHROME4)
 							renderFlags = RENDER_CHROME4;
@@ -1639,6 +1691,18 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					}
 #endif // SHADER_VERSION_TEST
 
+					// The legacy path and every special material consume the shared CPU
+					// vertex/normal arrays. Materialize them once, only when fallback is
+					// actually needed after an explicitly deferred object transform.
+					EnsureCpuTransforms();
+					if (EnableLight)
+					{
+						for (int j = 0; j < m->NumNormals; ++j)
+						{
+							VectorScale(BodyLight, IntensityTransform[i][j], LightTransform[i][j]);
+						}
+					}
+
 					CRenderProfilerScope legacyProfilerScope(RP_BMD_RENDER_MESH_LEGACY);
 					auto vertices = RenderArrayVertices;
 					auto colors = RenderArrayColors;
@@ -1837,6 +1901,7 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 
 void BMD::RenderMeshTranslate(int i, int RenderFlag, float Alpha, int BlendMesh, float BlendMeshLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, int MeshTexture)
 {
+	EnsureCpuTransforms();
 	if (i >= NumMeshs || i < 0)
 		return;
 
@@ -2255,6 +2320,7 @@ void BMD::RenderBodyShadow(int BlendMesh, int HiddenMesh, int StartMeshNumber, i
 
 	if (ClothesCount == 0)
 	{
+		EnsureCpuTransforms();
 		AddMeshShadowTriangles(BlendMesh, HiddenMesh, startMesh, endMesh, sx, sy);
 	}
 	else
