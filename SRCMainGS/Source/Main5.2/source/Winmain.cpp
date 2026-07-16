@@ -736,7 +736,7 @@ namespace
 			glGetActiveUniform != NULL;
 		g_ErrorReport.Write("Active VBO entry set\t: %s\r\n", activeVboEntries ? "complete" : "INCOMPLETE");
 		if (!activeVboEntries)
-			g_ErrorReport.Write("WARNING: draw selection is unchanged in Phase 0; continuing with missing VBO entry points remains unsafe.\r\n");
+			g_ErrorReport.Write("WARNING: unsafe VBO programs remain disabled; the CPU/legacy mesh fallback stays active.\r\n");
 	}
 }
 
