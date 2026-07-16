@@ -9,13 +9,45 @@ schedulers, every consumer family (migrated, legacy-by-design, continuous,
 frame-counter), the scattered/duplicated pieces, and the commented-out or
 unfinished parts — and states precisely what "FPS done" means.
 
-## 0. Does FPS involve the Encoder?
+## 0. Does FPS involve the Encoder / MainInfo?
 
-**No.** `SRCMainGS/Source/Encoder/` (`Encoder.sln` + the Encoder tool) contains
-**no** timing/FPS symbols (`steady_clock`, `checkNormalizer`, `timefac`,
-`GetLimitFps`, `V_SYNCRONIZE`, `WorldTime`, `REFERENCE_FPS` — none). The Encoder
-is the separate asset/packet encoder tool; the FPS system is entirely client
-render/update timing and never touches it. Nothing to do there.
+**Yes — the Encoder (MainInfo) is the FPS-cap configuration source.** (An earlier
+draft wrongly excluded it after only checking the `Encoder/` folder's top level;
+this section is the corrected finding.)
+
+The `Encoder/Encoder/*` source (icon `maininfo.ico`, `MemScript` parser) builds
+`MainInfo/Encoder.exe` — the MainInfo config tool. It authors the packed client
+config (`av-code45.pak` / `MAIN_FILE_INFO`) from `MainInfo.ini`, and that config
+includes the FPS settings:
+
+```
+MainInfo.ini [Custom]
+  FpsRenderMax     = 60   ; "render FPS cap"
+  FpsWindowsOption = 0    ; "Prompt for FPS when entering game (On:1/Off:0)"
+```
+
+Chain, end to end:
+
+1. `MainInfo.ini [Custom] FpsRenderMax / FpsWindowsOption` — author the values.
+2. `Encoder.cpp:425-427` reads them into the packed struct:
+   `info.ajust_fps_render = GetPrivateProfileInt("Custom","FpsRenderMax",60,...)`;
+   `info.shutdown_popup = GetPrivateProfileInt("Custom","FpsWindowsOption",1,...)`.
+3. The client decodes them into `MAIN_FILE_INFO` (`CGMProtect.h:99-100`:
+   `BYTE shutdown_popup; BYTE ajust_fps_render;`).
+
+**But the open client source never applies them.** A fixed-string search finds
+no read of `gmProtect->ajust_fps_render` or `->shutdown_popup` anywhere; the only
+`ajust_fps_render` hits in `GMHellas.cpp` are an unrelated *local* variable
+initialised from the `frame_scene_desplace` frame counter. `GetLimitFps()`
+returns a hard-coded `60`, and no "prompt for FPS" popup exists in source.
+
+So the FPS-cap config is **plumbed but not consumed in the open source**. Either
+(a) the protection/packing layer (Themida / GMProtect binary, outside this source
+tree) applies `ajust_fps_render` at runtime, or (b) it is currently unwired dead
+config. This must be settled by a runtime check, and it is the correct place to
+wire a real, config-driven FPS cap (see §7/§8). The earlier claim that
+`GetLimitFps()` is "simply hard-coded 60" is therefore incomplete: a config path
+for the cap exists and reaches the client struct — it just is not read in source.
 
 ## 1. Executive summary
 
@@ -215,8 +247,13 @@ is the intended way to make random emitters FPS-independent — distinct from th
   intentionally on legacy; needs runtime/packet validation before any change.
 - **Dormant blur** (`MoveBlurs`/`MoveObjectBlurs`) — decide reconnect vs remove.
 - **`WorldTime` / `DeltaT` dual-writer** cleanup — pick one authority per global.
-- **Actual 120 FPS enablement** — `GetLimitFps()` is still hard-coded 60; raising
-  it is gated on interpolation + the frame-counter migration + validation.
+- **Config-driven FPS cap** — the `FpsRenderMax` chain reaches the client struct
+  (`MAIN_FILE_INFO::ajust_fps_render`) but the open source never reads it;
+  `GetLimitFps()` returns hard-coded 60 (see §0). Wiring `GetLimitFps()` to the
+  decoded `ajust_fps_render` (with a clamp and legacy fallback) is the intended
+  way to make the cap configurable, and the prerequisite for a real 120 mode.
+- **Actual 120 FPS enablement** — gated on the config-cap wiring above plus
+  interpolation + the frame-counter migration + runtime validation.
 - **Runtime validation** — no Windows `Release|Win32` build or 60/120 FPS
   cadence/visual-parity run has been performed; all conclusions here are static.
 
