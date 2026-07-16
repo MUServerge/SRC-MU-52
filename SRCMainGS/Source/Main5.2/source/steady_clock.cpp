@@ -11,6 +11,9 @@ csteady_clock::csteady_clock()
 	ping_reg_id = 0;
 	counterframe = 0;
 	deltaAccumulated = 0.0;
+	fixedUpdateAccumulator = 1.0 / REFERENCE_FPS;
+	fixedUpdateStepCount = 0;
+	droppedFixedUpdateStepCount = 0;
 	fpsNormalizer = REFERENCE_FPS;
 	realDeltaTime = 1.0 / REFERENCE_FPS;
 	realLegacyStep = 1.0;
@@ -23,7 +26,6 @@ csteady_clock::csteady_clock()
 	//mainthread = GetTickCount64();
 
 	mainthread = std::chrono::steady_clock::now();
-	last_check_time = std::chrono::steady_clock::now();
 
 	threadTime = new CTimer();
 }
@@ -78,6 +80,32 @@ double csteady_clock::GetDeltAccumulated()
 	return deltaAccumulated;
 }
 
+int csteady_clock::GetFixedUpdateStepCount() const
+{
+	return fixedUpdateStepCount;
+}
+
+int csteady_clock::GetDroppedFixedUpdateStepCount() const
+{
+	return droppedFixedUpdateStepCount;
+}
+
+double csteady_clock::GetFixedUpdateAlpha() const
+{
+	const double fixedStepSeconds = 1.0 / REFERENCE_FPS;
+	if (fixedStepSeconds <= 0.0)
+	{
+		return 0.0;
+	}
+
+	const double alpha = fixedUpdateAccumulator / fixedStepSeconds;
+	if (alpha <= 0.0)
+		return 0.0;
+	if (alpha >= 1.0)
+		return 1.0;
+	return alpha;
+}
+
 int csteady_clock::GetLimitFps()
 {
 	return 60;
@@ -105,25 +133,39 @@ double csteady_clock::Getframe_per_second()
 
 void csteady_clock::normalizefps()
 {
-	if (this->GetLimitFps() == (int)REFERENCE_FPS)
+	const double fixedStepSeconds = 1.0 / REFERENCE_FPS;
+	const int maxFixedStepsPerFrame = 5;
+	const double maxAccumulatedSeconds = fixedStepSeconds * maxFixedStepsPerFrame;
+
+	fixedUpdateStepCount = 0;
+	droppedFixedUpdateStepCount = 0;
+
+	double pendingSeconds = fixedUpdateAccumulator + realDeltaTime;
+	if (pendingSeconds > maxAccumulatedSeconds)
 	{
-		normal_check = true;
-		return;
+		const double discardedSeconds = pendingSeconds - maxAccumulatedSeconds;
+		droppedFixedUpdateStepCount = static_cast<int>(discardedSeconds / fixedStepSeconds);
+		pendingSeconds = maxAccumulatedSeconds;
+	}
+	else if (pendingSeconds < 0.0)
+	{
+		pendingSeconds = 0.0;
 	}
 
-	auto current_time = std::chrono::steady_clock::now();
-
-	double elapsed_time = std::chrono::duration<double>(current_time - last_check_time).count();
-
-	if (elapsed_time >= (0.04))
+	fixedUpdateStepCount = static_cast<int>(pendingSeconds / fixedStepSeconds);
+	if (fixedUpdateStepCount > maxFixedStepsPerFrame)
 	{
-		normal_check = true;
-		last_check_time = current_time;
+		fixedUpdateStepCount = maxFixedStepsPerFrame;
 	}
-	else
+
+	fixedUpdateAccumulator = pendingSeconds -
+		(static_cast<double>(fixedUpdateStepCount) * fixedStepSeconds);
+	if (fixedUpdateAccumulator < 0.0)
 	{
-		normal_check = false;
+		fixedUpdateAccumulator = 0.0;
 	}
+
+	normal_check = fixedUpdateStepCount > 0;
 }
 
 void csteady_clock::LoadInformationFps()
