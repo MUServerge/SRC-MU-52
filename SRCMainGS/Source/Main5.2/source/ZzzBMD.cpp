@@ -1619,17 +1619,9 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					}
 
 #ifdef SHADER_VERSION_TEST
-					// GPU-skinned draw (static bind-pose VBO + bone matrices in the shader,
-					// no per-frame vertex re-upload) for the textured and chrome/metal/oil
-					// materials. The Data\Effect\VBO shaders reproduce the legacy g_chrome UV
-					// formulas via u_setting uniforms, so RenderMeshVBO feeds them here.
-					// Excluded (kept on the legacy immediate path): CHROME8 (no matching
-					// shader), scrolling blend/stream meshes (EnableWave), wave/shadow vertex
-					// deformation, and body-translated/scaled draws (g_bShaderGPUEligible).
-					// ISOLATION PHASE: only plain LIT TEXTURED meshes go through the GPU
-					// path. Chrome/metal/oil (material-UV shaders) and flat/unlit meshes stay
-					// on the proven legacy path so scene colours are never a mix of two
-					// lighting paths; each material is re-enabled + verified 1:1 later.
+					// GPU-skinned Model draw for plain lit textured meshes. All special
+					// chrome/metal/oil, wave, shadow and effect materials remain on their
+					// authoritative legacy path.
 					if (IsVboSceneEnabled()
 						&& g_bShaderGPUEligible
 						&& IsVboMaterialEligible(renderFlags, EnableLight, EnableWave)
@@ -1639,8 +1631,7 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						// If the matching shader program is missing, RenderMeshVBO returns
 						// false and we fall through to the legacy immediate-mode draw.
 						g_RenderProfiler.AddCounter(RPC_VBO_DRAW_ATTEMPTED);
-						if (this->RenderMeshVBO(i, m, RenderFlag, renderFlags, Alpha,
-								EnableLight ? 1 : 0, BlendMeshTexCoordU, BlendMeshTexCoordV,
+						if (this->RenderMeshVBO(m, Alpha, EnableLight ? 1 : 0,
 								matrixSnapshot))
 						{
 							g_RenderProfiler.AddCounter(RPC_VBO_DRAW_SUCCEEDED);
@@ -2443,7 +2434,6 @@ void BMD::Release()
 				mesh->VBO_Vertices,
 				mesh->VBO_Normals,
 				mesh->VBO_TexCoords,
-				mesh->VBO_Colors,
 				mesh->VBO_Bones,
 				mesh->EBO,
 			};
@@ -2476,7 +2466,6 @@ void BMD::Release()
 			mesh->VBO_Vertices = 0;
 			mesh->VBO_Normals = 0;
 			mesh->VBO_TexCoords = 0;
-			mesh->VBO_Colors = 0;
 			mesh->VBO_Bones = 0;
 			mesh->EBO = 0;
 			mesh->VBO_ElementCount = 0;
@@ -3019,7 +3008,7 @@ bool BMD::Open2(char* DirName, char* ModelFileName, bool bReAlloc)
 		}
 
 #ifdef SHADER_VERSION_TEST
-		this->CreateVertexBuffer(i, *m);
+		this->CreateVertexBuffer(*m);
 #endif // SHADER_VERSION_TEST
 	}
 
@@ -3511,7 +3500,7 @@ void createViewMatrix(float* matrix, float* cameraPosition, float* cameraAngles,
 }
 
 
-void BMD::CreateVertexBuffer(int i, Mesh_t& mesh)
+void BMD::CreateVertexBuffer(Mesh_t& mesh)
 {
 #ifdef SHADER_VERSION_TEST
 	if (!gShaderGL->IsReadyVBO())
@@ -3647,43 +3636,15 @@ void BMD::CreateVertexBuffer(int i, Mesh_t& mesh)
 // the fixed-function stack so the result lines up 1:1 with the legacy draw; the
 // texture is already bound by the caller. Returns false (drawing nothing) when
 // the required program is unavailable, so the caller falls back to legacy.
-bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float Alpha, int EnableLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, ShaderMatrixSnapshot* matrixSnapshot)
+bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight,
+	ShaderMatrixSnapshot* matrixSnapshot)
 {
 #ifdef SHADER_VERSION_TEST
 	CRenderProfilerScope profilerScope(RP_BMD_RENDER_MESH_VBO);
 	if (m->VAO == 0 || m->VBO_ElementCount == 0)
 		return false;
 
-	// Select the material program and reproduce the legacy g_chrome UV formula
-	// (ZzzBMD.cpp RenderMesh) through the shader's u_setting uniforms.
-	eVBOShader prog = eVBO_Model;
-	int   enableLight = EnableLight; // textured: per-mesh light; chrome: flat body colour
-	float s1[4] = { 0.f, 0.f, 0.f, 0.f };
-	float s2[4] = { 0.f, 0.f, 0.f, 0.f };
-	float muv[2] = { 0.f, 0.f };
-
-	if (renderFlags != RENDER_TEXTURE)
-	{
-		enableLight = 0; // legacy chrome/metal/oil draws use flat BodyLight
-
-		const float Wave  = (int)WorldTime % 10000 * 0.0001f;
-		const float Wave2 = ((int)WorldTime % 5000) * 0.00024f - 0.4f;
-		float L[3];
-		L[0] = cosf(WorldTime * 0.001f);
-		L[1] = sinf(WorldTime * 0.002f);
-		L[2] = 1.0f;
-
-		if (RenderFlag & RENDER_CHROME2)      { prog = eVBO_Chrome2; s2[0] = 0.8f; s2[1] = 2.f; s2[2] = 1.f; s2[3] = 3.f; s1[3] = Wave2; }
-		else if (RenderFlag & RENDER_CHROME3) { prog = eVBO_Chrome3; s2[0] = LightVector[0]; s2[1] = LightVector[1]; s2[2] = LightVector[2]; }
-		else if (RenderFlag & RENDER_CHROME4) { prog = eVBO_Chrome4; s1[0] = L[0]; s1[1] = L[1]; s1[2] = L[2]; s1[3] = Wave; s2[0] = 0.5f; s2[1] = 3.f; s2[2] = 0.5f; s2[3] = 3.f; muv[0] = BlendMeshTexCoordU; muv[1] = BlendMeshTexCoordV; }
-		else if (RenderFlag & RENDER_CHROME5) { prog = eVBO_Chrome5; s1[0] = L[0]; s1[1] = L[1]; s1[2] = L[2]; s1[3] = Wave; s2[0] = 2.5f; s2[1] = 1.f; s2[2] = 3.f; s2[3] = 5.f; }
-		else if (RenderFlag & RENDER_CHROME6) { prog = eVBO_Chrome6; s1[0] = 0.8f; s1[1] = 2.f; s1[2] = Wave2; }
-		else if (RenderFlag & RENDER_CHROME7) { prog = eVBO_Chrome7; s1[0] = 0.8f; s1[1] = 0.8f; s1[2] = WorldTime; s1[3] = 0.00006f; }
-		else if (RenderFlag & RENDER_OIL)     { prog = eVBO_Oil;     muv[0] = BlendMeshTexCoordU; muv[1] = BlendMeshTexCoordV; }
-		else if (RenderFlag & RENDER_METAL)   { prog = eVBO_Metal;   s2[0] = 0.5f; s2[1] = 0.2f; s2[2] = 0.5f; s2[3] = 0.5f; }
-		else if (RenderFlag & RENDER_CHROME)  { prog = eVBO_Chrome1; s2[0] = 0.5f; s2[1] = 0.5f; s2[2] = 2.f; s1[2] = Wave; }
-		// RENDER_CHROME8 is excluded by the caller (no matching shader) -> legacy.
-	}
+	const eVBOShader prog = eVBO_Model;
 
 	// Validate the live model against the linked shader's active u_Bones array
 	// before binding or uploading. CPU transforms remain available for fallback.
@@ -3767,10 +3728,7 @@ bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float
 
 	gShaderGL->vboSetVec4("u_bodyLight", BodyLight[0], BodyLight[1], BodyLight[2], Alpha);
 	gShaderGL->vboSetVec4("u_lightPosition", g_ShaderLightPos[0], g_ShaderLightPos[1], g_ShaderLightPos[2], 0.f);
-	gShaderGL->vboSetVec4("u_meshUV", muv[0], muv[1], 0.f, 0.f);
-	gShaderGL->vboSetVec4("u_setting1", s1[0], s1[1], s1[2], s1[3]);
-	gShaderGL->vboSetVec4("u_setting2", s2[0], s2[1], s2[2], s2[3]);
-	gShaderGL->vboSetInt("u_enableLight", enableLight);
+	gShaderGL->vboSetInt("u_enableLight", EnableLight);
 	gShaderGL->vboSetInt("uTexture", 0); // texture already bound by the caller
 
 	RenderProfilerBindVertexArray(m->VAO);
@@ -3795,62 +3753,6 @@ bool BMD::RenderMeshVBO(int i, Mesh_t* m, int RenderFlag, int renderFlags, float
 #else
 	return false;
 #endif // SHADER_VERSION_TEST
-}
-
-void BMD::RenderVertexBuffer(int i, Mesh_t* m, int vertex_index, vec3_t* vertices, vec2_t* textCoords, vec4_t* colors)
-{
-#ifdef SHADER_VERSION_TEST
-	GLuint shader_id = gShaderGL->GetShaderId();
-
-	if (shader_id != 0)
-	{
-		gShaderGL->run_projection();
-
-		RenderProfilerBindBuffer(GL_ARRAY_BUFFER, m->VBO_Vertices);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_index * sizeof(vec3_t), vertices);
-		RenderProfilerBindBuffer(GL_ARRAY_BUFFER, 0);
-		//--
-		RenderProfilerBindBuffer(GL_ARRAY_BUFFER, m->VBO_TexCoords);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_index * sizeof(vec2_t), textCoords);
-		RenderProfilerBindBuffer(GL_ARRAY_BUFFER, 0);
-		//--
-		if (colors != NULL)
-		{
-			RenderProfilerBindBuffer(GL_ARRAY_BUFFER, m->VBO_Colors);
-			glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_index * sizeof(vec4_t), colors);
-			RenderProfilerBindBuffer(GL_ARRAY_BUFFER, 0);
-		}
-
-		GLuint previousProgram = 0;
-		if (!gShaderGL->UseLegacy(&previousProgram))
-			return;
-		RenderProfilerBindVertexArray(m->VAO);
-		glDrawElements(GL_TRIANGLES, vertex_index, GL_UNSIGNED_SHORT, 0);
-		RenderProfilerBindVertexArray(0);
-		gShaderGL->RestoreProgram(previousProgram);
-	}
-	else
-	{
-		glEnableClientState(GL_VERTEX_ARRAY);
-		if (colors != NULL) glEnableClientState(GL_COLOR_ARRAY);
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-
-		glVertexPointer(3, GL_FLOAT, 0, vertices);
-		if (colors != NULL) glColorPointer(4, GL_FLOAT, 0, colors);
-		glTexCoordPointer(2, GL_FLOAT, 0, textCoords);
-		glDrawArrays(GL_TRIANGLES, 0, m->NumTriangles * 3);
-
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-		if (colors != NULL) glDisableClientState(GL_COLOR_ARRAY);
-		glDisableClientState(GL_VERTEX_ARRAY);
-	}
-#endif // SHADER_VERSION_TEST
-}
-
-
-BMD::~BMD()
-{
-	Release();
 }
 
 void BMD::InterpolationTrans(float(*Mat1)[4], float(*TransMat2)[4], float _Scale)
