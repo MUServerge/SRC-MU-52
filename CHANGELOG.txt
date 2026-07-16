@@ -6,6 +6,18 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 7: audited the uploaded Client/Shaders,
+  Client/Data/Effect/VBO and Client/Data/Effect/shader GLSL assets against the
+  active loaders, then tightened BMD VBO creation validation. Models with an
+  invalid bone count, non-triangle/quad polygon, invalid vertex/normal/UV index,
+  invalid vertex or normal bone, or a vertex/normal split across different bones
+  now keep VAO == 0 and use the existing legacy renderer. The VBO shader contract
+  exposes one bone attribute for both position and normal, so split-node corners
+  cannot be represented without changing output. Removed the silent bone-zero
+  substitution. No shader asset, draw order, gameplay, file format or fallback
+  behavior was changed. Static review only; Windows build/runtime validation
+  remains pending. (ZzzBMD.cpp)
+
 - Client renderer Phase 6: added runtime introspection for every linked VBO
   program's active u_Bones vec4 array and compared its declared component use
   with GL_MAX_VERTEX_UNIFORM_COMPONENTS. Programs with a missing/incompatible
