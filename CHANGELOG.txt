@@ -6,6 +6,15 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 4: scoped fixed-function model-view/projection snapshots
+  to one BMD::RenderBody mesh loop. The first successful VBO mesh captures the
+  exact current matrices and sibling meshes reuse them; direct RenderMesh calls
+  retain the original per-draw queries. This avoids unsafe frame-global caching
+  and preserves temporary NewUI/inventory preview cameras, matrix uploads, draw
+  order and the legacy fallback. Static review only; Windows build/runtime
+  validation and measured performance comparison remain pending.
+  (ZzzBMD.cpp/.h)
+
 - Client renderer Phase 3: added a bounded, allocation-free per-program uniform
   location cache under the authoritative CShaderScene owner, including negative
   lookup caching and explicit invalidation before program deletion. Active
