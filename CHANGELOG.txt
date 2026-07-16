@@ -6,6 +6,15 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client renderer Phase 3: added a bounded, allocation-free per-program uniform
+  location cache under the authoritative CShaderScene owner, including negative
+  lookup caching and explicit invalidation before program deletion. Active
+  CShaderGL scene, legacy and VBO programs now share one compile/link/error path;
+  the non-SHADER_PIPELINE compiler remains as the compatibility fallback. Shader
+  files, uniforms uploaded, material selection, draw order and visual intent are
+  unchanged. Static review only; Windows build/runtime validation is pending.
+  (CShaderScene.cpp/.h, CShaderGL.cpp/.h)
+
 - Client renderer Phase 2: centralized all active GLSL program binding and
   nested restoration through CShaderScene's authoritative GL_CURRENT_PROGRAM
   tracker. CShaderGL now uses adapters for legacy/VBO programs and no longer
