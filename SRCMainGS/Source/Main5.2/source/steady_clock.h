@@ -253,6 +253,9 @@ public:
 	// Bounded 25 Hz scheduler. Consumers migrate to the step count incrementally;
 	// the legacy CheckNormalizer cadence remains unchanged until its Phase 4 audit.
 	int GetFixedUpdateStepCount() const;
+	// Visual emitters consume at most one opportunity per render frame. This
+	// avoids replay bursts when the bounded scheduler recovers multiple steps.
+	bool ShouldRunFixedVisualEmission() const;
 	int GetDroppedFixedUpdateStepCount() const;
 	double GetFixedUpdateAlpha() const;
 

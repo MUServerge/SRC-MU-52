@@ -26,7 +26,7 @@ runtime cadence measurements remain pending.
 
 | Symbol/domain | Active source files | Observed uses | Classification |
 | --- | ---: | ---: | --- |
-| `CheckNormalizer` | 9 | 21 | Remaining discrete 25 Hz compatibility pulse |
+| `CheckNormalizer` | 8 | 18 | Remaining discrete 25 Hz compatibility pulse |
 | `timefac` | 35 | 1772 | Continuous elapsed-time scaling |
 | `timeNormalizer` | 3 | 4 | Continuous normalization helper |
 | `standlimit` | 6 | 55 | Mixed lifetime/modulo compatibility |
@@ -81,6 +81,23 @@ found no active caller while `RenderBlurs()` is called by the scene. That is a
 dormant or incomplete lifecycle path, not a safe optimization target. It needs a
 separate decision to reconnect or remove it after Windows runtime evidence.
 
+### Phase 4B-3: non-burst synchronized visual emission
+
+`csteady_clock::ShouldRunFixedVisualEmission()` is the explicit policy for
+render-called visual emission: it returns true when the current render frame
+contains at least one fixed update step, but never asks a caller to replay
+multiple emissions after a stall. `CreateEffectSync()`, `CreateJointSync()`
+and `CreateParticleSync()` now use this policy instead of `CheckNormalizer`.
+At 25 Hz they remain enabled every authored step; at 60/120 FPS they receive
+approximately 25 emission opportunities per second; a recovered multi-step frame
+still provides one opportunity, preventing a particle/joint burst.
+
+The direct `BITMAP_FLARE_FORCE` counters remain unchanged. `MultiUse`,
+`Weapon` and `MaxTails` participate in a next-frame tail-generation state
+machine, so replacing each boolean increment independently would either burst
+tail creation or delay a state transition. That path requires a dedicated
+fixed-step update stage rather than arithmetic substitution.
+
 Phase 4A removes only those duplicate/no-op branches and the obsolete commented
 define. The surviving statements are the exact calls previously compiled by the
 default path. No animation formula, velocity, order or ownership changes.
@@ -105,10 +122,11 @@ Do not globally replace these systems:
 2. Review minimap auto-movement separately; it has gameplay/network authority.
 3. Completed: migrate active rain intensity/position counters in `MoveLeaves()`.
 4. Decide whether the dormant blur-move lifecycle must be reconnected or removed.
-5. Review remaining active deterministic effect counters one family at a time.
-6. Migrate random pet/boid/Hellas emitters only with explicit stall and RNG rules.
-7. Review `standlimit` and `MoveSceneFrame` owners last.
-8. Remove a legacy helper only after active calls, callbacks, macros and runtime
+5. Completed: migrate the three Sync wrappers to a non-burst emission gate.
+6. Design a dedicated fixed-step state update for joint tail-generation counters.
+7. Migrate random pet/boid/Hellas emitters only with explicit stall and RNG rules.
+8. Review `standlimit` and `MoveSceneFrame` owners last.
+9. Remove a legacy helper only after active calls, callbacks, macros and runtime
    lookups are all proven absent.
 
 Each group is a separate rollback point and requires a Release Win32 build plus

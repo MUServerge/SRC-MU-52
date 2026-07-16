@@ -86,6 +86,11 @@ int csteady_clock::GetFixedUpdateStepCount() const
 	return fixedUpdateStepCount;
 }
 
+bool csteady_clock::ShouldRunFixedVisualEmission() const
+{
+	return fixedUpdateStepCount > 0;
+}
+
 int csteady_clock::GetDroppedFixedUpdateStepCount() const
 {
 	return droppedFixedUpdateStepCount;
