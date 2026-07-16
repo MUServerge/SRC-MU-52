@@ -6,6 +6,19 @@
  2026-07-16
 ------------------------------------------------------------
 
+- Client FPS Phase 4B-2: migrated the active deterministic weather
+  cadence in MoveLeaves from the lossy CheckNormalizer boolean to the bounded
+  25 Hz scheduler step count. RainCurrent still moves one unit toward its target
+  and RainPosition still advances 20 units modulo 2000 per authored step, but
+  recovered steps are no longer discarded after a bounded stall. WorldTime
+  oscillation, random generation, leaf movement/density, map rules, gameplay and
+  packets are unchanged. The blur-move path was audited but not edited because
+  MoveBlurs/MoveObjectBlurs have no active caller in the repository; reconnect
+  versus removal requires separate runtime evidence. Static source verification
+  only; Windows build and weather visual-parity checks remain pending.
+  (ZzzEffectFireLeave.cpp,
+  docs/FPS_TIMING_CONSUMER_AUDIT_2026-07-16.md)
+
 - Client FPS Phase 4B-1: migrated the two deterministic UI blink
   consumers from the lossy CheckNormalizer boolean to the bounded 25 Hz
   scheduler step count. Text-input caret and slide-notice blink counters now
