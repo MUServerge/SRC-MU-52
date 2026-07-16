@@ -14,8 +14,9 @@
   now keep VAO == 0 and use the existing legacy renderer. The VBO shader contract
   exposes one bone attribute for both position and normal, so split-node corners
   cannot be represented without changing output. Removed the silent bone-zero
-  substitution. No shader asset, draw order, gameplay, file format or fallback
-  behavior was changed. Static review only; Windows build/runtime validation
+  substitution. No shader asset, draw order, gameplay or file format changed;
+  rejected meshes reuse the unchanged legacy fallback. Static review only;
+  Windows build/runtime validation
   remains pending. (ZzzBMD.cpp)
 
 - Client renderer Phase 6: added runtime introspection for every linked VBO
