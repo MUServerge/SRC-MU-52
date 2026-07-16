@@ -22,7 +22,7 @@ extern float g_fBoneSave[10][3][4];
 
 void CreateJointSync(int Type, vec3_t Position, vec3_t TargetPosition, vec3_t Angle, int SubType, OBJECT* Target, float Scale, short PK, WORD SkillIndex, WORD SkillSerialNum, int iChaIndex, const float* vColor, short int sTargetIndex)
 {
-	if (checkNormalizer)
+	if (gsteady_clock->ShouldRunFixedVisualEmission())
 	{
 		CreateJoint(Type, Position, TargetPosition, Angle, SubType, Target, Scale, PK, SkillIndex, SkillSerialNum, iChaIndex, vColor, sTargetIndex);
 	}
@@ -5000,7 +5000,7 @@ void MoveJoint(JOINT* o, int iIndex)
 				}
 				else
 				{
-					assert(!"µð¹ö±ë");
+					assert(!"ë””ë²„ê¹…");
 				}
 			}
 			break;
@@ -5210,7 +5210,7 @@ void MoveJoint(JOINT* o, int iIndex)
 				o->Light[2] -= timefac(10.12f);
 			}
 		}
-		else if (o->SubType == 1 || o->SubType == 2 || o->SubType == 3 || o->SubType == 5 || o->SubType == 6 || o->SubType == 7) //  À§¿¡¼­ ¾Æ·¡·Î ³»·Á¿À´Â ¹ø°³.
+		else if (o->SubType == 1 || o->SubType == 2 || o->SubType == 3 || o->SubType == 5 || o->SubType == 6 || o->SubType == 7) //  ìœ„ì—ì„œ ì•„ëž˜ë¡œ ë‚´ë ¤ì˜¤ëŠ” ë²ˆê°œ.
 
 		{
 			VectorCopy(o->StartPosition, o->Position);
@@ -5798,7 +5798,7 @@ void MoveJoint(JOINT* o, int iIndex)
 			else
 			{
 				if (fLife < 10.f)
-				{	// ³¡
+				{	// ë
 					fPos = fLife * 7.0f;
 				}
 				else
@@ -6042,7 +6042,7 @@ void MoveJoint(JOINT* o, int iIndex)
 		{
 			if (o->Target->Live)
 			{
-				o->LifeTime = 100.f; //¹«ÇÑ
+				o->LifeTime = 100.f; //ë¬´í•œ
 				o->life_time_work = standlimit((int)o->LifeTime);
 
 				if (rand() % 3 == 0)
@@ -6508,8 +6508,8 @@ void MoveJoint(JOINT* o, int iIndex)
 							CreateParticleSync(BITMAP_FIRE, o->Position, o->Angle, o->Light, 0);
 						}
 
-						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 10 + 5.f, 5, 10); //  Àü±â 
-						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 8 + 4.f, 5, 10); //  Àü±â 
+						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 10 + 5.f, 5, 10); //  ì „ê¸° 
+						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 8 + 4.f, 5, 10); //  ì „ê¸° 
 					}
 				}
 				if (o->SubType == 0)
