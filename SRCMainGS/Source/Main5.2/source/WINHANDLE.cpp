@@ -183,16 +183,7 @@ void CWINHANDLE::InitSize(mu_uint32 RenderSizeX, mu_uint32 RenderSizeY)
 
 	WindowHeight = RenderSizeY;
 
-	if (gmProtect->LookAndFeel == 5)
-	{
-		const mu_float ScaleX = (mu_float)WindowWidth / (mu_float)LOOK5_DESIGN_WIDTH;
-		const mu_float ScaleY = (mu_float)WindowHeight / (mu_float)LOOK5_DESIGN_HEIGHT;
-		const mu_float Scale = min(ScaleX, ScaleY);
-
-		g_fScreenRate_x = (Scale > 0.0f) ? Scale : 1.0f;
-		g_fScreenRate_y = g_fScreenRate_x;
-	}
-	else if (gmProtect->ScreenType == 0)
+	if (gmProtect->ScreenType == 0)
 	{
 		g_fScreenRate_x = (float)WindowWidth / 640.0;
 		g_fScreenRate_y = (float)WindowHeight / 480.0;
@@ -214,13 +205,13 @@ void CWINHANDLE::InitSize(mu_uint32 RenderSizeX, mu_uint32 RenderSizeY)
 	{
 		if (WindowWidth >= 1920)
 		{
-			g_fScreenRate_x = 2.1f;
-			g_fScreenRate_y = 2.1f;
+			g_fScreenRate_x = 1.6f;
+			g_fScreenRate_y = 1.6f;
 		}
 		else
 		{
-			g_fScreenRate_x = 1.65f;
-			g_fScreenRate_y = 1.65f;
+			g_fScreenRate_x = 1.75f;
+			g_fScreenRate_y = 1.75f;
 		}
 	}
 
@@ -417,41 +408,6 @@ mu_float CWINHANDLE::GetScreenX()
 mu_float CWINHANDLE::GetScreenY()
 {
 	return iWinHight;
-}
-
-mu_float CWINHANDLE::GetLook5Scale()
-{
-	return (g_fScreenRate_x > 0.0f) ? g_fScreenRate_x : 1.0f;
-}
-
-mu_float CWINHANDLE::GetLook5SafeOffsetX()
-{
-	return ((mu_float)WindowWidth - ((mu_float)LOOK5_DESIGN_WIDTH * GetLook5Scale())) * 0.5f;
-}
-
-mu_float CWINHANDLE::GetLook5SafeOffsetY()
-{
-	return ((mu_float)WindowHeight - ((mu_float)LOOK5_DESIGN_HEIGHT * GetLook5Scale())) * 0.5f;
-}
-
-mu_float CWINHANDLE::Look5DesignToScreenX(mu_float DesignX)
-{
-	return GetLook5SafeOffsetX() + (DesignX * GetLook5Scale());
-}
-
-mu_float CWINHANDLE::Look5DesignToScreenY(mu_float DesignY)
-{
-	return GetLook5SafeOffsetY() + (DesignY * GetLook5Scale());
-}
-
-mu_float CWINHANDLE::Look5ScreenToDesignX(mu_float ScreenX)
-{
-	return (ScreenX - GetLook5SafeOffsetX()) / GetLook5Scale();
-}
-
-mu_float CWINHANDLE::Look5ScreenToDesignY(mu_float ScreenY)
-{
-	return (ScreenY - GetLook5SafeOffsetY()) / GetLook5Scale();
 }
 
 ResolutionConfig* CWINHANDLE::LoadCurrentConfig()
@@ -687,32 +643,6 @@ LONG CWINHANDLE::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			else
 			{
 				gwinhandle->Change_State(false);
-			}
-		}
-		else if (gmProtect->LookAndFeel == 5)
-		{
-			const mu_uint32 RenderSizeX = LOWORD(lParam);
-			const mu_uint32 RenderSizeY = HIWORD(lParam);
-
-			if (RenderSizeX > 0 && RenderSizeY > 0
-				&& (RenderSizeX != WindowWidth || RenderSizeY != WindowHeight))
-			{
-				const mu_float PreviousScreenX = gwinhandle->GetScreenX();
-				const mu_float PreviousScreenY = gwinhandle->GetScreenY();
-
-				gwinhandle->InitSize(RenderSizeX, RenderSizeY);
-				MouseX = MouseRenderX / g_fScreenRate_x;
-				MouseY = MouseRenderY / g_fScreenRate_y;
-
-				if (g_pNewUISystem->GetNewUIManager() != NULL)
-				{
-					g_pNewUISystem->RenderFrameUpdate(PreviousScreenX, PreviousScreenY);
-
-					if (g_pNewUI3DRenderMng != NULL)
-					{
-						g_pNewUI3DRenderMng->Reload3DEffectObject(WindowWidth, WindowHeight);
-					}
-				}
 			}
 		}
 		break;

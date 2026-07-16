@@ -22,12 +22,6 @@ class CChatRoomSocketList;
 class CWINHANDLE
 {
 public:
-	enum
-	{
-		LOOK5_DESIGN_WIDTH = 640,
-		LOOK5_DESIGN_HEIGHT = 480,
-	};
-
 	CWINHANDLE();
 	virtual~CWINHANDLE();
 	void Release();
@@ -51,13 +45,6 @@ public:
 	mu_uint8 GetDisplayIndex(const std::string text_name);
 	mu_float GetScreenX();
 	mu_float GetScreenY();
-	mu_float GetLook5Scale();
-	mu_float GetLook5SafeOffsetX();
-	mu_float GetLook5SafeOffsetY();
-	mu_float Look5DesignToScreenX(mu_float DesignX);
-	mu_float Look5DesignToScreenY(mu_float DesignY);
-	mu_float Look5ScreenToDesignX(mu_float ScreenX);
-	mu_float Look5ScreenToDesignY(mu_float ScreenY);
 	ResolutionConfig* LoadCurrentConfig();
 	void Check_State();
 	void Change_State(mu_boolean bActive);

@@ -104,6 +104,10 @@ void CNewUIInGameShop::SetPos(int x, int y)
 	m_StoragePrevButton.SetPos(m_Pos.x + IMAGE_IGS_STORAGE_PAGE_LEFT_POS_X - 12, m_Pos.y + IMAGE_IGS_STORAGE_PAGE_BTN_POS_Y - 3);
 	// Storage Page next
 	m_StorageNextButton.SetPos(m_Pos.x + IMAGE_IGS_STORAGE_PAGE_RIGHT_POS_X + 10, m_Pos.y + IMAGE_IGS_STORAGE_PAGE_BTN_POS_Y - 3);
+
+	// No-op until CreateRadioGroup() runs in SetBtnInfo(); keeps the tabs anchored
+	// to m_Pos when SetPos() is called again on a resolution change.
+	m_ListBoxTabButton.ChangeRadioButtonInfo(true, m_Pos.x + IMAGE_IGS_TAB_BTN_POS_X, m_Pos.y + IMAGE_IGS_TAB_BTN_POS_Y, IMAGE_IGS_TAB_BTN_WIDTH, IMAGE_IGS_TAB_BTN_HEIGHT, IMAGE_IGS_TAB_BTN_DISTANCE);
 }
 
 bool CNewUIInGameShop::Render()

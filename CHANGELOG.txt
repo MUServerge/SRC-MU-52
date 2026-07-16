@@ -6,6 +6,16 @@
  2026-07-15
 ------------------------------------------------------------
 
+- Client: reverted the LookAndFeel5 responsive-resolution changes below. The
+  LookAndFeel5 branch ran ahead of the ScreenType checks in InitSize, so ScreenType
+  0 (stretch) and 1 (aspect-lock) never executed under LookAndFeel5 and widescreen
+  scaling was lost; the WM_SIZE resize handler also left UI windows at stale
+  positions. InitSize is ScreenType-driven again, the LookAndFeel5 WM_SIZE block is
+  removed, and the unused Look5 safe-area/design-conversion helpers plus the
+  LOOK5_DESIGN_* enum are gone (they assumed a letterbox model that contradicts the
+  extended virtual canvas used by the pos_*/Position_* anchor macros).
+  (WINHANDLE.cpp::InitSize, WINHANDLE.cpp::WndProc, WINHANDLE.h)
+
 - Client: replaced LookAndFeel5's fixed 1.8 screen rate with a uniform responsive
   640x480 design transform derived from the current drawable size, exposed explicit
   safe-area forward/inverse conversions, and invalidated existing UI layout and 3D
