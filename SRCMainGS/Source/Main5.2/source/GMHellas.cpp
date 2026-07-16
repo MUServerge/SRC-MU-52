@@ -676,7 +676,7 @@ void MoveBigMon(OBJECT* o)
 {
 	o->Angle[2] += timefac(o->Gravity);
 
-	if (rand() % 5 == 0 && checkNormalizer)
+	if (rand() % 5 == 0 && gsteady_clock->ShouldRunFixedVisualEmission())
 	{
 		o->Gravity *= -1;
 	}

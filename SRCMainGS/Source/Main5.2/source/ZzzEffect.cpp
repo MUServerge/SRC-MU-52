@@ -8210,7 +8210,7 @@ void MoveEffect(OBJECT* o, int iIndex)
 
 		VectorSubtract(vTempPosition, o->Position, vTempPosition);
 
-		if (o->AnimationFrame >= 11.0f && checkNormalizer)
+		if (o->AnimationFrame >= 11.0f && gsteady_clock->ShouldRunFixedVisualEmission())
 		{
 			CreateBomb3(o->Position, o->SubType);
 			if (rand() % 2 == 0)

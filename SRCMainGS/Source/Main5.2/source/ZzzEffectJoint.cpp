@@ -7161,7 +7161,7 @@ void MoveJoint(JOINT* o, int iIndex)
 			float Velocity = (double)(o->m_sTargetIndex - (float)o->LifeTime) * owner->Velocity * 0.04;
 			pModel->PlayAnimation(&owner->AnimationFrame, &owner->PriorAnimationFrame, &owner->PriorAction, Velocity, owner->Position, owner->Angle);
 
-			if (owner->AnimationFrame < 18.0 && owner->AnimationFrame >= 3.0 && checkNormalizer)
+			if (owner->AnimationFrame < 18.0 && owner->AnimationFrame >= 3.0 && gsteady_clock->ShouldRunFixedVisualEmission())
 			{
 				int iBoneNumber1[] = { 1, 5 };
 				int iBoneNumber2[] = { 2, 6 };
