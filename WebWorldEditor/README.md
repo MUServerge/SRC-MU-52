@@ -58,10 +58,10 @@ npm run preview  # serve the production build
 
 ## Deploy on Vercel
 
-The repo root of this project (`WebWorldEditor/`) is a standard Vite app.
+This repository is a standard Vite app at its root — import it into Vercel and
+deploy with no extra configuration:
 - Framework preset: **Vite**
 - Build command: `npm run build`
 - Output directory: `dist`
 
-`vercel.json` already declares these. If you import the whole game repo into
-Vercel, set the **Root Directory** to `WebWorldEditor`.
+`vercel.json` already declares these.
