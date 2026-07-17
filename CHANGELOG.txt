@@ -3,6 +3,26 @@
 ============================================================
 
 ------------------------------------------------------------
+ 2026-07-17
+------------------------------------------------------------
+
+- Tools: added WebWorldEditor/ - a standalone, browser-based (Vite + TypeScript +
+  Three.js) world viewer/editor that opens Season 5.2 map files locally/offline
+  (no client, no server, no upload) and deploys as a static site on Vercel. It
+  renders terrain from TerrainHeight.OZB with TerrainLight.OZB baked light, shows
+  the TW_* attribute grid as a colour overlay, draws every EncTerrain{N}.obj
+  placement as a per-type marker, supports Shift-drag attribute painting, and
+  exports correctly encrypted EncTerrain{N}.att / .obj. All parsers are byte-exact
+  ports of the canonical client loaders: MapFileDecrypt/MapFileEncrypt/BuxConvert
+  (ZzzLodTerrain.h, Util.cpp), OpenTerrainAttribute/OpenTerrainMapping/
+  OpenTerrainHeight[New]/OpenBMPBuffer (ZzzLodTerrain.cpp) and OpenObjectsEnc
+  (ZzzObject.cpp). Files using the newer ATT1/MAP1 ModulusDecrypt2 container are
+  detected and reported (proprietary routine, not decodable client-side). Does not
+  touch any existing client/server code. Verified: crypto inverse + .att/.obj
+  round-trip self-tests pass, and a headless-Chromium end-to-end run loads a
+  synthetic map and renders terrain, light, attribute overlay and 50 objects.
+
+------------------------------------------------------------
  2026-07-16
 ------------------------------------------------------------
 

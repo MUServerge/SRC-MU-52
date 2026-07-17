@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MU Web World Editor · Season 5.2</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar">
+        <h1>MU World Editor <span class="tag">5.2</span></h1>
+
+        <section class="panel">
+          <h2>Load map</h2>
+          <p class="hint">
+            Pick a map folder (e.g. <code>Data\World1</code>) or drop the map
+            files below. Files stay on your machine — nothing is uploaded.
+          </p>
+          <button id="btnPickFolder">Open map folder…</button>
+          <label class="filebtn">
+            <input id="filePick" type="file" multiple />
+            <span>…or select files</span>
+          </label>
+          <div id="dropZone" class="drop">Drop map files here</div>
+          <div id="fileList" class="filelist"></div>
+        </section>
+
+        <section class="panel" id="layersPanel" hidden>
+          <h2>Layers</h2>
+          <label class="row"><input type="checkbox" id="chkLight" checked /> Terrain light</label>
+          <label class="row"><input type="checkbox" id="chkWire" /> Wireframe</label>
+          <label class="row"><input type="checkbox" id="chkAtt" /> Attribute overlay</label>
+          <label class="row"><input type="checkbox" id="chkObjects" checked /> Objects</label>
+          <label class="row"><input type="checkbox" id="chkGrid" /> Grid (tiles)</label>
+        </section>
+
+        <section class="panel" id="attPanel" hidden>
+          <h2>Attribute edit</h2>
+          <p class="hint">Paint terrain flags, then export a new <code>EncTerrain*.att</code>.</p>
+          <label class="row">Flag
+            <select id="attFlag">
+              <option value="1">Safe zone (0x01)</option>
+              <option value="2">Character (0x02)</option>
+              <option value="4">No move (0x04)</option>
+              <option value="8">No ground (0x08)</option>
+              <option value="16">Water (0x10)</option>
+              <option value="32">Action (0x20)</option>
+              <option value="64">Height (0x40)</option>
+              <option value="128">Camera up (0x80)</option>
+            </select>
+          </label>
+          <label class="row">Brush
+            <input type="range" id="attBrush" min="0" max="6" value="1" />
+            <span id="attBrushVal">1</span>
+          </label>
+          <div class="row">
+            <label><input type="radio" name="attMode" value="add" checked /> Add</label>
+            <label><input type="radio" name="attMode" value="sub" /> Remove</label>
+          </div>
+          <p class="hint">Hold <b>Shift</b> + drag on the terrain to paint.</p>
+          <button id="btnSaveAtt" disabled>Export .att</button>
+          <button id="btnSaveObj" disabled>Export .obj</button>
+        </section>
+
+        <section class="panel">
+          <h2>Info</h2>
+          <div id="info" class="info">No map loaded.</div>
+        </section>
+      </aside>
+
+      <main id="stage">
+        <canvas id="gl"></canvas>
+        <div id="hud"></div>
+        <div id="overlay" class="overlay">
+          <div class="overlay-card">
+            <h2>MU Online — Web World Editor</h2>
+            <p>Open a Season&nbsp;5.2 map folder to view and edit terrain locally.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
