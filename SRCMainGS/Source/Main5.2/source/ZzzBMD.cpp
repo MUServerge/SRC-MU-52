@@ -24,6 +24,9 @@
 // NOTE: CShaderGL.h (which pulls in glm and disables the Win32 min/max macros) is
 // included further down, right before the VBO/shader code that needs it, so it does
 // not affect bare max()/min() usage in the rest of this translation unit.
+#ifdef SHADER_VERSION_TEST
+bool IsTranslatedVBOEnabled();
+#endif
 
 extern float MouseX;
 extern float MouseY;
@@ -51,8 +54,9 @@ vec2_t RenderArrayTexCoords[MAX_VERTICES * 3];
 // Transform() is the choke point invoked for every object right before its meshes
 // are rendered, with the exact bone matrix that builds VertexTransform — so
 // RenderMeshVBO uploads the same 200*3 vec4 matrices and reproduces the geometry
-// 1:1. Only valid when the bones are world-placed (Translate == false, no body
-// scale), which is the standard object path; otherwise the CPU path is used.
+// 1:1. World-placed bones are the production default. The opt-in translated path
+// applies the matching BodyScale/BodyOrigin contract in the same Model shader;
+// every special material and effect consumer retains the CPU/legacy path.
 static float (*g_pShaderBoneMatrix)[3][4] = NULL;
 static bool   g_bShaderGPUEligible = false;
 // Diagnostics only: first object-level condition that rejected GPU skinning.
@@ -1690,22 +1694,28 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					}
 
 #ifdef SHADER_VERSION_TEST
-					// Count the first failed VBO gate condition. This is observability
-					// only; the authoritative selection chain below remains unchanged.
+					// Count the first failed VBO gate condition. The opt-in translated
+					// prototype promotes only that object-level gate; every downstream
+					// material, light, resource and render-flag gate stays authoritative.
+					const bool translatedVboEligible =
+						g_ShaderGPUIneligibleReason == 1 && IsTranslatedVBOEnabled();
+					const bool objectVboEligible =
+						g_bShaderGPUEligible || translatedVboEligible;
+
+					if (g_ShaderGPUIneligibleReason == 1 && g_RenderProfiler.IsEnabled())
+					{
+						g_RenderProfiler.AddCounter(ClassifyTranslatedVboMesh(renderFlags,
+							EnableLight, EnableWave, m->VAO, RenderFlag));
+					}
+
 					if (!IsVboSceneEnabled())
 						g_RenderProfiler.AddCounter(RPC_VBO_GATE_SCENE_OFF);
-					else if (!g_bShaderGPUEligible)
+					else if (!objectVboEligible)
 					{
 						g_RenderProfiler.AddCounter(
 							g_ShaderGPUIneligibleReason == 1 ? RPC_VBO_GATE_TRANSLATE :
 							g_ShaderGPUIneligibleReason == 2 ? RPC_VBO_GATE_BONESCALE :
 							RPC_VBO_GATE_OBJSCALE);
-
-						if (g_ShaderGPUIneligibleReason == 1 && g_RenderProfiler.IsEnabled())
-						{
-							g_RenderProfiler.AddCounter(ClassifyTranslatedVboMesh(renderFlags,
-								EnableLight, EnableWave, m->VAO, RenderFlag));
-						}
 					}
 					else if (renderFlags != RENDER_TEXTURE)
 						g_RenderProfiler.AddCounter(RPC_VBO_GATE_NOT_PLAIN_TEXTURE);
@@ -1722,7 +1732,7 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					// chrome/metal/oil, wave, shadow and effect materials remain on their
 					// authoritative legacy path.
 					if (IsVboSceneEnabled()
-						&& g_bShaderGPUEligible
+						&& objectVboEligible
 						&& IsVboMaterialEligible(renderFlags, EnableLight, EnableWave)
 						&& m->VAO != 0 // non-zero only when CreateVertexBuffer ran (VBO path ready)
 						&& !HasVboExcludedRenderFlag(RenderFlag))
@@ -1730,13 +1740,21 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						// If the matching shader program is missing, RenderMeshVBO returns
 						// false and we fall through to the legacy immediate-mode draw.
 						g_RenderProfiler.AddCounter(RPC_VBO_DRAW_ATTEMPTED);
+						if (translatedVboEligible)
+							g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_ATTEMPTED);
+
 						if (this->RenderMeshVBO(m, Alpha, EnableLight ? 1 : 0,
+								translatedVboEligible,
 								matrixSnapshot))
 						{
 							g_RenderProfiler.AddCounter(RPC_VBO_DRAW_SUCCEEDED);
+							if (translatedVboEligible)
+								g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_SUCCEEDED);
 							return;
 						}
 						g_RenderProfiler.AddCounter(RPC_VBO_DRAW_REJECTED);
+						if (translatedVboEligible)
+							g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_REJECTED);
 					}
 #endif // SHADER_VERSION_TEST
 
@@ -3754,7 +3772,7 @@ void BMD::CreateVertexBuffer(Mesh_t& mesh)
 // the fixed-function stack so the result lines up 1:1 with the legacy draw; the
 // texture is already bound by the caller. Returns false (drawing nothing) when
 // the required program is unavailable, so the caller falls back to legacy.
-bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight,
+bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 	ShaderMatrixSnapshot* matrixSnapshot)
 {
 #ifdef SHADER_VERSION_TEST
@@ -3852,6 +3870,18 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight,
 	gShaderGL->vboSetVec4("u_bodyLight", BodyLight[0], BodyLight[1], BodyLight[2], Alpha);
 	gShaderGL->vboSetVec4("u_lightPosition", g_ShaderLightPos[0], g_ShaderLightPos[1], g_ShaderLightPos[2], 0.f);
 	gShaderGL->vboSetInt("u_enableLight", EnableLight);
+	if (IsTranslatedVBOEnabled() &&
+		(matrixSnapshot == NULL || !matrixSnapshot->BodyTransformUploaded))
+	{
+		if (Translate)
+		{
+			gShaderGL->vboSetVec4("u_bodyTransform",
+				BodyOrigin[0], BodyOrigin[1], BodyOrigin[2], BodyScale);
+		}
+		gShaderGL->vboSetInt("u_translate", Translate ? 1 : 0);
+		if (matrixSnapshot != NULL)
+			matrixSnapshot->BodyTransformUploaded = true;
+	}
 	gShaderGL->vboSetInt("uTexture", 0); // texture already bound by the caller
 
 	RenderProfilerBindVertexArray(m->VAO);

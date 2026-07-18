@@ -25,6 +25,9 @@ enum RenderProfilerCounter
 	RPC_VBO_DRAW_SUCCEEDED,
 	RPC_VBO_DRAW_REJECTED,
 	RPC_VBO_BONE_CAPACITY_REJECTED,
+	RPC_VBO_TRANSLATED_DRAW_ATTEMPTED,
+	RPC_VBO_TRANSLATED_DRAW_SUCCEEDED,
+	RPC_VBO_TRANSLATED_DRAW_REJECTED,
 	// First failing condition in the VBO eligibility chain. One reason is counted
 	// per rejected mesh without changing the render-path decision.
 	RPC_VBO_GATE_SCENE_OFF,

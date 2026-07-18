@@ -277,10 +277,12 @@ public:
 		float Projection[16];
 		GLuint UploadedMatrixPrograms[MATRIX_PROGRAM_CAPACITY];
 		int UploadedMatrixProgramCount;
+		bool BodyTransformUploaded;
 
 		ShaderMatrixSnapshot()
 			: Captured(false)
 			, UploadedMatrixProgramCount(0)
+			, BodyTransformUploaded(false)
 		{
 			for (int i = 0; i < MATRIX_PROGRAM_CAPACITY; ++i)
 				UploadedMatrixPrograms[i] = 0;
@@ -288,7 +290,7 @@ public:
 	};
 
 	void CreateVertexBuffer(Mesh_t& mesh);
-	bool RenderMeshVBO(Mesh_t* mesh, float alpha, int enableLight,
+	bool RenderMeshVBO(Mesh_t* mesh, float alpha, int enableLight, bool translate,
 		ShaderMatrixSnapshot* matrixSnapshot);
 
 	bool PlayAnimation(float* AnimationFrame, float* PriorAnimationFrame, unsigned short* PriorAction, float Speed, vec3_t Origin, vec3_t Angle);

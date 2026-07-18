@@ -51,6 +51,15 @@
   otherwise plain VBO candidates; material, unlit, missing-VAO and excluded draws
   remain explicitly separated for legacy ownership. (RenderProfiler, ZzzBMD)
 
+- Client renderer Phase 15 checkpoint: added a default-off `-vbotranslate`
+  prototype for only translated meshes that also pass the plain lit texture,
+  VAO and render-flag gates. The active Model shader reproduces the legacy
+  BodyScale-then-BodyOrigin vertex transform while special materials, unlit
+  passes, effects and missing resources remain on legacy. Transform uniforms are
+  uploaded once per body snapshot and are untouched in the production default.
+  Runtime visual/performance A/B validation remains required before promotion.
+  (CShaderGL, BMD::RenderMeshVBO, Model.vs)
+
 - Client UI: corrected the Iberia cooldown draw order and blend mode so the
   120-frame alpha mask renders over the skill icon without clipping its soft
   transition, while hotkey numbers remain readable above it. Enlarged the

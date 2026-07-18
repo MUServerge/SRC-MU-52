@@ -35,6 +35,9 @@ namespace
 		case RPC_VBO_DRAW_SUCCEEDED: return "VBODrawSucceeded";
 		case RPC_VBO_DRAW_REJECTED: return "VBODrawRejected";
 		case RPC_VBO_BONE_CAPACITY_REJECTED: return "VBOBoneCapacityRejected";
+		case RPC_VBO_TRANSLATED_DRAW_ATTEMPTED: return "VBOTranslatedDrawAttempted";
+		case RPC_VBO_TRANSLATED_DRAW_SUCCEEDED: return "VBOTranslatedDrawSucceeded";
+		case RPC_VBO_TRANSLATED_DRAW_REJECTED: return "VBOTranslatedDrawRejected";
 		case RPC_VBO_GATE_SCENE_OFF: return "VBOGateSceneOff";
 		case RPC_VBO_GATE_TRANSLATE: return "VBOGateTranslate";
 		case RPC_VBO_GATE_BONESCALE: return "VBOGateBoneScale";

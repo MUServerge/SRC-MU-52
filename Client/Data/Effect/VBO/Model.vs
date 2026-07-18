@@ -23,6 +23,8 @@ uniform vec4 u_Bones[600];
 uniform vec4 u_bodyLight;
 uniform vec4 u_lightPosition;
 uniform int u_enableLight;
+uniform vec4 u_bodyTransform;
+uniform int u_translate;
 
 out vec2 vTex;
 out vec4 vColor;
@@ -50,6 +52,13 @@ void main()
     vec3 worldPos = ApplyBonePosition(aPos, boneIndex);
     vec3 normal = ApplyBoneNormal(aNormal, boneIndex);
 
+    // Match BMD::MaterializeCpuTransforms for translated character/equipment
+    // meshes: bone-space result, uniform BodyScale, then BodyOrigin. Normals are
+    // rotated by the bone only, exactly like the legacy CPU path.
+    if (u_translate != 0) {
+        worldPos = worldPos * u_bodyTransform.w + u_bodyTransform.xyz;
+    }
+
     vTex = aTex;
 
     // Match the legacy fixed-function lighting exactly (ZzzBMD.cpp RenderMesh /
@@ -62,9 +71,10 @@ void main()
         if (intensity < 0.2) intensity = 0.2;
         color.rgb *= intensity;
     }
-    // Fixed-function clamps vertex colour before the texture modulate; the trim
-    // must come AFTER the clamp or saturated pixels (>1) ignore it. 0.85 = 15% dimmer.
-    color.rgb = clamp(color.rgb, 0.0, 1.0) * 0.85;
+    // Fixed-function clamps vertex colour before the texture modulate. Preserve
+    // the established 0.85 trim for the existing world-object VBO path, but use
+    // the untrimmed legacy colour for opt-in translated character/equipment draws.
+    color.rgb = clamp(color.rgb, 0.0, 1.0) * (u_translate != 0 ? 1.0 : 0.85);
     vColor = color;
 
     gl_Position = uProj * uView * vec4(worldPos, 1.0);

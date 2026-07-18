@@ -18,6 +18,8 @@ enum eVBOBoneTransport
 	eVBOBoneTransport_UniformBuffer,
 };
 
+bool IsTranslatedVBOEnabled();
+
 class CShaderGL
 {
 public:
@@ -38,6 +40,7 @@ public:
 	GLuint GetVBOProgram(eVBOShader shader) const;
 	int GetVBOBoneCapacity(eVBOShader shader) const;
 	eVBOBoneTransport GetBoneTransport() const { return m_BoneTransport; }
+	bool IsTranslatedVBOEnabled() const { return m_TranslatedVboEnabled; }
 	bool UseVBO(eVBOShader shader, GLuint* previousProgram = NULL);
 	void RestoreProgram(GLuint program);
 
@@ -68,6 +71,7 @@ private:
 	int m_MaxUniformBlockSize;
 	GLuint m_BoneUniformBuffer;
 	eVBOBoneTransport m_BoneTransport;
+	bool m_TranslatedVboEnabled;
 };
 
 #define gShaderGL (CShaderGL::Instance())

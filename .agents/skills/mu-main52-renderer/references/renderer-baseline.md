@@ -81,6 +81,14 @@ an excluded flag, and no wave draw was observed. The subcategories sum to the
 translated total in each stable window. This bounds a future translated prototype
 to the plain-candidate subset and keeps effect/material ownership on legacy.
 
+The resulting `-vbotranslate` prototype is deliberately default-off. It promotes
+only that measured plain-candidate subset, applies legacy `BodyScale` followed by
+`BodyOrigin` in the existing Model shader, and keeps CPU transforms plus every
+special/effect fallback intact. The existing world-object VBO colour trim is not
+applied to translated draws. Build verification is not runtime parity: character,
+equipment, set-effect flicker and like-for-like frame-time A/B remain the first
+required tests before this path can be enabled by default.
+
 ## First actions
 
 1. Audit actual GLSL assets.

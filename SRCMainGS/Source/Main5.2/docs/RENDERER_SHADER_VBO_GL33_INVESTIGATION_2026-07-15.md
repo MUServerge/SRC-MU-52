@@ -707,3 +707,24 @@ bounded to the plain-candidate subset behind an opt-in switch. It must reproduce
 `BodyScale` and `BodyOrigin` exactly in the active Model shader and retain every
 material, unlit, missing-resource and excluded draw on the authoritative legacy
 path. The earlier set-effect flicker remains a mandatory visual regression case.
+
+## Phase 15 checkpoint — opt-in translated plain VBO (2026-07-18)
+
+`-vbotranslate` promotes only translated meshes that also pass the existing plain
+lit textured material, wave, VAO and excluded-flag gates. The production default
+does not pass this switch and retains the exact Phase 14 legacy selection.
+
+The existing Model program now accepts one body-transform vector and a translation
+mode. For translated draws it applies `worldPos * BodyScale + BodyOrigin`, matching
+`BMD::MaterializeCpuTransforms`; normals retain the legacy bone-only rotation.
+The established 0.85 world-object VBO colour trim remains limited to nontranslated
+draws so opt-in character/equipment colour follows its previous legacy value.
+Transform mode/origin/scale uploads are cached once per `RenderBody` matrix
+snapshot, and no new uniform upload occurs when the opt-in switch is absent.
+
+Translated attempt/success/rejection counters provide the A/B boundary. CPU
+transforms deliberately remain enabled because attachment, effect, collision and
+special-material consumers have not been proven removable. This checkpoint is
+build-only until the next session validates shader linking and screenshot/video
+parity for characters, equipment, weapons/wings, animation, set effects, shadows,
+selection edges and UI previews, then compares identical profiler windows.

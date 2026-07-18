@@ -22,6 +22,7 @@ CShaderGL::CShaderGL()
 	, m_MaxUniformBlockSize(0)
 	, m_BoneUniformBuffer(0)
 	, m_BoneTransport(eVBOBoneTransport_None)
+	, m_TranslatedVboEnabled(false)
 {
 	for (int i = 0; i < eVBO_Max; ++i)
 	{
@@ -33,6 +34,11 @@ CShaderGL::CShaderGL()
 CShaderGL::~CShaderGL()
 {
 	Release();
+}
+
+bool IsTranslatedVBOEnabled()
+{
+	return gShaderGL->IsTranslatedVBOEnabled();
 }
 
 void CShaderGL::ReleaseUniformBuffer(bool canDelete)
@@ -98,6 +104,10 @@ void CShaderGL::Release()
 
 void CShaderGL::Init()
 {
+	const char* commandLine = GetCommandLineA();
+	m_TranslatedVboEnabled =
+		commandLine != NULL && strstr(commandLine, "-vbotranslate") != NULL;
+
 	InitVBOShaders();
 
 	const char* transport = "none (legacy mesh fallback)";
@@ -111,6 +121,8 @@ void CShaderGL::Init()
 	g_ErrorReport.Write("Bone transport\t\t: %s\r\n", transport);
 	g_ErrorReport.Write("Bone capacity\t\t: %d\r\n", m_VBOBoneCapacity[eVBO_Model]);
 	g_ErrorReport.Write("GPU skinning ready\t: %s\r\n", IsReadyVBO() ? "yes" : "no");
+	g_ErrorReport.Write("Translated plain VBO\t: %s\r\n",
+		m_TranslatedVboEnabled ? "enabled (opt-in)" : "disabled (legacy default)");
 	g_ErrorReport.AddSeparator();
 }
 
