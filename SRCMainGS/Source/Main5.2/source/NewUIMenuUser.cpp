@@ -121,7 +121,7 @@ void SEASON3B::CNewUIMenuUser::GetCloseRect(float& x, float& y, float& w, float&
 	w = CLOSE_SZ;
 	h = CLOSE_SZ;
 	x = m_Pos.x + MENU_WIDTH - w - 8.f;
-	y = m_Pos.y + (TITLE_H - h) * 0.5f;
+	y = m_Pos.y + (TITLE_H - h) * 0.5f + 1.f;
 }
 
 void SEASON3B::CNewUIMenuUser::GetBottomRect(float& x, float& y, float& w, float& h)
@@ -129,7 +129,7 @@ void SEASON3B::CNewUIMenuUser::GetBottomRect(float& x, float& y, float& w, float
 	w = BOTTOM_W;
 	h = BOTTOM_H;
 	x = m_Pos.x + (MENU_WIDTH - w) * 0.5f;
-	y = m_Pos.y + MENU_HEIGHT - h - 5.f;
+	y = m_Pos.y + MENU_HEIGHT - h - 8.f;
 }
 
 bool SEASON3B::CNewUIMenuUser::IsItemEnabled(int index) const
@@ -251,7 +251,7 @@ void SEASON3B::CNewUIMenuUser::RenderFrame()
 	g_pRenderText->SetBgColor(0);
 	g_pRenderText->SetFont(g_hFontBold);
 	g_pRenderText->SetTextColor(255, 220, 150, 255);
-	g_pRenderText->RenderText(m_Pos.x, (int)(m_Pos.y + 9.f), "Menu Game [F5]", (int)MENU_WIDTH, 0, RT3_SORT_CENTER);
+	g_pRenderText->RenderText(m_Pos.x, (int)(m_Pos.y + 11.f), "Menu Game [F5]", (int)MENU_WIDTH, 0, RT3_SORT_CENTER);
 }
 
 void SEASON3B::CNewUIMenuUser::RenderItems()

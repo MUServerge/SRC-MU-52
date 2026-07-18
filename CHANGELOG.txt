@@ -6,6 +6,11 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: fine-tuned the F5 menu chrome in virtual 640x480 space: moved the
+  header text two pixels and the title-bar close X one pixel downward, and
+  raised the bottom Close button three pixels. Render and hit-test rectangles
+  continue to share the same responsive coordinates. (NewUIMenuUser.cpp)
+
 - Client: restored the F5 custom game menu as a responsive 4x4 Iberia_Menu
   grid. F5 now reaches the menu hotkey whenever chat input is closed; the menu
   uses its native-aspect background/title, three-state close control and bottom
