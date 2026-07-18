@@ -97,29 +97,24 @@ void CErrorReport::Destroy(void)
 
 void CErrorReport::CutHead(void)
 {
-	DWORD dwNumber;
-	char* lpszBuffer = new char[128 * 1024];
+	if (m_hFile == INVALID_HANDLE_VALUE)
+		return;
 
-	if (ReadFile(m_hFile, &lpszBuffer[0], 128 * 1024 - 1, &dwNumber, NULL) != 0)
-	{
-		lpszBuffer[dwNumber] = '\0';
+	DWORD highSize = 0;
+	const DWORD lowSize = GetFileSize(m_hFile, &highSize);
+	if (lowSize == INVALID_FILE_SIZE && GetLastError() != NO_ERROR)
+		return;
 
-		char* lpCut = CheckHeadToCut(&lpszBuffer[0], dwNumber);
+	if (highSize == 0 && lowSize < 32 * 1024)
+		return;
 
-		if (dwNumber >= 32 * 1024 - 1)
-		{
-			lpCut = &lpszBuffer[32 * 1024 - 1];
-		}
-		if (lpCut != lpszBuffer)
-		{
-			CloseHandle(m_hFile);
-			DeleteFile(m_lpszFileName);
-			m_hFile = CreateFile(m_lpszFileName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			DWORD dwSize = dwNumber - (lpCut - &lpszBuffer[0]);
-			m_iKey = 0;
-			WriteFile(m_hFile, lpCut, dwSize, &dwNumber, NULL);
-		}
-	}
+	// The file is XOR encrypted, so searching its raw bytes for plaintext log
+	// markers and re-encrypting a copied tail corrupts both the retained data and
+	// the next key position. Rotate to a clean diagnostic log instead.
+	CloseHandle(m_hFile);
+	m_hFile = CreateFile(m_lpszFileName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
+		NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	m_iKey = 0;
 }
 
 char* CErrorReport::CheckHeadToCut(char* lpszBuffer, DWORD dwNumber)

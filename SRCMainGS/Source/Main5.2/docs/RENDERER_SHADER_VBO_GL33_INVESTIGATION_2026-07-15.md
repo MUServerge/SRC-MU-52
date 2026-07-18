@@ -648,3 +648,36 @@ problem and identifies translated character/equipment rendering as the largest
 measured eligibility blocker. The previous translated prototype produced
 set-effect flicker, so the next expansion must first separate plain translated
 meshes from effect/material consumers and retain their legacy ownership.
+
+## Phase 13 implementation — opt-in OpenGL 3.3 Compatibility (2026-07-18)
+
+The production default still creates the established legacy WGL context. Passing
+`-gl33compat` uses that context only as the WGL-extension bootstrap, then requests
+an OpenGL 3.3 Compatibility profile through `wglCreateContextAttribsARB`. Missing
+entry points, context creation failure, activation failure, or GLEW failure all
+restore the legacy context. Core Profile is deliberately not requested because
+the profiler still records thousands of immediate-mode draws per frame and the
+client retains fixed-function matrices, client arrays, alpha test and OpenGL2
+ImGui ownership.
+
+The target NVIDIA driver accepted the request without fallback and exposed a
+newer compatible context:
+
+- requested/selected: OpenGL 3.3 Compatibility;
+- runtime: OpenGL 4.6, GLSL 4.60, Compatibility profile mask `0x2`;
+- GLEW 2.2 and every required VBO entry point: available;
+- Terrain, Character and Model programs: linked successfully;
+- Model bone transport: validated 200-bone UBO.
+
+The worst captured crowded main-scene sample reached 25 FPS, 38.173 ms mean frame
+time and 36.250 ms in `Render`. It recorded 513.0 successful VBO draws/frame at
+2.220 ms and 737.9 legacy BMD draws/frame at 15.675 ms. Translated rendering was
+again the dominant first-failure gate at 636.9 meshes/frame; total draw calls were
+5,558.8/frame and immediate-mode draws were 2,499.2/frame. This matches the legacy
+context's bottleneck shape and proves that explicit Compatibility selection is
+not the cause of the existing FPS drops. It makes no performance claim.
+
+During this validation the encrypted `MuError.log` rollover owner was also fixed.
+The old code searched ciphertext for plaintext separators and re-encrypted an
+already encrypted tail, corrupting subsequent diagnostic sessions. Oversized
+logs now rotate to a clean encrypted file and reset the XOR key position.

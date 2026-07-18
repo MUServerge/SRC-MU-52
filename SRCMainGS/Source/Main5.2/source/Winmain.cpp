@@ -65,7 +65,7 @@
 #include <tlhelp32.h>
 
 #include <dbghelp.h>
-#include <wglext.h>
+#include <gl/wglew.h>
 #pragma comment(lib,"dbghelp.lib")
 
 #include <wzAudio.h>
@@ -105,6 +105,7 @@ bool ashies = false;
 int weather = rand() % 3;
 HDC       g_hDC = NULL;
 HGLRC     g_hRC = NULL;
+static HGLRC g_hBootstrapRC = NULL;
 HFONT     g_hFont = NULL;
 HFONT     g_hFontBold = NULL;
 HFONT     g_hFontBig = NULL;
@@ -223,6 +224,13 @@ GLvoid KillGLWindow(GLvoid)
 		}
 
 		g_hRC = NULL;
+	}
+
+	if (g_hBootstrapRC)
+	{
+		if (!wglDeleteContext(g_hBootstrapRC))
+			g_ErrorReport.Write("GL - Bootstrap Rendering Context Release Failed\r\n");
+		g_hBootstrapRC = NULL;
 	}
 
 	if (g_hDC && !ReleaseDC(gwinhandle->GethWnd(), g_hDC))
@@ -528,6 +536,66 @@ namespace
 			proc != (PROC)3 && proc != (PROC)-1;
 	}
 
+	bool HasCommandLineSwitch(const char* option)
+	{
+		const char* commandLine = GetCommandLineA();
+		return commandLine != NULL && option != NULL && strstr(commandLine, option) != NULL;
+	}
+
+	bool SelectRendererContext(bool requestGL33Compatibility, HGLRC legacyContext, HGLRC& selectedContext)
+	{
+		selectedContext = legacyContext;
+		if (!requestGL33Compatibility)
+			return true;
+
+		PROC proc = wglGetProcAddress("wglCreateContextAttribsARB");
+		if (!IsValidWGLProcAddress(proc))
+		{
+			g_ErrorReport.Write("Compatibility request\t: unavailable (wglCreateContextAttribsARB missing); using legacy context\r\n");
+			return true;
+		}
+
+		PFNWGLCREATECONTEXTATTRIBSARBPROC createContextAttributes =
+			(PFNWGLCREATECONTEXTATTRIBSARBPROC)proc;
+		const int contextAttributes[] =
+		{
+			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+			WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+			0
+		};
+
+		SetLastError(ERROR_SUCCESS);
+		HGLRC compatibilityContext = createContextAttributes(g_hDC, NULL, contextAttributes);
+		if (compatibilityContext == NULL)
+		{
+			g_ErrorReport.Write("Compatibility request\t: creation failed (%u); using legacy context\r\n", GetLastError());
+			return true;
+		}
+
+		if (!wglMakeCurrent(g_hDC, compatibilityContext))
+		{
+			const DWORD errorCode = GetLastError();
+			if (!wglDeleteContext(compatibilityContext))
+			{
+				g_ErrorReport.Write("Compatibility candidate\t: release failed (%u)\r\n", GetLastError());
+				g_hBootstrapRC = compatibilityContext;
+			}
+			if (wglGetCurrentContext() != legacyContext && !wglMakeCurrent(g_hDC, legacyContext))
+			{
+				g_ErrorReport.Write("Compatibility request\t: activation failed (%u) and legacy recovery failed (%u)\r\n",
+					errorCode, GetLastError());
+				return false;
+			}
+
+			g_ErrorReport.Write("Compatibility request\t: activation failed (%u); using legacy context\r\n", errorCode);
+			return true;
+		}
+
+		selectedContext = compatibilityContext;
+		return true;
+	}
+
 	const char* PixelFormatAcceleration(const PIXELFORMATDESCRIPTOR& pfd)
 	{
 		if ((pfd.dwFlags & PFD_GENERIC_FORMAT) == 0)
@@ -808,7 +876,59 @@ bool CreateOpenglWindow()
 		return FALSE;
 	}
 
-	const GLenum glewResult = glewInit();
+	const bool requestGL33Compatibility = HasCommandLineSwitch("-gl33compat");
+	const HGLRC legacyContext = g_hRC;
+	HGLRC selectedContext = legacyContext;
+
+	g_ErrorReport.Write("<Renderer context selection>\r\n");
+	g_ErrorReport.Write("Requested context\t: %s\r\n",
+		requestGL33Compatibility ? "OpenGL 3.3 Compatibility" : "legacy default");
+	if (!SelectRendererContext(requestGL33Compatibility, legacyContext, selectedContext))
+	{
+		g_hRC = legacyContext;
+		KillGLWindow();
+		MessageBox(NULL, GlobalText[4], "OpenGL Context Selection Error.", MB_OK | MB_ICONEXCLAMATION);
+		return FALSE;
+	}
+
+	g_hRC = selectedContext;
+	GLenum glewResult = glewInit();
+	if (selectedContext != legacyContext && glewResult != GLEW_OK)
+	{
+		g_ErrorReport.Write("Compatibility request\t: GLEW failed (%u); restoring legacy context\r\n", (unsigned int)glewResult);
+		if (!wglMakeCurrent(g_hDC, legacyContext))
+		{
+			g_ErrorReport.Write("Legacy context recovery\t: FAILED (%u)\r\n", GetLastError());
+			if (!wglDeleteContext(legacyContext))
+				g_hBootstrapRC = legacyContext;
+			g_hRC = selectedContext;
+			KillGLWindow();
+			MessageBox(NULL, GlobalText[4], "OpenGL Legacy Context Recovery Error.", MB_OK | MB_ICONEXCLAMATION);
+			return FALSE;
+		}
+
+		if (!wglDeleteContext(selectedContext))
+		{
+			g_ErrorReport.Write("Compatibility candidate\t: release failed (%u)\r\n", GetLastError());
+			g_hBootstrapRC = selectedContext;
+		}
+		selectedContext = legacyContext;
+		g_hRC = legacyContext;
+		glewResult = glewInit();
+	}
+
+	if (selectedContext != legacyContext)
+	{
+		if (!wglDeleteContext(legacyContext))
+		{
+			g_ErrorReport.Write("Legacy bootstrap context\t: release failed (%u)\r\n", GetLastError());
+			g_hBootstrapRC = legacyContext;
+		}
+	}
+
+	g_ErrorReport.Write("Selected context\t: %s\r\n",
+		selectedContext != legacyContext ? "OpenGL 3.3 Compatibility" : "legacy WGL context");
+	g_ErrorReport.AddSeparator();
 	WritePixelFormatDiagnostics(g_hDC, (int)PixelFormat, pfd, glewResult == GLEW_OK);
 	WriteOpenGLCapabilityDiagnostics(glewResult);
 

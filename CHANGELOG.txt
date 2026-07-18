@@ -28,6 +28,22 @@
   meshes were the dominant first-failure gate. (CShaderScene, CShaderGL,
   RenderProfiler, ZzzBMD, ErrorReport)
 
+- Client diagnostics: fixed encrypted MuError.log rollover at its owner. The old
+  CutHead searched ciphertext for plaintext markers, reopened with OPEN_ALWAYS
+  without guaranteed truncation and XOR-converted the retained ciphertext again.
+  Oversized diagnostic history now rotates to a clean encrypted file with a reset
+  key, so subsequent renderer/profile runs remain readable. (CErrorReport::CutHead)
+
+- Client renderer Phase 13: added an opt-in `-gl33compat` startup path that uses
+  the legacy context as a WGL bootstrap and requests OpenGL 3.3 Compatibility,
+  while preserving the production legacy default and restoring it after any
+  extension, creation, activation or GLEW failure. Runtime validation selected a
+  driver-provided OpenGL 4.6 Compatibility context satisfying the 3.3 request;
+  GLEW, Terrain, Character, Model and the 200-bone UBO path all initialized.
+  Crowded-scene profiling retained the legacy bottleneck shape, confirming the
+  context change did not cause the existing FPS drops. Core remains blocked by
+  fixed-function/immediate-mode ownership. (CreateOpenglWindow)
+
 - Client UI: corrected the Iberia cooldown draw order and blend mode so the
   120-frame alpha mask renders over the skill icon without clipping its soft
   transition, while hotkey numbers remain readable above it. Enlarged the

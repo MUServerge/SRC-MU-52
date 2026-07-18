@@ -36,6 +36,19 @@ Set-Location 'C:\Users\hatim\Desktop\SRC-MU-52\Client'
 
 Output is aggregated approximately every two seconds. No per-draw log lines, `glGetError` polling, or GPU timer query is performed. `FrameTimeStable` and `FrameTimeLoading` are separate fixed-capacity sample groups. Immediate-mode draw calls are counted, but their per-vertex submissions are intentionally not intercepted; `SubmittedVerticesKnown` and `SubmittedTrianglesKnown` are therefore lower bounds covering `glDrawArrays`/`glDrawElements` calls.
 
+To validate the opt-in OpenGL 3.3 Compatibility path with the same profiler, use:
+
+```powershell
+Set-Location 'C:\Users\hatim\Desktop\SRC-MU-52\Client'
+& '.\Main.exe' -gl33compat -renderprofiler
+```
+
+The startup log must say both `Requested context: OpenGL 3.3 Compatibility` and
+`Selected context: OpenGL 3.3 Compatibility`. Record `GL_VERSION` and the context
+profile mask; a driver may expose a newer Compatibility context that satisfies
+the 3.3 minimum. A legacy selection means the fallback was used and must be
+reported with its preceding reason rather than counted as a GL 3.3 run.
+
 ## Fixed test controls
 
 Use the same settings for every comparative run:
