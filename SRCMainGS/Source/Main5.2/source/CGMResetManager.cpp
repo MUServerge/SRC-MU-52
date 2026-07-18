@@ -434,6 +434,24 @@ void SEASON3B::CGMResetManager::ClosingProcess()
 	}
 }
 
+bool SEASON3B::CGMResetManager::OpenWindow(BYTE TypeUI)
+{
+	if (!IsWindowAvailable(TypeUI))
+		return false;
+
+	_TypeUI = TypeUI;
+	_Visible = true;
+	return true;
+}
+
+bool SEASON3B::CGMResetManager::IsWindowAvailable(BYTE TypeUI) const
+{
+	if (!gmProtect->WindowsResetInfo || TypeUI > 1)
+		return false;
+
+	return (TypeUI == 0) ? reset.m_Enable : master.m_Enable;
+}
+
 void SEASON3B::CGMResetManager::RenderResetInfo()
 {
 	float x = RenderFrameX + ((RenderSizeX - (reset.box_count * 22.f)) / 2.f);

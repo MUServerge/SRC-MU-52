@@ -524,10 +524,10 @@ bool SEASON3B::CNewUIChatInputBox::UpdateKeyEvent()
 			{
 				m_pNewUIChatLogWnd->ShowFrame();
 			}
-		}
 
-		PlayBuffer(SOUND_CLICK01);
-		return false;
+			PlayBuffer(SOUND_CLICK01);
+			return false;
+		}
 	}
 #else
 	if (SEASON3B::IsPress(VK_F5))

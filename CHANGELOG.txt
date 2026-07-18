@@ -6,6 +6,20 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client: restored the F5 custom game menu as a responsive 4x4 Iberia_Menu
+  grid. F5 now reaches the menu hotkey whenever chat input is closed; the menu
+  uses its native-aspect background/title, three-state close control and bottom
+  close button. Existing Character, Inventory, Command, Guild, Ranking, Reset,
+  Master Reset (Relife), Jewel Inventory, Event Time, Skill List, command and
+  VIP actions are wired to their real managers and feature flags. Menu entries
+  whose underlying Title/Market/Withdraw systems do not exist remain visibly
+  disabled instead of calling unrelated interfaces. (NewUIMenuUser.*,
+  NewUIChatInputBox.cpp, CGMResetManager.*, _TextureIndex.h)
+
+- Client UI: moved the complete five-button ESC System Menu group four virtual
+  pixels upward, preserving its internal spacing and resolution scaling while
+  balancing the top and bottom frame margins. (NewUICustomMessageBox.h)
+
 - Build layout: moved generated client output from the legacy `Client_2` folder
   to `Build\Client` for a clean separation between build artifacts and the live
   `Client` runtime. Added `Build/` to the repository ignore rules. Removed stale

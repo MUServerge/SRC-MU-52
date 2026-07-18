@@ -51,6 +51,8 @@ namespace SEASON3B
 		void RenderFrame();
 		void RenderButtons();
 		void ClosingProcess();
+		bool OpenWindow(BYTE TypeUI);
+		bool IsWindowAvailable(BYTE TypeUI) const;
 
 		void RenderResetInfo();
 		void RenderMasterResetInfo();
