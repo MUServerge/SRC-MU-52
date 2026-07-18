@@ -45,7 +45,7 @@ $head = (& git -C $root rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $head) { throw "Failed to resolve the Git commit." }
 $branch = (& git -C $root branch --show-current).Trim()
 if ($LASTEXITCODE -ne 0) { throw "Failed to resolve the Git branch." }
-$status = @(& git -C $root status --short)
+$statusBefore = @(& git -C $root status --short)
 if ($LASTEXITCODE -ne 0) { throw "Failed to read Git worktree status." }
 $remote = (& git -C $root remote get-url origin 2>$null)
 if ($LASTEXITCODE -ne 0) { $remote = "" }
@@ -96,16 +96,23 @@ foreach ($config in $Configuration) {
             }
         }
     }
+    $artifactVerified = ($configArtifacts.Count -gt 0)
+    $evidenceGatePassed = ($exitCode -eq 0 -and $artifactVerified)
     $results += [ordered]@{
         configuration = $config
         platform = $Platform
         target = $target
         exit_code = $exitCode
-        succeeded = ($exitCode -eq 0)
+        msbuild_succeeded = ($exitCode -eq 0)
+        artifact_verified = $artifactVerified
+        evidence_gate_passed = $evidenceGatePassed
         log = $log
         artifacts = $configArtifacts
     }
 }
+
+$statusAfter = @(& git -C $root status --short)
+if ($LASTEXITCODE -ne 0) { throw "Failed to read post-build Git worktree status." }
 
 $evidence = [ordered]@{
     generated_utc = [DateTime]::UtcNow.ToString("o")
@@ -113,8 +120,10 @@ $evidence = [ordered]@{
     remote = $remote
     branch = $branch
     commit = $head
-    dirty = ($status.Count -gt 0)
-    worktree_changes = $status
+    dirty_before = ($statusBefore.Count -gt 0)
+    worktree_changes_before = $statusBefore
+    dirty_after = ($statusAfter.Count -gt 0)
+    worktree_changes_after = $statusAfter
     solution = $solutionPath
     msbuild = $msbuild
     msbuild_version = $msbuildVersion
@@ -124,4 +133,4 @@ $json = Join-Path $output "build-evidence.json"
 $evidence | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $json -Encoding UTF8
 
 $evidence | ConvertTo-Json -Depth 6
-if ($results.Where({ -not $_.succeeded }).Count -gt 0) { exit 1 }
+if ($results.Where({ -not $_.evidence_gate_passed }).Count -gt 0) { exit 1 }
