@@ -2,11 +2,11 @@
 
 ## Authority order
 
-`CLAUDE.md` at the project root is authoritative. Where it and these skills disagree, `CLAUDE.md` wins — notably its Golden Rule #7 (do not modernize; keep x86), which narrows the "incremental modernization" direction described here and in `$mu-main52-refactor` to changes the user explicitly asks for.
+`AGENTS.md` at the project root is authoritative. Where it and these skills disagree, `AGENTS.md` wins — notably its Golden Rule #7 (do not modernize; keep x86), which narrows the "incremental modernization" direction described here and in `$mu-main52-refactor` to changes the user explicitly asks for.
 
 ## Local checkout
 
-These skills describe the `MUServerge/main-5.2` client. In this working copy that tree lives inside the SRC 5.2 BASE checkout, so repo-relative paths map as follows (verified 2026-07-15):
+This is the standalone `MUServerge/SRC-MU-52` checkout at `C:\Users\hatim\Desktop\SRC-MU-52`. The client and server suite share one repository root, with paths mapped as follows (verified 2026-07-18):
 
 | Skill path | Local path |
 |---|---|
@@ -15,13 +15,13 @@ These skills describe the `MUServerge/main-5.2` client. In this working copy tha
 | `dependencies/` | `SRCMainGS\Source\Main5.2\dependencies\` |
 | `Source/<Service>/` | `SRCMainGS\Source\<Service>\` |
 
-Build output goes to `Client_2\Main.exe`, but the **live client the user runs is `Client\`** — build to `Client_2\`, then copy the exe over. Confirmed local toolchain matches the skills: v143, Win32, static CRT, `stdcpp17`/`stdcpp14` per configuration.
+Build output goes to `Build\Client\Main.exe`, while the **live client the user runs is `Client\`**. Copy a verified build into the live client only as an explicit deployment step. Confirmed local toolchain: v143, Win32/x86, static CRT, `stdcpp17`/`stdcpp14` per configuration.
 
-`git remote` for this checkout is `github.com/MUServerge/SRCMainGS0.0.1`; `SRCMainGS some fixes\` is a parallel copy — leave it alone unless told otherwise. The build-release-qa caution that `Source/Main5.2` may differ from a standalone `main-5.2` revision still applies: this checkout is the canonical one to edit.
+`origin` is `https://github.com/MUServerge/SRC-MU-52.git`. This desktop checkout is canonical; the older `SRC 5.2 BASE` tree is backup/reference only.
 
 ## Identity
 
-- Repository: `MUServerge/main-5.2`
+- Repository: `MUServerge/SRC-MU-52`
 - Product: MU Online Season 5.2 client
 - Language: C++17
 - Platform: Windows Win32/x86

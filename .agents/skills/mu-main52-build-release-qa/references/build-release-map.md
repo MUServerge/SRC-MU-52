@@ -2,12 +2,12 @@
 
 ## Client build
 
-- Solution: `MUServerge/main-5.2/Main.sln`
+- Solution: `SRCMainGS/Source/Main5.2/Main.sln`
 - Project: `source/Main.vcxproj`
 - Inspected public branch: Win32, MultiByte, v143, static CRT (`MultiThreaded`), Release and Debug configurations.
 - Important macros include `MAIN_UPDATE=603`, `PROTO_EXTRA`, language/debug flags, and `FT2_BUILD_LIBRARY`.
 - Dependencies are under `dependencies/` and include OpenGL/GLU/GLEW-related libraries, Lua/Sol, FreeType, Crypto++, TurboJPEG, ImGui, audio/shared-memory/modulus libraries, and Windows system libraries.
-- The project currently points `OutDir` outside the repository (`..\..\..\..\Client_2`). Treat output-path cleanup as a deliberate build-system change.
+- Generated client output is isolated under repository-root `Build/Client/`; the live `Client/` runtime is updated only through an explicit deployment step.
 
 ## Server suite
 
@@ -26,7 +26,7 @@ The server projects contain multiple update/product configurations (603, 401, 80
 - Several server project configurations contain developer-machine absolute output paths such as `D:\NewSource5.2Tkm\Build` or deployment-tree-relative outputs.
 - GameServer configurations mix `v142` and legacy `v100` toolsets.
 - The inspected GameServer Debug 603 configuration uses `MultiThreadedDebugDLL`, while Release 603 uses `MultiThreaded`. Verify every linked library's CRT/configuration before changing or diagnosing heap/iterator/runtime issues.
-- The SRCMainGS repository also contains `Source/Main5.2`; do not assume it is the same revision as the prioritized standalone `MUServerge/main-5.2` client.
+- This standalone checkout's canonical client is `SRCMainGS/Source/Main5.2`; the older desktop BASE tree is backup/reference only.
 
 ## Compatibility fingerprint
 

@@ -1,4 +1,4 @@
-# SRC 5.2 BASE — Project Guide
+# SRC-MU-52 — Project Guide
 
 MU Online (MuEmu-style emulator), **Season 5.2**. Windows, C++, **32-bit (x86)**.
 A **long-running, legacy** project: every change prioritizes **stability, compatibility,
@@ -103,14 +103,14 @@ Any uncertainty → **search the project first.**
 | `SRCMainGS/Source/JoinServer/` | JoinServer |
 | `SRCMainGS/Source/Encoder/` | Encoder tool |
 | `MainInfo/` | Editor for `av-code45.pak` |
-| `Client_2/` | Live client (`Main.exe` output) |
-| `Client/` | Secondary client |
+| `Build/Client/` | Generated client build output |
+| `Client/` | Live client runtime and Data assets |
 | `MuServer/`, `MuServerTK/` | Runtime servers |
 | `CHANGELOG.txt` | Change history |
 
 # Build
 Client: `MSBuild "SRCMainGS/Source/Main5.2/Main.sln" /p:Configuration=Release /p:Platform=x86`
-→ output `Client_2/Main.exe`. **Never switch to x64.** Build only the solution for the
+→ output `Build/Client/Main.exe`. **Never switch to x64.** Build only the solution for the
 component you changed.
 
 # CHANGELOG format
@@ -140,11 +140,9 @@ _Confirmed in real work only. Detailed code-map lives in the `src52` skill._
   across `ZzzLodTerrain.cpp` (RenderFace), `MapManager.cpp` (LoadWorld), `ZzzObject.cpp`, `ZzzScene.cpp`,
   `GOBoid.cpp`, etc. A map not wired in → objects as cubes/black, no effects/water. This — **not** the index —
   is where map bugs live. Deep guide: `mu-worlds` skill.
-- **Two source trees:** edit the canonical `SRCMainGS\` (builds `Client_2\Main.exe`); `SRCMainGS some fixes\`
-  is a parallel copy — leave it unless told otherwise.
+- **Canonical source tree:** edit `SRCMainGS\`; client builds go to `Build\Client\Main.exe`.
+  The older `SRC 5.2 BASE` desktop tree is backup/reference only.
 - **Header change → clean rebuild** (Rebuild, not incremental — a widely-included header like `MapManager.h`
   can leave stale `.obj`s and produce inconsistent behavior).
 - _Index naming (trivia, rarely the bug):_ client `Data\WorldK`/`ObjectK` (`EncTerrainK`) = internal/server
   map index `K−1`.
-
-## Imported Claude Cowork project instructions

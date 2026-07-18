@@ -205,11 +205,6 @@ void gluPerspective2(float Fov, float Aspect, float ZNear, float ZFar)
 {
 	gluPerspective(Fov, Aspect, ZNear, ZFar);
 
-#ifdef SHADER_VERSION_TEST
-	gShaderGL->SetPerspective(Fov, Aspect, ZNear, ZFar);
-#endif // SHADER_VERSION_TEST
-
-
 	ScreenCenterX = OpenglWindowX + OpenglWindowWidth / 2;
 	ScreenCenterY = OpenglWindowY + OpenglWindowHeight / 2;
 	ScreenCenterYFlip = WindowWidth - ScreenCenterY;

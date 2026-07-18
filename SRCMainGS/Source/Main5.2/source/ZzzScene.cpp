@@ -3319,7 +3319,6 @@ void MainScene(HDC hDC)
 		}
 	}
 
-	TimeRemain = accumulatedTime;
 }
 
 void Scene(HDC hDC)

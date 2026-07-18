@@ -8,6 +8,7 @@
 # --- Not part of this repo -----------------------------------
 /Client/
 /Client_2/
+/Build/
 /MuServerTK/
 /SRCMainGS/.git_backup_old/
 "/SRCMainGS some fixes/"

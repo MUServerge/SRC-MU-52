@@ -2606,6 +2606,11 @@ void BMD::Release()
 #endif // LDS_FIX_SETNULLALLOCVALUE_WHEN_BMDRELEASE
 }
 
+BMD::~BMD()
+{
+	Release();
+}
+
 void BMD::FindNearTriangle(void)
 {
 	for (int iMesh = 0; iMesh < NumMeshs; iMesh++)

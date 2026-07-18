@@ -3,6 +3,26 @@
 ============================================================
 
 ------------------------------------------------------------
+ 2026-07-18
+------------------------------------------------------------
+
+- Build layout: moved generated client output from the legacy `Client_2` folder
+  to `Build\Client` for a clean separation between build artifacts and the live
+  `Client` runtime. Added `Build/` to the repository ignore rules. Removed stale
+  Claude-only metadata, obsolete handoff/plan documents and local Visual Studio
+  caches; source, runtime assets and Codex project guidance remain intact.
+  (Main.vcxproj, .gitignore)
+
+- Client build: removed three dangling dependencies left by the renderer/FPS
+  consolidation: the obsolete CShaderGL::SetPerspective call, the dead
+  accumulatedTime assignment, and the unused/unshipped glprocs.lib linker input.
+  Restored BMD::~BMD(), which Renderer Phase 9 accidentally removed together
+  with the adjacent dormant VBO adapter; it retains the existing Release()
+  ownership and context-safe GPU cleanup contract. SHADER_VERSION_TEST and the
+  active VBO/GPU-skinning path remain enabled. (ZzzOpenglUtil.cpp, ZzzScene.cpp,
+  ZzzBMD.cpp, Main.vcxproj)
+
+------------------------------------------------------------
  2026-07-16
 ------------------------------------------------------------
 
