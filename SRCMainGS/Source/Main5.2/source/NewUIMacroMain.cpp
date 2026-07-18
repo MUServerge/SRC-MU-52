@@ -1078,6 +1078,7 @@ void SEASON3B::CNewUIMacroMain::InitButtons()
 	ltext.push_back(GlobalText[3590]);
 
 	m_iTab.CreateRadioGroup(3, BITMAP_GUILDINFO_BEGIN);
+	m_iTab.ChangeImageSourceSize(224.f, 88.f);
 	m_iTab.ChangeRadioText(ltext);
 
 	m_iTab.ChangeFrame(m_iNumCurOpenTab);

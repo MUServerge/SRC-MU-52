@@ -65,7 +65,7 @@ namespace
 	const float NOTIFY_TEX_CELL   = 72.f;
 	const int   NOTIFY_CELL_DAILY = 6;
 	const float NOTIFY_ICON_SIZE  = 18.f;	// on-screen size (virtual px)
-	const float NOTIFY_EFFECT_SIZE = 30.f;
+	const float NOTIFY_EFFECT_SIZE = 48.f;
 	const DWORD NOTIFY_EFFECT_FRAME_TIME = 70;
 	const int   NOTIFY_EFFECT_FRAME_COUNT = 18;
 	const char* NOTIFY_EFFECT_FRAME_NAMES[NOTIFY_EFFECT_FRAME_COUNT] =
@@ -610,7 +610,8 @@ void CGMInvasionManager::RenderNotifyIcon(float fAgX, float fAgY, float fAgW)
 	m_ShieldIconY = iconY;
 	m_CharacterIconX = m_ShieldIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
 	m_CharacterIconY = iconY;
-	m_NotifyIconX = m_CharacterIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
+	const float effectMargin = (NOTIFY_EFFECT_SIZE - NOTIFY_ICON_SIZE) * 0.5f;
+	m_NotifyIconX = m_CharacterIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X - effectMargin;
 	m_NotifyIconY = iconY;
 
 	struct HUD_ICON_DRAW

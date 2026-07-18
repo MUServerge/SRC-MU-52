@@ -6,6 +6,26 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: corrected the Iberia cooldown draw order and blend mode so the
+  120-frame alpha mask renders over the skill icon without clipping its soft
+  transition, while hotkey numbers remain readable above it. Enlarged the
+  active-Invasion animation to expose its outer square and reserved matching
+  space before the Character notification. (CNewUISkillList,
+  CGMInvasionManager)
+
+- Client UI: wired the replaced newui_guild texture family to its native source
+  rectangles. Guild tabs use their full 4x/2x art, shared tab04 radio buttons
+  use the full 224x88 state frames, and the Guild window owns the new dedicated
+  table borders without overwriting Inventory's shared table bitmaps.
+  (CNewUIGuildInfoWindow, Castle/Guard/Pet/Macro tabs)
+
+- Client UI: aligned the warp/map-entry banner with the Look5 notice typography
+  by using the bold UI font and brighter notice-gold text. Replaced its
+  frame-rate-dependent fade steps with elapsed-time fades and rendered the
+  semi-transparent banner texture without alpha testing, preventing its black
+  backing layer from popping in or out at the alpha-test threshold. Font,
+  color, and UI blend state are restored after drawing. (CUIMapName)
+
 - Client UI: corrected the high-resolution Quest tab textures by rendering the
   full 4x native source rectangles through RenderImageF. Quest_tab01/02/03 now
   fit their unchanged responsive 166x22, 48x22 and 72x22 virtual tab geometry

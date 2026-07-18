@@ -66,6 +66,7 @@ void CNewUIPetInfoWindow::InitButtons()
 
 	// Tab Button	
 	m_BtnTab.CreateRadioGroup(2, IMAGE_PETINFO_TAB_BUTTON);
+	m_BtnTab.ChangeImageSourceSize(224.f, 88.f);
 	m_BtnTab.ChangeRadioText(ltext);
 	m_BtnTab.ChangeRadioButtonInfo(true, m_Pos.x + 12.f, m_Pos.y + 48.f, 56, 22);
 	m_BtnTab.ChangeFrame(m_iNumCurOpenTab);

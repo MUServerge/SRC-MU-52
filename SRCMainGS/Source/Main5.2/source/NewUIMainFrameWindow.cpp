@@ -5822,12 +5822,6 @@ void SEASON3B::CNewUISkillList::RenderSkillIcon(int iIndex, float x, float y, fl
 		}
 	}
 
-	if (iHotKey != -1 && RenderNumber == TRUE)
-	{
-		glColor3f(1.f, 0.9f, 0.8f);
-		SEASON3B::RenderNumber(x + NBX, y + NBY, iHotKey);
-	}
-
 	if ((bySkillType != 262 && bySkillType != 265 && bySkillType != 264 && bySkillType != 558 && bySkillType != 560 || !bCantSkill)
 		&& bySkillType != 77
 		&& bySkillType != 233
@@ -5836,6 +5830,12 @@ void SEASON3B::CNewUISkillList::RenderSkillIcon(int iIndex, float x, float y, fl
 		&& bySkillType != 441)
 	{
 		RenderSkillDelay(iIndex, x, y, width, height);
+	}
+
+	if (iHotKey != -1 && RenderNumber == TRUE)
+	{
+		glColor3f(1.f, 0.9f, 0.8f);
+		SEASON3B::RenderNumber(x + NBX, y + NBY, iHotKey);
 	}
 }
 
@@ -5862,10 +5862,11 @@ void SEASON3B::CNewUISkillList::RenderSkillDelay(int iIndex, float x, float y, f
 			const int iFrameCount = IMAGE_SKILL_COOLDOWN_END - IMAGE_SKILL_COOLDOWN_BEGIN + 1;
 			const int iFrame = (int)((1.f - fPersent) * (float)(iFrameCount - 1));
 
-			EnableAlphaTest(true);
+			EnableAlphaBlend3();
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			SEASON3B::RenderImageF(IMAGE_SKILL_COOLDOWN_BEGIN + iFrame,
 				x, y, width, height, 0.f, 0.f, 52.f, 52.f);
+			EnableAlphaTest(true);
 			return;
 		}
 

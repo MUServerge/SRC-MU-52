@@ -18,7 +18,8 @@
 #endif	// ASG_ADD_GENS_SYSTEM
 
 #define	UIMN_SHOW_TIME				5000
-#define	UIMN_ALPHA_VARIATION		0.015f
+#define	UIMN_FADEIN_TIME			800
+#define	UIMN_FADEOUT_TIME			1000
 
 // Banner size — fixed, same across all resolutions.
 #define	UIMN_BANNER_WIDTH			150.0f
@@ -61,7 +62,8 @@ void CUIMapName::ShowMapName()
 	}
 
 	m_eState = FADEIN;
-	m_fAlpha = 0.2f;
+	m_fAlpha = 0.0f;
+	m_dwOldTime = ::timeGetTime();
 	m_dwDeltaTickSum = 0;
 
 	// One shared banner for every map - loaded once, never swapped per map.
@@ -84,11 +86,13 @@ void CUIMapName::Update()
 	switch (m_eState)
 	{
 	case FADEIN:
-		m_fAlpha += UIMN_ALPHA_VARIATION;
-		if (1.0f <= m_fAlpha)
+		m_dwDeltaTickSum += dwDeltaTick;
+		m_fAlpha = (float)m_dwDeltaTickSum / (float)UIMN_FADEIN_TIME;
+		if (m_dwDeltaTickSum >= UIMN_FADEIN_TIME)
 		{
 			m_eState = SHOW;
 			m_fAlpha = 1.0f;
+			m_dwDeltaTickSum = 0;
 		}
 		break;
 
@@ -102,8 +106,9 @@ void CUIMapName::Update()
 		break;
 
 	case FADEOUT:
-		m_fAlpha -= UIMN_ALPHA_VARIATION;
-		if (0.0f >= m_fAlpha)
+		m_dwDeltaTickSum += dwDeltaTick;
+		m_fAlpha = 1.0f - (float)m_dwDeltaTickSum / (float)UIMN_FADEOUT_TIME;
+		if (m_dwDeltaTickSum >= UIMN_FADEOUT_TIME)
 		{
 			m_eState = HIDE;
 			m_fAlpha = 0.0f;
@@ -127,7 +132,7 @@ void CUIMapName::Render()
 	float fPosX = (fVirtW - UIMN_BANNER_WIDTH) / 2.0f;
 	float fPosY = fVirtH * UIMN_BANNER_POS_Y_RATIO;
 
-	::EnableAlphaTest();
+	::EnableAlphaBlend3();
 	::glColor4f(1.0f, 1.0f, 1.0f, m_fAlpha);
 
 #ifdef ASG_ADD_GENS_SYSTEM
@@ -137,11 +142,18 @@ void CUIMapName::Render()
 
 	SEASON3B::RenderImageF(BITMAP_INTERFACE_EX + 45, fPosX, fPosY, UIMN_BANNER_WIDTH, UIMN_BANNER_HEIGHT);
 
-	g_pRenderText->SetFont(g_hFontBig);
-	g_pRenderText->SetBgColor(0);
-	g_pRenderText->SetTextColor(255, 204, 100, (BYTE)(m_fAlpha * 255.0f));
+	const HFONT oldFont = g_pRenderText->GetFont();
+	const DWORD oldTextColor = g_pRenderText->GetTextColor();
+	const DWORD oldBgColor = g_pRenderText->GetBgColor();
+
+	g_pRenderText->SetFont(g_hFontBold);
+	g_pRenderText->SetBgColor(0, 0, 0, 0);
+	g_pRenderText->SetTextColor(255, 204, 25, (BYTE)(m_fAlpha * 255.0f + 0.5f));
 	g_pRenderText->RenderFont((int)fPosX, (int)(fPosY + (UIMN_BANNER_HEIGHT - UIMN_TEXT_HEIGHT) / 2.0f), gMapManager->GetMapName(), (int)UIMN_BANNER_WIDTH, (int)UIMN_TEXT_HEIGHT, RT3_SORT_CENTER);
 
+	g_pRenderText->SetFont(oldFont);
+	g_pRenderText->SetTextColor(oldTextColor);
+	g_pRenderText->SetBgColor(oldBgColor);
 	::glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-	::DisableAlphaBlend();
+	::EnableAlphaTest(true);
 }

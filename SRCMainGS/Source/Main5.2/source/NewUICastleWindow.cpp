@@ -53,6 +53,7 @@ bool CNewUICastleWindow::Create(CNewUIManager* pNewUIMng, int x, int y)
 	ltext.push_back(GlobalText[1640]);
 
 	m_TabBtn.CreateRadioGroup(4, IMAGE_CASTLEWINDOW_TAB_BTN);
+	m_TabBtn.ChangeImageSourceSize(224.f, 88.f);
 	m_TabBtn.ChangeRadioText(ltext);
 	m_TabBtn.ChangeRadioButtonInfo(true, m_Pos.x + 12.f, m_Pos.y + 32.f, 40, 22);
 	m_TabBtn.ChangeFrame(m_iNumCurOpenTab);

@@ -525,9 +525,9 @@ void SEASON3B::CNewUIGuildInfoWindow::RenderNoneGuild()
 
 void SEASON3B::CNewUIGuildInfoWindow::RenderTabButton()
 {
-	RenderImage(IMAGE_GUILDINFO_TAB_LIST,m_Pos.x+12,m_Pos.y+68,166.f,22.f);
+	RenderImageF(IMAGE_GUILDINFO_TAB_LIST,m_Pos.x+12,m_Pos.y+68,166.f,22.f,0.f,0.f,664.f,88.f);
 	int Tab_Pos = m_nCurrentTab * 55;
-	RenderImage(IMAGE_GUILDINFO_TAB_POINT,m_Pos.x+12+Tab_Pos,m_Pos.y+68,56.f,22.f);
+	RenderImageF(IMAGE_GUILDINFO_TAB_POINT,m_Pos.x+12+Tab_Pos,m_Pos.y+68,56.f,22.f,0.f,0.f,224.f,88.f);
 }
 
 void SEASON3B::CNewUIGuildInfoWindow::Render_Text()
@@ -656,19 +656,19 @@ void SEASON3B::CNewUIGuildInfoWindow::Render_Guild_History()
 {
 	for(int x=m_Pos.x+73; x<m_Pos.x+73+42; x++)
 	{
-		RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+104, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
-		RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+104+34, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
+		RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+104, 1, 14, 0.f, 0.f, 1.f, 16.f);
+		RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+104+34, 1, 14, 0.f, 0.f, 1.f, 16.f);
 	}
 	for(int y=m_Pos.y+104; y<m_Pos.y+104 +42; y++)
 	{
-		RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+70, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
-		RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+105, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
+		RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+70, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
+		RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+105, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
 	}
 
-	RenderImage(IMAGE_GUILDINFO_TOP_LEFT, m_Pos.x+70, m_Pos.y+104, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+105, m_Pos.y+104, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+70, m_Pos.y+138, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+105, m_Pos.y+138, 14, 14);
+	RenderImageF(IMAGE_GUILDINFO_TOP_LEFT, m_Pos.x+70, m_Pos.y+104, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+105, m_Pos.y+104, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+70, m_Pos.y+138, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+105, m_Pos.y+138, 14, 14, 0.f, 0.f, 16.f, 16.f);
 
 	CreateGuildMark( Hero->GuildMarkIndex );
 	RenderBitmap( BITMAP_GUILD, m_Pos.x+74, m_Pos.y+106, 39, 39 );
@@ -676,20 +676,20 @@ void SEASON3B::CNewUIGuildInfoWindow::Render_Guild_History()
 
 	for(int x=m_Pos.x+12; x<m_Pos.x+12+166; x++)
 	{
-		RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+159, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
-		RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+159+56, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
+		RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+159, 1, 14, 0.f, 0.f, 1.f, 16.f);
+		RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+159+56, 1, 14, 0.f, 0.f, 1.f, 16.f);
 	}
 
 	for(int y=m_Pos.y+159; y<m_Pos.y+159 +65; y++)
 	{
-		RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+10, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
-		RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+167, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
+		RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+10, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
+		RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+167, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
 	}
 
-	RenderImage(IMAGE_GUILDINFO_TOP_LEFT, m_Pos.x+10, m_Pos.y+159, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+167, m_Pos.y+159, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+10, m_Pos.y+215, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+167, m_Pos.y+215, 14, 14);
+	RenderImageF(IMAGE_GUILDINFO_TOP_LEFT, m_Pos.x+10, m_Pos.y+159, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+167, m_Pos.y+159, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+10, m_Pos.y+215, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+167, m_Pos.y+215, 14, 14, 0.f, 0.f, 16.f, 16.f);
 
 	glColor4ub(0, 0, 0, 255);
 	RenderColor(m_Pos.x+11, m_Pos.y+260, 165, 84);
@@ -698,19 +698,19 @@ void SEASON3B::CNewUIGuildInfoWindow::Render_Guild_History()
 	for(int x=m_Pos.x+12; x<m_Pos.x+12+165; x++)
 	{
 		if(x > 73)
-		RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+260, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
-		RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+260+74, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
+		RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+260, 1, 14, 0.f, 0.f, 1.f, 16.f);
+		RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+260+74, 1, 14, 0.f, 0.f, 1.f, 16.f);
 	}
 
 	for(int y=m_Pos.y+260; y<m_Pos.y+260 +82; y++)
 	{
-		RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+10, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
-		RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+167, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
+		RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+10, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
+		RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+167, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
 	}
-	RenderImage(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+167, m_Pos.y+260, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+10, m_Pos.y+334, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+167, m_Pos.y+334, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_TAB_HEAD,m_Pos.x+11,m_Pos.y+237,63.f,25.f);
+	RenderImageF(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+167, m_Pos.y+260, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+10, m_Pos.y+334, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+167, m_Pos.y+334, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_TAB_HEAD,m_Pos.x+11,m_Pos.y+237,63.f,25.f,0.f,0.f,126.f,52.f);
 
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -844,20 +844,20 @@ void SEASON3B::CNewUIGuildInfoWindow::Render_Guild_Info()
 
 		for(int x=m_Pos.x+12; x<m_Pos.x+12+166; x++)
 		{
-			RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+109, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
-			RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+109+92, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
+			RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+109, 1, 14, 0.f, 0.f, 1.f, 16.f);
+			RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+109+92, 1, 14, 0.f, 0.f, 1.f, 16.f);
 		}
 		for(int y=m_Pos.y+109; y<m_Pos.y+109 +100; y++)
 		{
-			RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+10, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
-			RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+167, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
+			RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+10, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
+			RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+167, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
 		}
 
 
-		RenderImage(IMAGE_GUILDINFO_TOP_LEFT, m_Pos.x+10, m_Pos.y+109, 14, 14);
-		RenderImage(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+167, m_Pos.y+109, 14, 14);
-		RenderImage(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+10, m_Pos.y+201, 14, 14);
-		RenderImage(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+167, m_Pos.y+201, 14, 14);
+		RenderImageF(IMAGE_GUILDINFO_TOP_LEFT, m_Pos.x+10, m_Pos.y+109, 14, 14, 0.f, 0.f, 16.f, 16.f);
+		RenderImageF(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+167, m_Pos.y+109, 14, 14, 0.f, 0.f, 16.f, 16.f);
+		RenderImageF(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+10, m_Pos.y+201, 14, 14, 0.f, 0.f, 16.f, 16.f);
+		RenderImageF(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+167, m_Pos.y+201, 14, 14, 0.f, 0.f, 16.f, 16.f);
 
 		EndRenderColor();
 
@@ -882,19 +882,19 @@ void SEASON3B::CNewUIGuildInfoWindow::Render_Guild_Enum()
 
 	for(int x=m_Pos.x+12; x<m_Pos.x+177; x++)
 	{
-		RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+93+12, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
-		RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+3+344, 1, 14, 0.f, 0.f, (float)((1) * 4.f), 56.f);
+		RenderImageF(IMAGE_GUILDINFO_TOP_PIXEL, x, m_Pos.y+93+12, 1, 14, 0.f, 0.f, 1.f, 16.f);
+		RenderImageF(IMAGE_GUILDINFO_BOTTOM_PIXEL, x, m_Pos.y+3+344, 1, 14, 0.f, 0.f, 1.f, 16.f);
 	}
 	for(int y=m_Pos.y+12+93; y<m_Pos.y+12 +344; y++)
 	{
-		RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+8, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
-		RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+168, y, 14, 1, 0.f, 0.f, 56.f, (float)((1) * 4.f));
+		RenderImageF(IMAGE_GUILDINFO_LEFT_PIXEL, m_Pos.x+8, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
+		RenderImageF(IMAGE_GUILDINFO_RIGHT_PIXEL, m_Pos.x+168, y, 14, 1, 0.f, 0.f, 16.f, 1.f);
 	}
 
-	RenderImage(IMAGE_GUILDINFO_TOP_LEFT, m_Pos.x+8, m_Pos.y+105, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+168, m_Pos.y+105, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+8, m_Pos.y+347, 14, 14);
-	RenderImage(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+168, m_Pos.y+347, 14, 14);
+	RenderImageF(IMAGE_GUILDINFO_TOP_LEFT, m_Pos.x+8, m_Pos.y+105, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_TOP_RIGHT, m_Pos.x+168, m_Pos.y+105, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_BOTTOM_LEFT, m_Pos.x+8, m_Pos.y+347, 14, 14, 0.f, 0.f, 16.f, 16.f);
+	RenderImageF(IMAGE_GUILDINFO_BOTTOM_RIGHT, m_Pos.x+168, m_Pos.y+347, 14, 14, 0.f, 0.f, 16.f, 16.f);
 
 	if(gGuildManager.IsGuildMaster())
 	{
@@ -929,11 +929,14 @@ void SEASON3B::CNewUIGuildInfoWindow::LoadImages()
 	LoadBitmap("Interface\\newui_guild_tab02.tga", IMAGE_GUILDINFO_TAB_POINT, GL_LINEAR);
 	LoadBitmap("Interface\\newui_guild_tab03.tga", IMAGE_GUILDINFO_TAB_HEAD, GL_LINEAR);
 	
-
-	LoadBitmap("Interface\\newui_item_table03(Up).tga", IMAGE_GUILDINFO_TOP_PIXEL, GL_LINEAR);
-	LoadBitmap("Interface\\newui_item_table03(Dw).tga", IMAGE_GUILDINFO_BOTTOM_PIXEL, GL_LINEAR);
-	LoadBitmap("Interface\\newui_item_table03(L).tga", IMAGE_GUILDINFO_LEFT_PIXEL, GL_LINEAR);
-	LoadBitmap("Interface\\newui_item_table03(R).tga", IMAGE_GUILDINFO_RIGHT_PIXEL, GL_LINEAR);
+	LoadBitmap("Interface\\newui_guild_table03(Up).tga", IMAGE_GUILDINFO_TOP_PIXEL, GL_LINEAR);
+	LoadBitmap("Interface\\newui_guild_table03(Dw).tga", IMAGE_GUILDINFO_BOTTOM_PIXEL, GL_LINEAR);
+	LoadBitmap("Interface\\newui_guild_table03(L).tga", IMAGE_GUILDINFO_LEFT_PIXEL, GL_LINEAR);
+	LoadBitmap("Interface\\newui_guild_table03(R).tga", IMAGE_GUILDINFO_RIGHT_PIXEL, GL_LINEAR);
+	LoadBitmap("Interface\\newui_guild_table01(L).tga", IMAGE_GUILDINFO_TOP_LEFT, GL_LINEAR);
+	LoadBitmap("Interface\\newui_guild_table01(R).tga", IMAGE_GUILDINFO_TOP_RIGHT, GL_LINEAR);
+	LoadBitmap("Interface\\newui_guild_table02(L).tga", IMAGE_GUILDINFO_BOTTOM_LEFT, GL_LINEAR);
+	LoadBitmap("Interface\\newui_guild_table02(R).tga", IMAGE_GUILDINFO_BOTTOM_RIGHT, GL_LINEAR);
 	LoadBitmap("Interface\\newui_exit_00.tga", IMAGE_GUILDINFO_EXIT_BTN, GL_LINEAR);
 	LoadBitmap("Interface\\newui_btn_empty_small.tga", IMAGE_GUILDINFO_BUTTON, GL_LINEAR);
 
@@ -963,6 +966,10 @@ void SEASON3B::CNewUIGuildInfoWindow::UnloadImages()
 	DeleteBitmap(IMAGE_GUILDINFO_RIGHT_PIXEL);
 
 	DeleteBitmap(IMAGE_GUILDINFO_LEFT_PIXEL);
+	DeleteBitmap(IMAGE_GUILDINFO_TOP_LEFT);
+	DeleteBitmap(IMAGE_GUILDINFO_TOP_RIGHT);
+	DeleteBitmap(IMAGE_GUILDINFO_BOTTOM_LEFT);
+	DeleteBitmap(IMAGE_GUILDINFO_BOTTOM_RIGHT);
 	DeleteBitmap(IMAGE_GUILDINFO_EXIT_BTN);
 
 	DeleteBitmap(IMAGE_GUILDINFO_SCROLL_TOP);
