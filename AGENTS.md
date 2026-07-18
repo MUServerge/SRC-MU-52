@@ -7,8 +7,32 @@ and reuse** over rewriting or modernization.
 > **Prime directive:** _Search first → reuse second → extend third → write new code last._
 > Every change should look like the original author wrote it.
 
-Deep reference (code map of defines/packets, encryption, scene/camera, build & test details):
-invoke the **`src52`** skill.
+Primary project workflow: invoke **`mu-main52-engineering`**. Route architecture inventories to
+**`mu-main52-codebase-audit`**, PR/commit-range checks to **`mu-main52-pr-regression`**, and then
+load every affected specialist `mu-main52-*` skill.
+
+---
+
+# Skill routing and verification debt
+
+- Treat this repository as the canonical source. Use separate `main-5.2` or `SRCMainGS`
+  repositories only for historical comparison.
+- Scattered code, ownership, duplication, dead-code or unused-asset claims:
+  `mu-main52-codebase-audit`.
+- Pull requests, commit ranges, or a chain of changes merged without a desktop build:
+  `mu-main52-pr-regression`.
+- FPS/renderer changes always require `mu-main52-performance`, `mu-main52-renderer`,
+  `mu-main52-build-release-qa`, and `mu-main52-pr-regression`; add
+  `mu-main52-refactor` when ownership or structure changes.
+- Mark a change **build-unverified** until a clean Release|Win32 build exists, and
+  **runtime-unverified** until the affected behavior and fallback/error/reload/shutdown path run.
+  A later edit to the same path invalidates older verification.
+- Before removing a symbol, manager, library, asset, or fallback, check declarations,
+  definitions, every caller, callbacks/exports, feature macros, project files, config/scripts,
+  runtime lookup, initialization, reload, and teardown.
+
+Audit helpers live under `tools/audit/`; they are read-only and create reports only when an
+output path is explicitly supplied.
 
 ---
 
@@ -67,9 +91,8 @@ A change is done only when: **(a)** the affected solution builds clean in **Rele
 **(b)** behavior is verified by actually running the component (a clean build does not by
 itself prove correct behavior), **(c)** a `CHANGELOG.txt` entry is added, and **(d)** if the change
 (or the user) **confirmed a new durable, non-obvious fact** about a subsystem — or changed how one
-works — the relevant docs are updated the same way as the changelog: the matching skill
-(`src52` / `mu-worlds` / `mu-packets` / `mu-server-data` / `mu-build-run` / `mu-assets`) and/or this
-file's **Project facts**. Verified facts only, kept general (not example-bound); skip trivial one-offs.
+works — the relevant docs are updated the same way as the changelog: the matching `mu-main52-*` skill
+and/or this file's **Project facts**. Verified facts only, kept general (not example-bound); skip trivial one-offs.
 
 ### 11. Bug fixes: fix at the source, clean — not bolted on
 When fixing a **bug**, don't stack a patch, compensating hack, workaround, or extra layer on top
@@ -127,7 +150,7 @@ Newest block on top. Use the **real current date** (don't copy an old one):
 ---
 
 # Project facts
-_Confirmed in real work only. Detailed code-map lives in the `src52` skill._
+_Confirmed in real work only. Detailed workflows live in the matching `mu-main52-*` skills._
 
 - **All client UI must be resolution-aware (standing rule):** the UI is authored in a virtual **640×480**
   base scaled by `g_fScreenRate` (`WINHANDLE.cpp::InitSize`; `ScreenType` 0=stretch, 1=aspect-lock,
@@ -139,7 +162,7 @@ _Confirmed in real work only. Detailed code-map lives in the `src52` skill._
   transparency / object blend / camera / fog / BGM / ambient effects **per map**, keyed on `WD_*`, scattered
   across `ZzzLodTerrain.cpp` (RenderFace), `MapManager.cpp` (LoadWorld), `ZzzObject.cpp`, `ZzzScene.cpp`,
   `GOBoid.cpp`, etc. A map not wired in → objects as cubes/black, no effects/water. This — **not** the index —
-  is where map bugs live. Deep guide: `mu-worlds` skill.
+  is where map bugs live. Deep guide: `mu-main52-maps-worlds` skill.
 - **Canonical source tree:** edit `SRCMainGS\`; client builds go to `Build\Client\Main.exe`.
   The older `SRC 5.2 BASE` desktop tree is backup/reference only.
 - **Header change → clean rebuild** (Rebuild, not incremental — a widely-included header like `MapManager.h`
