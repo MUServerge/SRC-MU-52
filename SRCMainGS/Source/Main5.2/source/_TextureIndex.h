@@ -782,6 +782,11 @@ enum
 	// on demand, one per distinct icon file, cached by filename.
 	BITMAP_NPCICON_BEGIN,
 	BITMAP_NPCICON_END = BITMAP_NPCICON_BEGIN + 63,
+	// Iberia TAB minimap skin (Interface\Iberia\Minimaps\TournamentMaps_I1..I30.ozt).
+	// Kept outside the legacy BITMAP_MINI_MAP range so the old map and button
+	// identities remain unchanged while the new skin is migrated incrementally.
+	BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN,
+	BITMAP_INTERFACE_IBERIA_MINIMAP_END = BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 29,
 	BITMAP_EFFECT_TEXTURE_END = 33000,
 
 	BITMAP_LINKED_TEXTURES_BEGIN = 33001,

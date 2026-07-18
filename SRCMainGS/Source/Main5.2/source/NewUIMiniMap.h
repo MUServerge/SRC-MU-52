@@ -39,6 +39,20 @@ namespace SEASON3B
 			EVENT_SCROLL_BTN_DOWN,
 		};
 	private:
+		struct XML_MINIMAP_DATA
+		{
+			int Map;
+			int Type;
+			int PosX;
+			int PosY;
+			int StageIndex;
+			int ClearStageIndex;
+			DWORD ColorText;
+			DWORD ColorTextInfo;
+			char Text[100];
+			char TextInfo[128];
+		};
+
 		unicode::t_string		m_TooltipText;
 		DWORD					m_TooltipTextColor;
 		CNewUIManager*			m_pNewUIMng;
@@ -49,6 +63,14 @@ namespace SEASON3B
 		float					m_Btn_Loc[MAX_MINI_MAP_DATA][4];
 		bool					m_bSuccess;
 		std::vector<MINI_MAP>	m_MinimapData;
+		std::vector<XML_MINIMAP_DATA> m_XmlMinimapData;
+		int m_iHoveredXmlEntry;
+		float m_fHoveredIconX;
+		float m_fHoveredIconY;
+		float m_fIberiaFrameX;
+		float m_fIberiaFrameY;
+		float m_fIberiaFrameWidth;
+		float m_fIberiaFrameHeight;
 		bool m_State;
 		int m_Map;
 		int m_MoveX;
@@ -104,6 +126,12 @@ namespace SEASON3B
 		void runtime_render_name(int i, const char* name);
 
 		bool runtime_calc_target(float mx, float my, int* dx, int* dy);
+		bool LoadXmlData();
+		bool HasXmlDataForCurrentMap() const;
+		int GetIberiaIconId(int type) const;
+		void RenderIberiaFrame();
+		void RenderXmlIcons(const vec3_t angles);
+		void RenderXmlTooltip();
 
 	};
 }

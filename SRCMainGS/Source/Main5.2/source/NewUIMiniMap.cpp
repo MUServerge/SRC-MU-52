@@ -18,6 +18,7 @@
 #include "ZzzLodTerrain.h"
 #include "ScaleForm.h"
 #include "TextClien.h"
+#include "pugixml.hpp"
 
 using namespace SEASON3B;
 
@@ -25,6 +26,25 @@ extern int TargetX;
 extern int TargetY;
 extern BYTE m_OccupationState;
 extern WORD TerrainWall[TERRAIN_SIZE * TERRAIN_SIZE];
+
+namespace
+{
+	const float IBERIA_FRAME_WIDTH = 316.f;
+	const float IBERIA_FRAME_HEIGHT = 317.f;
+	const float IBERIA_MAP_INSET_X = 10.f;
+	const float IBERIA_MAP_INSET_TOP = 21.f;
+	const float IBERIA_MAP_INSET_BOTTOM = 10.f;
+	const float IBERIA_ICON_SIZE = 18.f;
+	const float IBERIA_TOOLTIP_WIDTH = 136.f;
+	const float IBERIA_TOOLTIP_HEIGHT = 50.f;
+
+	enum IBERIA_MINIMAP_TEXTURE
+	{
+		IBERIA_TEXTURE_FRAME = BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 20,   // I21
+		IBERIA_TEXTURE_HERO = BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 22,    // I23
+		IBERIA_TEXTURE_TOOLTIP = BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 23, // I24
+	};
+}
 
 SEASON3B::CNewUIMiniMap::CNewUIMiniMap()
 {
@@ -55,6 +75,13 @@ SEASON3B::CNewUIMiniMap::CNewUIMiniMap()
 	m_MoveY = -1;
 
 	m_State = true;
+	m_iHoveredXmlEntry = -1;
+	m_fHoveredIconX = 0.f;
+	m_fHoveredIconY = 0.f;
+	m_fIberiaFrameX = 0.f;
+	m_fIberiaFrameY = 0.f;
+	m_fIberiaFrameWidth = 0.f;
+	m_fIberiaFrameHeight = 0.f;
 
 	this->runtime_move();
 }
@@ -73,6 +100,7 @@ bool SEASON3B::CNewUIMiniMap::Create(CNewUIManager* pNewUIMng, int x, int y)
 	m_pNewUIMng->AddUIObj(SEASON3B::INTERFACE_MINI_MAP, this);
 
 	this->LoadImages();
+	this->LoadXmlData();
 
 #if MAIN_UPDATE > 303
 	m_BtnExit.ChangeButtonImgState(true, IMAGE_MINIMAP_INTERFACE + 6, false);
@@ -112,6 +140,13 @@ void SEASON3B::CNewUIMiniMap::LoadImages()
 	LoadBitmap("Interface\\mini_map_ui_cancel.tga", IMAGE_MINIMAP_INTERFACE + 6, GL_LINEAR);
 
 	LoadBitmap("Interface\\HUD\\minimap_frame.tga", IMAGE_MINIMAP_INTERFACE + 1, GL_LINEAR);
+
+	char FileName[128];
+	for (int i = 0; i < 30; i++)
+	{
+		sprintf(FileName, "Interface\\Iberia\\Minimaps\\TournamentMaps_I%d.tga", i + 1);
+		LoadBitmap(FileName, BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + i, GL_LINEAR);
+	}
 }
 
 void SEASON3B::CNewUIMiniMap::UnloadImages()
@@ -123,6 +158,90 @@ void SEASON3B::CNewUIMiniMap::UnloadImages()
 	DeleteBitmap(IMAGE_MINIMAP_INTERFACE + 4);
 	DeleteBitmap(IMAGE_MINIMAP_INTERFACE + 5);
 	DeleteBitmap(IMAGE_MINIMAP_INTERFACE + 6);
+
+	for (int i = 0; i < 30; i++)
+	{
+		DeleteBitmap(BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + i);
+	}
+
+	m_XmlMinimapData.clear();
+}
+
+bool SEASON3B::CNewUIMiniMap::LoadXmlData()
+{
+	m_XmlMinimapData.clear();
+
+	pugi::xml_document document;
+	pugi::xml_parse_result result = document.load_file("Data\\Local\\xml\\Minimap.xml");
+	if (result.status != pugi::status_ok)
+	{
+		return false;
+	}
+
+	pugi::xml_node root = document.child("MiniMap");
+	for (pugi::xml_node node = root.child("NPC"); node; node = node.next_sibling("NPC"))
+	{
+		XML_MINIMAP_DATA info;
+		memset(&info, 0, sizeof(info));
+
+		info.Map = node.attribute("IDMAP").as_int(-1);
+		info.Type = node.attribute("Type").as_int(0);
+		info.PosX = node.attribute("PosX").as_int(-1);
+		info.PosY = node.attribute("PosY").as_int(-1);
+		info.StageIndex = node.attribute("StageIndex").as_int(-1);
+		info.ClearStageIndex = node.attribute("ClearStageIndex").as_int(-1);
+		info.ColorText = strtoul(node.attribute("ColorText").value(), NULL, 0);
+		info.ColorTextInfo = strtoul(node.attribute("ColorTextInfo").value(), NULL, 0);
+		strncpy_s(info.Text, sizeof(info.Text), node.attribute("Text").value(), _TRUNCATE);
+		strncpy_s(info.TextInfo, sizeof(info.TextInfo), node.attribute("TextInfo").value(), _TRUNCATE);
+
+		if (info.Map < 0 || info.Type <= 0 || info.PosX < 0 || info.PosX >= TERRAIN_SIZE || info.PosY < 0 || info.PosY >= TERRAIN_SIZE)
+		{
+			continue;
+		}
+
+		m_XmlMinimapData.push_back(info);
+	}
+
+	return !m_XmlMinimapData.empty();
+}
+
+bool SEASON3B::CNewUIMiniMap::HasXmlDataForCurrentMap() const
+{
+	for (size_t i = 0; i < m_XmlMinimapData.size(); i++)
+	{
+		const XML_MINIMAP_DATA& info = m_XmlMinimapData[i];
+		if (info.Map == World && info.StageIndex < 0 && info.ClearStageIndex < 0)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+int SEASON3B::CNewUIMiniMap::GetIberiaIconId(int type) const
+{
+	// The common XML types intentionally map in one place so the final icon
+	// assignment can be adjusted without touching rendering or hover logic.
+	if (type >= 1 && type <= 20)
+	{
+		return BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + type - 1;
+	}
+
+	switch (type)
+	{
+	case 21:
+		return BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 21; // I22
+	case 22:
+		return BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 25; // I26
+	case 24:
+		return BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 27; // I28
+	case 25:
+		return BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 29; // I30
+	}
+
+	return BITMAP_INTERFACE_IBERIA_MINIMAP_BEGIN + 21;
 }
 
 float SEASON3B::CNewUIMiniMap::GetLayerDepth()
@@ -433,10 +552,27 @@ void SEASON3B::CNewUIMiniMap::runtime_move()
 {
 	if (this->IsVisible())
 	{
-		this->m_RenderFrameX = (70.f * g_fScreenRate_x);
-		this->m_RenderFrameY = (70.f * g_fScreenRate_y);
-		this->m_RenderSizeX = (GetWindowsX - 140.f) * g_fScreenRate_x;
-		this->m_RenderSizeY = (GetWindowsY - 166.f) * g_fScreenRate_y;
+		m_fIberiaFrameWidth = min(IBERIA_FRAME_WIDTH, GetWindowsX - 10.f);
+		m_fIberiaFrameHeight = m_fIberiaFrameWidth * (IBERIA_FRAME_HEIGHT / IBERIA_FRAME_WIDTH);
+		if (m_fIberiaFrameHeight > GetWindowsY - 10.f)
+		{
+			m_fIberiaFrameHeight = GetWindowsY - 10.f;
+			m_fIberiaFrameWidth = m_fIberiaFrameHeight * (IBERIA_FRAME_WIDTH / IBERIA_FRAME_HEIGHT);
+		}
+
+		m_fIberiaFrameX = (GetWindowsX - m_fIberiaFrameWidth) * 0.5f;
+		m_fIberiaFrameY = (GetWindowsY - m_fIberiaFrameHeight) * 0.5f;
+
+		const float frameScale = m_fIberiaFrameWidth / IBERIA_FRAME_WIDTH;
+		const float mapX = m_fIberiaFrameX + IBERIA_MAP_INSET_X * frameScale;
+		const float mapY = m_fIberiaFrameY + IBERIA_MAP_INSET_TOP * frameScale;
+		const float mapWidth = m_fIberiaFrameWidth - (IBERIA_MAP_INSET_X * 2.f * frameScale);
+		const float mapHeight = m_fIberiaFrameHeight - ((IBERIA_MAP_INSET_TOP + IBERIA_MAP_INSET_BOTTOM) * frameScale);
+
+		this->m_RenderFrameX = mapX * g_fScreenRate_x;
+		this->m_RenderFrameY = mapY * g_fScreenRate_y;
+		this->m_RenderSizeX = mapWidth * g_fScreenRate_x;
+		this->m_RenderSizeY = mapHeight * g_fScreenRate_y;
 	}
 	else
 	{
@@ -519,6 +655,7 @@ void SEASON3B::CNewUIMiniMap::runtime_render_map(bool rendername)
 {
 	float Matrix[3][4];
 	vec3_t rot, p1, p2, angle;
+	m_iHoveredXmlEntry = -1;
 
 	this->runtime_move();
 
@@ -547,10 +684,18 @@ void SEASON3B::CNewUIMiniMap::runtime_render_map(bool rendername)
 
 	RenderBitmapLocalProjection(IMAGE_MINIMAP_INTERFACE, Tx + p2[0], Ty + p2[1], (512 * this->m_RenderZoom), (512 * this->m_RenderZoom), angle, 0.f, 0.f, 1.f, 1.f, false);
 
-	for (size_t i = 0; i < m_MinimapData.size(); i++)
+	const bool renderXmlData = this->IsVisible() && this->HasXmlDataForCurrentMap();
+	if (renderXmlData)
 	{
-		float Rot_Loc = (double)m_MinimapData[i].Rotation;
-		runtime_render_objet(i, m_MinimapData[i].Location[0], m_MinimapData[i].Location[1], 1, m_MinimapData[i].Kind, 0.0, m_MinimapData[i].Name, rot);
+		this->RenderXmlIcons(rot);
+	}
+	else
+	{
+		for (size_t i = 0; i < m_MinimapData.size(); i++)
+		{
+			float Rot_Loc = (double)m_MinimapData[i].Rotation;
+			runtime_render_objet(i, m_MinimapData[i].Location[0], m_MinimapData[i].Location[1], 1, m_MinimapData[i].Kind, 0.0, m_MinimapData[i].Name, rot);
+		}
 	}
 
 	if (this->IsMoving())
@@ -561,7 +706,7 @@ void SEASON3B::CNewUIMiniMap::runtime_render_map(bool rendername)
 		}
 	}
 
-	if (rendername)
+	if (rendername && !renderXmlData)
 	{
 		g_pRenderText->SetTextColor(CLRDW_WHITE);
 		g_pRenderText->SetBgColor(0, 0, 0, 125);
@@ -576,8 +721,90 @@ void SEASON3B::CNewUIMiniMap::runtime_render_map(bool rendername)
 
 	float Rot = (((BYTE)((Hero->Object.Angle[2] + 22.5f) / 360.f * 8.f + 1.f) % 8) + 2) * 45.0;
 
-	RenderFrameAnimation2(BITMAP_ITEM_ENDURANCE_INFO_BEGIN + 13, Tx, Ty, 40.f, 40.f, Rot, 32.0 / 512.0, 32.0 / 128.0, 1.25, 10, 30, false);
+	RenderFrameAnimation2(this->IsVisible() ? IBERIA_TEXTURE_HERO : BITMAP_ITEM_ENDURANCE_INFO_BEGIN + 13, Tx, Ty, 40.f, 40.f, Rot, 32.0 / 512.0, 32.0 / 128.0, 1.25, 10, 30, false);
 	//RenderBitmapRotate(IMAGE_MINIMAP_INTERFACE + 1, Tx, Ty, 40.f, 40.f, Hero->Object.Angle[2] + 135.f, 0.f, 0.f, 32.f / 64.f, 32.f / 256.f, false);
+
+	if (this->IsVisible())
+	{
+		this->RenderIberiaFrame();
+		this->RenderXmlTooltip();
+	}
+}
+
+void SEASON3B::CNewUIMiniMap::RenderIberiaFrame()
+{
+	SEASON3B::RenderImageF(IBERIA_TEXTURE_FRAME, m_fIberiaFrameX, m_fIberiaFrameY, m_fIberiaFrameWidth, m_fIberiaFrameHeight);
+
+	g_pRenderText->SetFont(g_hFontBold);
+	g_pRenderText->SetBgColor(0);
+	g_pRenderText->SetTextColor(CLRDW_GOLD);
+	g_pRenderText->RenderText(m_fIberiaFrameX, m_fIberiaFrameY + 6.f, gMapManager->GetMapName(), m_fIberiaFrameWidth, 0, RT3_SORT_CENTER);
+}
+
+void SEASON3B::CNewUIMiniMap::RenderXmlIcons(const vec3_t angles)
+{
+	m_iHoveredXmlEntry = -1;
+
+	float Matrix[3][4];
+	AngleMatrix(angles, Matrix);
+	const float ratio = (MAX_MAP_SIZE / (float)(TERRAIN_SIZE * TERRAIN_SCALE)) * m_RenderZoom;
+	const float iconSize = IBERIA_ICON_SIZE * min(g_fScreenRate_x, g_fScreenRate_y);
+
+	for (size_t i = 0; i < m_XmlMinimapData.size(); i++)
+	{
+		const XML_MINIMAP_DATA& info = m_XmlMinimapData[i];
+		if (info.Map != World || info.StageIndex >= 0 || info.ClearStageIndex >= 0)
+		{
+			continue;
+		}
+
+		vec3_t p1, p2;
+		p1[0] = (((info.PosY * TERRAIN_SCALE) - Hero->GetPositionY()) * ratio);
+		p1[1] = (((info.PosX * TERRAIN_SCALE) - Hero->GetPositionX()) * ratio);
+		p1[2] = 0.f;
+		VectorRotate(p1, Matrix, p2);
+
+		const float x = this->m_RenderFrameX + (this->m_RenderSizeX * 0.5f) + p2[0] - (iconSize * 0.5f);
+		const float y = this->m_RenderFrameY + (this->m_RenderSizeY * 0.5f) + p2[1] - (iconSize * 0.5f);
+		RenderBitmap(this->GetIberiaIconId(info.Type), x, y, iconSize, iconSize, 0.f, 0.f, 1.f, 1.f, false, false);
+
+		if (MouseRenderX >= x && MouseRenderX <= x + iconSize && MouseRenderY >= y && MouseRenderY <= y + iconSize)
+		{
+			m_iHoveredXmlEntry = (int)i;
+			m_fHoveredIconX = x / g_fScreenRate_x;
+			m_fHoveredIconY = y / g_fScreenRate_y;
+		}
+	}
+}
+
+void SEASON3B::CNewUIMiniMap::RenderXmlTooltip()
+{
+	if (m_iHoveredXmlEntry < 0 || m_iHoveredXmlEntry >= (int)m_XmlMinimapData.size())
+	{
+		return;
+	}
+
+	const XML_MINIMAP_DATA& info = m_XmlMinimapData[m_iHoveredXmlEntry];
+	if (info.Map != World || info.StageIndex >= 0 || info.ClearStageIndex >= 0)
+	{
+		return;
+	}
+
+	float x = m_fHoveredIconX + IBERIA_ICON_SIZE + 2.f;
+	float y = m_fHoveredIconY - (IBERIA_TOOLTIP_HEIGHT * 0.5f);
+	x = max(0.f, min(x, GetWindowsX - IBERIA_TOOLTIP_WIDTH));
+	y = max(0.f, min(y, GetWindowsY - IBERIA_TOOLTIP_HEIGHT));
+
+	SEASON3B::RenderImageF(IBERIA_TEXTURE_TOOLTIP, x, y, IBERIA_TOOLTIP_WIDTH, IBERIA_TOOLTIP_HEIGHT);
+
+	g_pRenderText->SetFont(g_hFontBold);
+	g_pRenderText->SetBgColor(0);
+	g_pRenderText->SetTextColor(info.ColorText ? info.ColorText : CLRDW_GOLD);
+	g_pRenderText->RenderText(x + 10.f, y + 13.f, info.Text, IBERIA_TOOLTIP_WIDTH - 20.f, 0, RT3_SORT_CENTER);
+
+	g_pRenderText->SetFont(g_hFont);
+	g_pRenderText->SetTextColor(info.ColorTextInfo ? info.ColorTextInfo : CLRDW_WHITE);
+	g_pRenderText->RenderText(x + 10.f, y + 29.f, info.TextInfo, IBERIA_TOOLTIP_WIDTH - 20.f, 0, RT3_SORT_CENTER);
 }
 
 void SEASON3B::CNewUIMiniMap::runtime_render_objet(int i, int x, int y, int group, int type, float angle, const char* name, const vec3_t angles)

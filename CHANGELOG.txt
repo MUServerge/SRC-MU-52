@@ -6,6 +6,16 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: rebuilt the TAB minimap presentation around the Iberia Minimap
+  texture set. The responsive I21 frame preserves a dedicated centered map-name
+  header, I23 skins the player direction marker, and XML-backed map icons use
+  individual textures with an I24 two-line hover panel for Text/TextInfo.
+  Minimap.xml is loaded once and validated; the existing encrypted per-map BMD
+  data remains the fallback for missing and staged-map entries, and the compact
+  HUD minimap keeps its legacy rendering path. Icon type assignment is isolated
+  in one mapping function for later art alignment. (NewUIMiniMap.*,
+  _TextureIndex.h)
+
 - Client assets: updated the F5 game menu texture loader to use the organized
   Interface\\Iberia\\Menu directory. Bitmap IDs, filenames and runtime OZT
   decoding remain unchanged. (NewUIMenuUser::LoadImages)
