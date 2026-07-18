@@ -12,6 +12,9 @@ extern char* getMonsterName(int type);
 
 using namespace SEASON3B;
 
+static_assert(BITMAP_INTERFACE_IBERIA_NOTIFICATION_END < BITMAP_EFFECT_TEXTURE_END,
+	"Iberia notification bitmap range overlaps the effect texture boundary");
+
 //-----------------------------------------------------------------------------
 // MuDream-style skin (Interface\ActiveInvasion\*.OZT) - layout constants.
 // Every rect below is in virtual 640x480 pixels; RenderImageF / CheckMouseIn
@@ -60,9 +63,7 @@ namespace
 
 	// Look-5 notification atlas: 11 cells of 72x72.
 	const float NOTIFY_TEX_CELL   = 72.f;
-	const int   NOTIFY_CELL_PLUS  = 0;
 	const int   NOTIFY_CELL_DAILY = 6;
-	const int   NOTIFY_CELL_INVASION = 7;
 	const float NOTIFY_ICON_SIZE  = 18.f;	// on-screen size (virtual px)
 	const float NOTIFY_EFFECT_SIZE = 30.f;
 	const DWORD NOTIFY_EFFECT_FRAME_TIME = 70;
@@ -102,7 +103,7 @@ namespace
 			y = maxY;
 	}
 	const float NOTIFY_HOVER_GROW = 2.f;
-	const float NOTIFY_ICON_GAP_X = 2.f;
+	const float NOTIFY_ICON_GAP_X = 3.f;
 	const float NOTIFY_ICON_PAD_X = 8.f;	// inset from the AG gauge's right edge
 	const float NOTIFY_ICON_GAP_Y = 2.f;	// gap between icon bottom and AG gauge top
 
@@ -134,6 +135,10 @@ CGMInvasionManager::CGMInvasionManager()
 	m_NotifyIconY = -9999.f;
 	m_CharacterIconX = -9999.f;
 	m_CharacterIconY = -9999.f;
+	m_ShieldIconX = -9999.f;
+	m_ShieldIconY = -9999.f;
+	m_SwordsIconX = -9999.f;
+	m_SwordsIconY = -9999.f;
 	m_DailyIconX = -9999.f;
 	m_DailyIconY = -9999.f;
 	m_bDragging = false;
@@ -166,6 +171,16 @@ void CGMInvasionManager::LoadImages()
 	LoadBitmap("Interface\\ActiveInvasion\\minus.tga",          IMAGE_ACTINV_MINUS,          GL_LINEAR);
 	LoadBitmap("Interface\\HUD\\Look-5\\UI_HUD_NOTIFICATIONS.tga", IMAGE_ACTINV_NOTIFY,      GL_LINEAR);
 
+	const int notificationFiles[] = { 78, 79, 80, 82, 83, 84, 85, 86, 87, 169, 170, 171 };
+	char szNotificationPath[MAX_PATH];
+	const int notificationFileCount = (int)(sizeof(notificationFiles) / sizeof(notificationFiles[0]));
+	for (int i = 0; i < notificationFileCount; ++i)
+	{
+		sprintf_s(szNotificationPath, "Interface\\Iberia\\UI_Notification\\TournamentMain_I%d.tga",
+			notificationFiles[i]);
+		LoadBitmap(szNotificationPath, IMAGE_NOTIFY_CHARACTER_NORMAL + i, GL_LINEAR);
+	}
+
 	char szEffectPath[MAX_PATH];
 	for (int i = 0; i < NOTIFY_EFFECT_FRAME_COUNT; ++i)
 	{
@@ -187,6 +202,11 @@ void CGMInvasionManager::UnloadImages()
 	DeleteBitmap(IMAGE_ACTINV_PLUS);
 	DeleteBitmap(IMAGE_ACTINV_MINUS);
 	DeleteBitmap(IMAGE_ACTINV_NOTIFY);
+
+	for (int i = IMAGE_NOTIFY_CHARACTER_NORMAL; i <= IMAGE_NOTIFY_INVASION_DISABLED; ++i)
+	{
+		DeleteBitmap(i);
+	}
 
 	for (int i = IMAGE_ACTINV_NOTIFY_EFFECT_BEGIN; i <= IMAGE_ACTINV_NOTIFY_EFFECT_END; ++i)
 	{
@@ -336,6 +356,13 @@ bool CGMInvasionManager::UpdateMouseEvent()
 		return true;
 	}
 
+	// Reserved notification icons have no action yet, but own their HUD hit areas.
+	if (SEASON3B::CheckMouseIn(m_ShieldIconX, m_ShieldIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE)
+		|| SEASON3B::CheckMouseIn(m_SwordsIconX, m_SwordsIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE))
+	{
+		return true;
+	}
+
 	// Daily Reward is visual-only for now, but still owns its HUD hit area.
 	if (SEASON3B::CheckMouseIn(m_DailyIconX, m_DailyIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE))
 		return true;
@@ -343,10 +370,9 @@ bool CGMInvasionManager::UpdateMouseEvent()
 	// HUD notify icon first: it stays clickable while the widget itself is closed, so the user
 	// can bring the widget back after hiding it with X. Its rect is only valid on frames the
 	// HUD actually drew it (RenderFrame parks it off-screen otherwise).
-	if (m_CountActive > 0 && currentInvasion != -1
-		&& SEASON3B::CheckMouseIn(m_NotifyIconX, m_NotifyIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE))
+	if (SEASON3B::CheckMouseIn(m_NotifyIconX, m_NotifyIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE))
 	{
-		if (SEASON3B::IsRelease(VK_LBUTTON))
+		if (m_CountActive > 0 && currentInvasion != -1 && SEASON3B::IsRelease(VK_LBUTTON))
 			m_bHidden = !m_bHidden;
 
 		return true;
@@ -422,9 +448,10 @@ bool CGMInvasionManager::UpdateMouseEvent()
 bool CGMInvasionManager::IsHudNotificationHovered() const
 {
 	return SEASON3B::CheckMouseIn(m_CharacterIconX, m_CharacterIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE)
+		|| SEASON3B::CheckMouseIn(m_ShieldIconX, m_ShieldIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE)
+		|| SEASON3B::CheckMouseIn(m_SwordsIconX, m_SwordsIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE)
 		|| SEASON3B::CheckMouseIn(m_DailyIconX, m_DailyIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE)
-		|| (m_CountActive > 0 && currentInvasion != -1
-			&& SEASON3B::CheckMouseIn(m_NotifyIconX, m_NotifyIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE));
+		|| SEASON3B::CheckMouseIn(m_NotifyIconX, m_NotifyIconY, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE);
 }
 
 void CGMInvasionManager::RenderFrame(float /*RenderFrameX*/, float /*RenderFrameY*/)
@@ -439,6 +466,10 @@ void CGMInvasionManager::RenderFrame(float /*RenderFrameX*/, float /*RenderFrame
 	m_NotifyIconY = -9999.f;
 	m_CharacterIconX = -9999.f;
 	m_CharacterIconY = -9999.f;
+	m_ShieldIconX = -9999.f;
+	m_ShieldIconY = -9999.f;
+	m_SwordsIconX = -9999.f;
+	m_SwordsIconY = -9999.f;
 	m_DailyIconX = -9999.f;
 	m_DailyIconY = -9999.f;
 
@@ -573,7 +604,11 @@ void CGMInvasionManager::RenderNotifyIcon(float fAgX, float fAgY, float fAgW)
 
 	m_DailyIconX = rightX;
 	m_DailyIconY = iconY;
-	m_CharacterIconX = rightX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
+	m_SwordsIconX = rightX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
+	m_SwordsIconY = iconY;
+	m_ShieldIconX = m_SwordsIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
+	m_ShieldIconY = iconY;
+	m_CharacterIconX = m_ShieldIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
 	m_CharacterIconY = iconY;
 	m_NotifyIconX = m_CharacterIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
 	m_NotifyIconY = iconY;
@@ -582,23 +617,31 @@ void CGMInvasionManager::RenderNotifyIcon(float fAgX, float fAgY, float fAgW)
 	{
 		float x;
 		float y;
+		int imageNormal;
+		int imageHover;
+		int imageDisabled;
+		float sourceWidth;
+		float sourceHeight;
 		int cell;
 		const char* tip;
-		bool visible;
+		bool enabled;
+		bool atlas;
 	};
 
 	HUD_ICON_DRAW icons[] =
 	{
-		{ m_NotifyIconX,    m_NotifyIconY,    NOTIFY_CELL_INVASION, "Active Invasion ON / OFF", m_CountActive > 0 && currentInvasion != -1 },
-		{ m_CharacterIconX, m_CharacterIconY, NOTIFY_CELL_PLUS,     "Free Level-up Points",      true },
-		{ m_DailyIconX,     m_DailyIconY,     NOTIFY_CELL_DAILY,    "Daily Reward",              true },
+		{ m_NotifyIconX,    m_NotifyIconY,    IMAGE_NOTIFY_INVASION_NORMAL,  IMAGE_NOTIFY_INVASION_HOVER,  IMAGE_NOTIFY_INVASION_DISABLED,  72.f,  72.f,  0,                 "Active Invasion ON / OFF", m_CountActive > 0 && currentInvasion != -1, false },
+		{ m_CharacterIconX, m_CharacterIconY, IMAGE_NOTIFY_CHARACTER_NORMAL, IMAGE_NOTIFY_CHARACTER_HOVER, IMAGE_NOTIFY_CHARACTER_DISABLED, 56.f,  56.f,  0,                 "Free Level-up Points",      true,                                       false },
+		{ m_ShieldIconX,    m_ShieldIconY,    IMAGE_NOTIFY_SHIELD_NORMAL,    IMAGE_NOTIFY_SHIELD_HOVER,    IMAGE_NOTIFY_SHIELD_DISABLED,    108.f, 120.f, 0,                 NULL,                        true,                                       false },
+		{ m_SwordsIconX,    m_SwordsIconY,    IMAGE_NOTIFY_SWORDS_NORMAL,    IMAGE_NOTIFY_SWORDS_HOVER,    IMAGE_NOTIFY_SWORDS_DISABLED,    108.f, 120.f, 0,                 NULL,                        true,                                       false },
+		{ m_DailyIconX,     m_DailyIconY,     IMAGE_ACTINV_NOTIFY,           IMAGE_ACTINV_NOTIFY,           IMAGE_ACTINV_NOTIFY,             72.f,  72.f,  NOTIFY_CELL_DAILY, "Daily Reward",              true,                                       true  },
 	};
 
 	glColor4f(1.f, 1.f, 1.f, 1.f);
 
 	// The server-fed active invasion state already controls icon visibility. Reuse that
 	// same authoritative state for the glow and keep the effect centered behind the icon.
-	if (icons[0].visible)
+	if (icons[0].enabled)
 	{
 		const int effectFrame = (GetTickCount() / NOTIFY_EFFECT_FRAME_TIME) % NOTIFY_EFFECT_FRAME_COUNT;
 		const float effectX = m_NotifyIconX + (NOTIFY_ICON_SIZE - NOTIFY_EFFECT_SIZE) * 0.5f;
@@ -612,20 +655,31 @@ void CGMInvasionManager::RenderNotifyIcon(float fAgX, float fAgY, float fAgW)
 
 	for (size_t i = 0; i < sizeof(icons) / sizeof(icons[0]); ++i)
 	{
-		if (!icons[i].visible)
-			continue;
-
 		const bool hovered = SEASON3B::CheckMouseIn(icons[i].x, icons[i].y, NOTIFY_ICON_SIZE, NOTIFY_ICON_SIZE);
 		const float grow = hovered ? NOTIFY_HOVER_GROW : 0.f;
 		const float drawX = icons[i].x - grow * 0.5f;
 		const float drawY = icons[i].y - grow * 0.5f;
 		const float drawSize = NOTIFY_ICON_SIZE + grow;
 
-		SEASON3B::RenderImageF(IMAGE_ACTINV_NOTIFY,
-			drawX, drawY, drawSize, drawSize,
-			icons[i].cell * NOTIFY_TEX_CELL, 0.f, NOTIFY_TEX_CELL, NOTIFY_TEX_CELL);
+		if (icons[i].atlas)
+		{
+			SEASON3B::RenderImageF(icons[i].imageNormal,
+				drawX, drawY, drawSize, drawSize,
+				icons[i].cell * NOTIFY_TEX_CELL, 0.f, NOTIFY_TEX_CELL, NOTIFY_TEX_CELL);
+		}
+		else
+		{
+			const int image = !icons[i].enabled ? icons[i].imageDisabled
+				: (hovered ? icons[i].imageHover : icons[i].imageNormal);
+			const float imageWidth = drawSize * icons[i].sourceWidth / icons[i].sourceHeight;
+			const float imageX = drawX + (drawSize - imageWidth) * 0.5f;
 
-		if (hovered)
+			SEASON3B::RenderImageF(image,
+				imageX, drawY, imageWidth, drawSize,
+				0.f, 0.f, icons[i].sourceWidth, icons[i].sourceHeight);
+		}
+
+		if (hovered && icons[i].tip != NULL)
 		{
 			HudTooltip::RenderCenteredText(
 				icons[i].x + NOTIFY_ICON_SIZE * 0.5f, drawY - 16.f, icons[i].tip);

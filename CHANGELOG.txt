@@ -6,6 +6,13 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: migrated the Invasion and Character HUD notifications to their
+  individual Iberia normal/hover/disabled textures, added reserved Shield and
+  Swords notifications without actions, and increased horizontal spacing in
+  the responsive notification row. The existing Daily Reward calendar remains
+  in place until its replacement art is supplied. (CGMInvasionManager,
+  _TextureIndex.h)
+
 - Client UI: replaced the Look5 skill cooldown color overlay with the Iberia
   Pegasus 120-frame sequence. The displayed frame is derived directly from the
   existing client skill-delay percentage, follows every rendered hotkey/current
