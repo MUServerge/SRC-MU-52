@@ -15,7 +15,7 @@ This register tracks changes that lack reproducible Windows build or runtime evi
 |---|---|---|---|---|---|
 | PRs #13–#23 | FPS, frame pacing, scheduler, renderer refactors | build-unverified | runtime-unverified | SHA-pinned range audit; clean Main Release/Debug Win32; 60/120 FPS empty+dense scenes; map change, reconnect, shutdown | Pending desktop validation |
 | PR #25 | dangling timing/shader symbols and `glprocs.lib` linker cleanup | build-unverified | runtime-unverified | clean Main Release/Debug Win32; login/select/world/map/reconnect/exit; shader/VBO visual smoke | Pending desktop validation |
-| PR #27 | workflow documentation and read-only PowerShell audit tools | not product-code applicable | runtime-unverified | PowerShell parser/runtime execution from a clean checkout; confirm reports only and no source mutation | Pending desktop validation |
+| PR #27 | workflow documentation, read-only inventory tools, and build-evidence wrapper | not product-code applicable | runtime-unverified | PowerShell parser/runtime execution from a clean checkout; confirm audit exporters do not mutate source and build wrapper changes only expected build outputs/intermediates plus external evidence | Pending desktop validation |
 
 ## Evidence record
 
@@ -25,4 +25,3 @@ When closing debt, append:
 |---|---|---|---|---|---|
 
 Never mark a row verified using evidence from a different commit, dirty worktree, configuration, runtime Data/config set, or later-conflicted PR head.
-
