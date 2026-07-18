@@ -38,6 +38,21 @@ load every affected specialist `mu-main52-*` skill.
 Audit helpers live under `tools/audit/`; they are read-only and create reports only when an
 output path is explicitly supplied.
 
+## Evidence workflows
+
+- Build evidence: `tools/build/Invoke-MU52BuildEvidence.ps1`. Record exact commit,
+  dirty-worktree state, solution/configuration/platform, MSBuild version, logs, result, artifact
+  metadata, and SHA256. Store generated evidence outside the repository unless intentionally
+  attaching it to a review.
+- Verification debt: update `docs/VERIFICATION_DEBT.md` whenever required Windows build or
+  runtime evidence is missing, invalidated by a later edit, or completed for an exact SHA.
+- FPS/timing audit: run `tools/audit/Export-MU52TimingInventory.ps1`, then classify every
+  consumer using `docs/FPS_TIMING_AUDIT.md` before migrating cadence.
+- Renderer ownership: run `tools/audit/Export-MU52RendererOwnership.ps1` and complete
+  `docs/RENDERER_OWNERSHIP_AUDIT.md` before consolidating shader/GL/GPU resource ownership.
+- Generated inventories are discovery evidence. They never prove that a path is defective,
+  unused, or safe to delete.
+
 ---
 
 # Golden Rules
