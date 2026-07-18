@@ -5,6 +5,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+$OutputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
 $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 $client = Join-Path $root "SRCMainGS\Source\Main5.2"
 if (-not (Test-Path -LiteralPath $client)) { throw "Main5.2 client source was not found." }
@@ -45,4 +48,3 @@ if ($OutputPath) {
     $rows | Export-Csv -LiteralPath $destination -NoTypeInformation -Encoding UTF8
 }
 $rows | Format-Table -AutoSize
-
