@@ -59,5 +59,10 @@ Prefer direct reuse, small extension of an owner, adapter around proven code, fo
 
 ## Living knowledge
 
+Client shutdown is performed inside `CWINHANDLE::winLoop`'s `DispatchMessage`
+path for `WM_CLOSE`/`WM_DESTROY`. Once the global `Destroy` flag is set, the loop
+must exit before its protocol tail because socket/chat owners have already been
+released.
+
 When a fact is verified from code or runtime, update the relevant reference. Separate verified facts from hypotheses and include the evidence file/symbol.
 

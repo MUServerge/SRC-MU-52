@@ -35,6 +35,15 @@ namespace
 		case RPC_VBO_DRAW_SUCCEEDED: return "VBODrawSucceeded";
 		case RPC_VBO_DRAW_REJECTED: return "VBODrawRejected";
 		case RPC_VBO_BONE_CAPACITY_REJECTED: return "VBOBoneCapacityRejected";
+		case RPC_VBO_GATE_SCENE_OFF: return "VBOGateSceneOff";
+		case RPC_VBO_GATE_TRANSLATE: return "VBOGateTranslate";
+		case RPC_VBO_GATE_BONESCALE: return "VBOGateBoneScale";
+		case RPC_VBO_GATE_OBJSCALE: return "VBOGateObjScale";
+		case RPC_VBO_GATE_NOT_PLAIN_TEXTURE: return "VBOGateNotPlainTexture";
+		case RPC_VBO_GATE_UNLIT: return "VBOGateUnlit";
+		case RPC_VBO_GATE_WAVE: return "VBOGateWave";
+		case RPC_VBO_GATE_NO_VAO: return "VBOGateNoVAO";
+		case RPC_VBO_GATE_EXCLUDED_FLAG: return "VBOGateExcludedFlag";
 		case RPC_FIXED_UPDATE_STEPS: return "FixedUpdateSteps";
 		case RPC_FIXED_UPDATE_DROPPED: return "FixedUpdateStepsDropped";
 		case RPC_RENDERED_VERTICES_KNOWN: return "SubmittedVerticesKnown";
@@ -120,7 +129,9 @@ CRenderProfiler::CRenderProfiler()
 {
 	char enabledValue[16] = { 0 };
 	const DWORD enabledLength = GetEnvironmentVariableA("MU_RENDER_PROFILER", enabledValue, sizeof(enabledValue));
-	m_enabled = enabledLength > 0 && enabledLength < sizeof(enabledValue) && atoi(enabledValue) != 0;
+	const char* commandLine = GetCommandLineA();
+	const bool commandLineEnabled = commandLine != NULL && strstr(commandLine, "-renderprofiler") != NULL;
+	m_enabled = (enabledLength > 0 && enabledLength < sizeof(enabledValue) && atoi(enabledValue) != 0) || commandLineEnabled;
 	m_started = false;
 	m_loadingFrame = false;
 	m_sceneFlag = -1;
@@ -157,7 +168,7 @@ void CRenderProfiler::BeginFrame(int sceneFlag, float currentFps, bool loadingFr
 	{
 		m_started = true;
 		m_lastReportTime = timeGetTime();
-		g_ErrorReport.Write("[RenderProfiler] enabled by MU_RENDER_PROFILER=1; fixed sample capacity %d\r\n", FRAME_SAMPLE_CAPACITY);
+		g_ErrorReport.Write("[RenderProfiler] enabled; fixed sample capacity %d\r\n", FRAME_SAMPLE_CAPACITY);
 	}
 
 	if (m_sceneFlag >= 0 && m_sceneFlag != sceneFlag && m_frameCount > 0)

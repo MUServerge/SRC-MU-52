@@ -246,10 +246,7 @@ GLuint CShaderScene::BindProgram(GLuint program)
 		return 0;
 	}
 
-	GLint actualProgram = 0;
-	g_RenderProfiler.AddCounter(RPC_CURRENT_PROGRAM_QUERIES);
-	glGetIntegerv(GL_CURRENT_PROGRAM, &actualProgram);
-	const GLuint previousProgram = (GLuint)actualProgram;
+	const GLuint previousProgram = m_BoundProgram;
 
 	if (previousProgram != program)
 		RenderProfilerUseProgram(program);

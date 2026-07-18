@@ -21,18 +21,17 @@ Run from the normal `Client` working directory so `Data\...` and `Shaders\...` r
 
 ## Enabling the profiler
 
-The profiler is disabled when `MU_RENDER_PROFILER` is absent or zero. Start the client from a fresh process with the environment variable set before launch:
+The profiler is disabled by default. The protected runtime can remove inherited environment variables, so the preferred activation is the explicit command-line switch:
 
 ```powershell
-$env:MU_RENDER_PROFILER = '1'
-Set-Location 'C:\Users\hatim\Desktop\SRC 5.2 BASE\Client'
-& '.\Main.exe'
+Set-Location 'C:\Users\hatim\Desktop\SRC-MU-52\Client'
+& '.\Main.exe' -renderprofiler
 ```
 
-Close that shell or remove the variable after the run. Successful activation writes:
+`MU_RENDER_PROFILER=1` remains supported for launchers that preserve the environment. Successful activation writes:
 
 ```text
-[RenderProfiler] enabled by MU_RENDER_PROFILER=1
+[RenderProfiler] enabled
 ```
 
 Output is aggregated approximately every two seconds. No per-draw log lines, `glGetError` polling, or GPU timer query is performed. `FrameTimeStable` and `FrameTimeLoading` are separate fixed-capacity sample groups. Immediate-mode draw calls are counted, but their per-vertex submissions are intentionally not intercepted; `SubmittedVerticesKnown` and `SubmittedTrianglesKnown` are therefore lower bounds covering `glDrawArrays`/`glDrawElements` calls.

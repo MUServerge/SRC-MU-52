@@ -6,6 +6,28 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client: fixed the shutdown crash at its event-loop source. WM_CLOSE/WM_DESTROY
+  completes socket, chat and renderer teardown inside DispatchMessage; winLoop
+  now exits immediately when the established Destroy flag is set instead of
+  falling through once more to ProtocolCompiler and the already deleted chat-room
+  socket list. Resolution/font ownership and shutdown order are unchanged.
+  (CWINHANDLE::winLoop)
+
+- Client renderer Phase 12: added Release diagnostics for the selected Model bone
+  transport/capacity and first-failure VBO gate counters (scene, translation,
+  scale, material, light, wave, VAO and excluded flags). Restored the existing
+  encrypted MuError.log owner so renderer diagnostics are no longer silently
+  discarded; detailed profiler counters remain opt-in through
+  MU_RENDER_PROFILER or the protected-runtime-safe -renderprofiler switch.
+  CShaderScene now uses its synchronized program cache instead of querying
+  GL_CURRENT_PROGRAM on every bind request. An A/B runtime control reproduced the
+  same pre-existing 27 FPS drop with the query restored, excluding this cache
+  change as the cause; render selection, materials, visuals and fallback remain
+  unchanged. Runtime profiling then measured the crowded-scene bottleneck in the
+  translated legacy BMD path: all Model VBO attempts succeeded, while translated
+  meshes were the dominant first-failure gate. (CShaderScene, CShaderGL,
+  RenderProfiler, ZzzBMD, ErrorReport)
+
 - Client UI: corrected the Iberia cooldown draw order and blend mode so the
   120-frame alpha mask renders over the skill icon without clipping its soft
   transition, while hotkey numbers remain readable above it. Enlarged the

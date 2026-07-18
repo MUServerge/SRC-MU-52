@@ -311,6 +311,11 @@ MSG CWINHANDLE::winLoop()
 				break;
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
+
+			// WM_CLOSE/WM_DESTROY performs teardown inside DispatchMessage. Do not
+			// execute the per-frame protocol tail after its owners were released.
+			if (Destroy)
+				break;
 		}
 		else
 		{

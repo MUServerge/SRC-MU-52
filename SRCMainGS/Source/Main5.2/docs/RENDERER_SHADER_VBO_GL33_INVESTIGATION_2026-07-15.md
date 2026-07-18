@@ -607,3 +607,44 @@ and the actual CPU saving must still be verified with `MU_RENDER_PROFILER=1`
 across normal objects, special materials, shadows, effects, collision/picking,
 cloth, map transition and reconnect before extending opt-in to characters or
 equipment parts.
+
+## Phase 12 implementation — VBO gate diagnostics (2026-07-18)
+
+`CShaderScene::BindProgram` now trusts its synchronized `m_BoundProgram` value
+instead of querying `GL_CURRENT_PROGRAM` on every request. Repository review found
+that program changes route through the shared wrapper and the OpenGL2 ImGui backend
+does not own a shader program. More importantly, an A/B runtime control reproduced
+the same pre-existing 27 FPS drop after restoring the GL query, excluding the cache
+change as its cause. The cached path is therefore retained while the independent
+frame-time problem is measured with the opt-in profiler.
+
+The opt-in renderer profile now logs the selected Model program, bone transport,
+capacity and readiness, then attributes meshes that never reach `RenderMeshVBO`
+to the first failed gate: scene, translated transform, bone/object scale, material,
+unlit, wave, missing VAO, or an excluded render flag. The existing encrypted
+`MuError.log` owner is active again so Release diagnostics are not silently
+discarded; detailed frame and gate counters remain disabled unless
+`MU_RENDER_PROFILER` is nonzero or `-renderprofiler` is passed. These counters change no render decision and
+exist to validate Phase 11 before translated character/equipment eligibility is
+reconsidered.
+
+### Phase 12 runtime evidence
+
+The protected client accepted the new `-renderprofiler` activation and emitted
+stable aggregate windows. The captured worst crowded main-scene window reproduced
+27 FPS, 35.600 ms mean frame time, 33.951 ms in the render section and 0.810 ms in
+movement. BMD mesh rendering accounted for 17.512 ms/frame:
+
+- 499.0 VBO draws/frame all succeeded and consumed 1.981 ms/frame;
+- 757.9 legacy BMD mesh draws/frame consumed 14.696 ms/frame;
+- the first-failure chain attributed 659.9 meshes/frame to translated rendering,
+  versus 49.0 unlit and 49.0 missing-VAO meshes/frame;
+- 310.0 CPU transforms/frame were deferred and only 43.0 were later materialized;
+- 5,750.8 total and 2,635.2 immediate-mode draw calls/frame remain a separate
+  fixed-function/draw-granularity blocker before Core Profile.
+
+The evidence excludes the healthy Model VBO draw itself as the primary FPS
+problem and identifies translated character/equipment rendering as the largest
+measured eligibility blocker. The previous translated prototype produced
+set-effect flicker, so the next expansion must first separate plain translated
+meshes from effect/material consumers and retain their legacy ownership.

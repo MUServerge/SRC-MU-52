@@ -62,7 +62,7 @@ int Xor_ConvertBuffer(void* lpBuffer, int iSize, int iKey = 0)
 CErrorReport::CErrorReport()
 {
 	Clear();
-	//Create("MuError.log");
+	Create("MuError.log");
 }
 
 CErrorReport::~CErrorReport()

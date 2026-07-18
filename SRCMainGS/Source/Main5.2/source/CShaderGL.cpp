@@ -4,6 +4,7 @@
 
 #ifdef SHADER_VERSION_TEST
 #include "Utilities/Log/muConsoleDebug.h"
+#include "Utilities/Log/ErrorReport.h"
 
 namespace
 {
@@ -98,6 +99,19 @@ void CShaderGL::Release()
 void CShaderGL::Init()
 {
 	InitVBOShaders();
+
+	const char* transport = "none (legacy mesh fallback)";
+	if (m_BoneTransport == eVBOBoneTransport_UniformArray)
+		transport = "uniform array";
+	else if (m_BoneTransport == eVBOBoneTransport_UniformBuffer)
+		transport = "uniform buffer (UBO)";
+
+	g_ErrorReport.Write("<Renderer VBO model program>\r\n");
+	g_ErrorReport.Write("Model program\t\t: %u\r\n", m_VBOProgram[eVBO_Model]);
+	g_ErrorReport.Write("Bone transport\t\t: %s\r\n", transport);
+	g_ErrorReport.Write("Bone capacity\t\t: %d\r\n", m_VBOBoneCapacity[eVBO_Model]);
+	g_ErrorReport.Write("GPU skinning ready\t: %s\r\n", IsReadyVBO() ? "yes" : "no");
+	g_ErrorReport.AddSeparator();
 }
 
 GLuint CShaderGL::LoadVBOProgram(const char* baseName, const char* vertexDefine)

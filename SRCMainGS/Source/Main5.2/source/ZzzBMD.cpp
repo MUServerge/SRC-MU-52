@@ -55,6 +55,9 @@ vec2_t RenderArrayTexCoords[MAX_VERTICES * 3];
 // scale), which is the standard object path; otherwise the CPU path is used.
 static float (*g_pShaderBoneMatrix)[3][4] = NULL;
 static bool   g_bShaderGPUEligible = false;
+// Diagnostics only: first object-level condition that rejected GPU skinning.
+// 0=eligible, 1=translated, 2=bone scale, 3=object scale.
+static int    g_ShaderGPUIneligibleReason = 0;
 static vec3_t g_ShaderLightPos = { 0.f, 0.f, 0.f };
 
 struct DeferredCpuTransformContext
@@ -473,6 +476,7 @@ void BMD::Transform(float(*BoneMatrix)[3][4], vec3_t BoundingBoxMin, vec3_t Boun
 
 	g_pShaderBoneMatrix = BoneMatrix;
 	g_bShaderGPUEligible = (Translate == false && BoneScale == 1.f && _Scale == 0.f);
+	g_ShaderGPUIneligibleReason = Translate ? 1 : (BoneScale != 1.f ? 2 : (_Scale != 0.f ? 3 : 0));
 	if (LightEnable)
 		VectorCopy(LightPosition, g_ShaderLightPos);
 #endif // SHADER_VERSION_TEST
@@ -1669,6 +1673,26 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					}
 
 #ifdef SHADER_VERSION_TEST
+					// Count the first failed VBO gate condition. This is observability
+					// only; the authoritative selection chain below remains unchanged.
+					if (!IsVboSceneEnabled())
+						g_RenderProfiler.AddCounter(RPC_VBO_GATE_SCENE_OFF);
+					else if (!g_bShaderGPUEligible)
+						g_RenderProfiler.AddCounter(
+							g_ShaderGPUIneligibleReason == 1 ? RPC_VBO_GATE_TRANSLATE :
+							g_ShaderGPUIneligibleReason == 2 ? RPC_VBO_GATE_BONESCALE :
+							RPC_VBO_GATE_OBJSCALE);
+					else if (renderFlags != RENDER_TEXTURE)
+						g_RenderProfiler.AddCounter(RPC_VBO_GATE_NOT_PLAIN_TEXTURE);
+					else if (!EnableLight)
+						g_RenderProfiler.AddCounter(RPC_VBO_GATE_UNLIT);
+					else if (EnableWave)
+						g_RenderProfiler.AddCounter(RPC_VBO_GATE_WAVE);
+					else if (m->VAO == 0)
+						g_RenderProfiler.AddCounter(RPC_VBO_GATE_NO_VAO);
+					else if (HasVboExcludedRenderFlag(RenderFlag))
+						g_RenderProfiler.AddCounter(RPC_VBO_GATE_EXCLUDED_FLAG);
+
 					// GPU-skinned Model draw for plain lit textured meshes. All special
 					// chrome/metal/oil, wave, shadow and effect materials remain on their
 					// authoritative legacy path.
