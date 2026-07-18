@@ -54,6 +54,9 @@ SEASON3B::CNewUIMenuUser::CNewUIMenuUser()
 	m_iHoverItem = -1;
 	m_bHoverClose = false;
 	m_bHoverBottom = false;
+	m_bDragging = false;
+	m_fDragOffsetX = 0.f;
+	m_fDragOffsetY = 0.f;
 }
 
 SEASON3B::CNewUIMenuUser::~CNewUIMenuUser()
@@ -129,7 +132,23 @@ void SEASON3B::CNewUIMenuUser::GetBottomRect(float& x, float& y, float& w, float
 	w = BOTTOM_W;
 	h = BOTTOM_H;
 	x = m_Pos.x + (MENU_WIDTH - w) * 0.5f;
-	y = m_Pos.y + MENU_HEIGHT - h - 8.f;
+	y = m_Pos.y + MENU_HEIGHT - h - 10.f;
+}
+
+void SEASON3B::CNewUIMenuUser::ClampPosition()
+{
+	const float maxX = ((float)GetWindowsX > MENU_WIDTH) ? ((float)GetWindowsX - MENU_WIDTH) : 0.f;
+	const float maxY = ((float)GetWindowsY > MENU_HEIGHT) ? ((float)GetWindowsY - MENU_HEIGHT) : 0.f;
+
+	if ((float)m_Pos.x < 0.f)
+		m_Pos.x = 0;
+	else if ((float)m_Pos.x > maxX)
+		m_Pos.x = (LONG)maxX;
+
+	if ((float)m_Pos.y < 0.f)
+		m_Pos.y = 0;
+	else if ((float)m_Pos.y > maxY)
+		m_Pos.y = (LONG)maxY;
 }
 
 bool SEASON3B::CNewUIMenuUser::IsItemEnabled(int index) const
@@ -188,6 +207,22 @@ bool SEASON3B::CNewUIMenuUser::UpdateKeyEvent()
 bool SEASON3B::CNewUIMenuUser::UpdateMouseEvent()
 {
 	float x, y, w, h;
+
+	if (m_bDragging)
+	{
+		if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0)
+		{
+			m_bDragging = false;
+		}
+		else
+		{
+			m_Pos.x = (LONG)((float)MouseX - m_fDragOffsetX);
+			m_Pos.y = (LONG)((float)MouseY - m_fDragOffsetY);
+			ClampPosition();
+		}
+		return false;
+	}
+
 	m_iHoverItem = -1;
 
 	for (int i = 0; i < MENU_ITEM_COUNT; ++i)
@@ -215,6 +250,16 @@ bool SEASON3B::CNewUIMenuUser::UpdateMouseEvent()
 	{
 		g_pNewUISystem->Hide(INTERFACE_CUSTOM_MENU);
 		PlayBuffer(SOUND_CLICK01);
+		return false;
+	}
+
+	if (!m_bHoverClose
+		&& SEASON3B::CheckMouseIn((float)m_Pos.x, (float)m_Pos.y, MENU_WIDTH, TITLE_H)
+		&& SEASON3B::IsPress(VK_LBUTTON))
+	{
+		m_bDragging = true;
+		m_fDragOffsetX = (float)MouseX - (float)m_Pos.x;
+		m_fDragOffsetY = (float)MouseY - (float)m_Pos.y;
 		return false;
 	}
 
@@ -324,12 +369,14 @@ float SEASON3B::CNewUIMenuUser::GetLayerDepth()
 
 void SEASON3B::CNewUIMenuUser::OpenningProcess()
 {
-	SetPos(0.f, 0.f);
+	ClampPosition();
 	m_iHoverItem = -1;
 	m_bHoverClose = false;
 	m_bHoverBottom = false;
+	m_bDragging = false;
 }
 
 void SEASON3B::CNewUIMenuUser::ClosingProcess()
 {
+	m_bDragging = false;
 }

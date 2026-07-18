@@ -6,6 +6,12 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: added responsive header dragging to the F5 game menu by reusing
+  the Invasion widget's virtual-coordinate drag pattern. The title bar, except
+  for its close X, now moves the window; the complete menu remains clamped to
+  the current virtual screen and keeps its last position across reopenings.
+  Raised the bottom Close button another two virtual pixels. (NewUIMenuUser.*)
+
 - Client UI: opening the F5 game menu now closes every safely closable NewUI
   window through CNewUISystem::HideAll, including Character, Inventory and its
   Jewel/Core/Expansion companions, and also clears the legacy custom-window

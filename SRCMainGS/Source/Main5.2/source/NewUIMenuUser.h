@@ -25,6 +25,9 @@ namespace SEASON3B
 		int m_iHoverItem;
 		bool m_bHoverClose;
 		bool m_bHoverBottom;
+		bool m_bDragging;
+		float m_fDragOffsetX;
+		float m_fDragOffsetY;
 	public:
 		CNewUIMenuUser();
 		virtual~CNewUIMenuUser();
@@ -47,6 +50,7 @@ namespace SEASON3B
 		void GetItemRect(int index, float& x, float& y, float& w, float& h);
 		void GetCloseRect(float& x, float& y, float& w, float& h);
 		void GetBottomRect(float& x, float& y, float& w, float& h);
+		void ClampPosition();
 		bool IsItemEnabled(int index) const;
 		bool ActivateItem(int index);
 		void RenderFrame();
