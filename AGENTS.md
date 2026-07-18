@@ -30,6 +30,10 @@ load every affected specialist `mu-main52-*` skill.
 - Before removing a symbol, manager, library, asset, or fallback, check declarations,
   definitions, every caller, callbacks/exports, feature macros, project files, config/scripts,
   runtime lookup, initialization, reload, and teardown.
+- Treat default-branch code search as discovery only. Prove symbol/reference claims against the
+  exact base and head SHA. A conflicted or updated PR must be re-audited on its resulting head.
+- When project/dependency/configuration files change, build both clean Release|Win32 and
+  Debug|Win32; Release remains the runtime and delivery gate.
 
 Audit helpers live under `tools/audit/`; they are read-only and create reports only when an
 output path is explicitly supplied.
