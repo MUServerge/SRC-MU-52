@@ -92,6 +92,23 @@ static bool HasVboExcludedRenderFlag(int renderFlag)
 
 	return (renderFlag & kVboExcludeFlags) != 0;
 }
+
+static RenderProfilerCounter ClassifyTranslatedVboMesh(int renderFlags,
+	bool enableLight, bool enableWave, GLuint vao, int renderFlag)
+{
+	if (renderFlags != RENDER_TEXTURE)
+		return RPC_VBO_TRANSLATE_MATERIAL_BLOCKED;
+	if (!enableLight)
+		return RPC_VBO_TRANSLATE_UNLIT_BLOCKED;
+	if (enableWave)
+		return RPC_VBO_TRANSLATE_WAVE_BLOCKED;
+	if (vao == 0)
+		return RPC_VBO_TRANSLATE_NO_VAO_BLOCKED;
+	if (HasVboExcludedRenderFlag(renderFlag))
+		return RPC_VBO_TRANSLATE_EXCLUDED_BLOCKED;
+
+	return RPC_VBO_TRANSLATE_PLAIN_CANDIDATE;
+}
 #endif // SHADER_VERSION_TEST
 
 
@@ -1678,10 +1695,18 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					if (!IsVboSceneEnabled())
 						g_RenderProfiler.AddCounter(RPC_VBO_GATE_SCENE_OFF);
 					else if (!g_bShaderGPUEligible)
+					{
 						g_RenderProfiler.AddCounter(
 							g_ShaderGPUIneligibleReason == 1 ? RPC_VBO_GATE_TRANSLATE :
 							g_ShaderGPUIneligibleReason == 2 ? RPC_VBO_GATE_BONESCALE :
 							RPC_VBO_GATE_OBJSCALE);
+
+						if (g_ShaderGPUIneligibleReason == 1 && g_RenderProfiler.IsEnabled())
+						{
+							g_RenderProfiler.AddCounter(ClassifyTranslatedVboMesh(renderFlags,
+								EnableLight, EnableWave, m->VAO, RenderFlag));
+						}
+					}
 					else if (renderFlags != RENDER_TEXTURE)
 						g_RenderProfiler.AddCounter(RPC_VBO_GATE_NOT_PLAIN_TEXTURE);
 					else if (!EnableLight)

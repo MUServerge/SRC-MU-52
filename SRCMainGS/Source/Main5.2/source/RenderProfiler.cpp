@@ -44,6 +44,12 @@ namespace
 		case RPC_VBO_GATE_WAVE: return "VBOGateWave";
 		case RPC_VBO_GATE_NO_VAO: return "VBOGateNoVAO";
 		case RPC_VBO_GATE_EXCLUDED_FLAG: return "VBOGateExcludedFlag";
+		case RPC_VBO_TRANSLATE_PLAIN_CANDIDATE: return "VBOTranslatePlainCandidate";
+		case RPC_VBO_TRANSLATE_MATERIAL_BLOCKED: return "VBOTranslateMaterialBlocked";
+		case RPC_VBO_TRANSLATE_UNLIT_BLOCKED: return "VBOTranslateUnlitBlocked";
+		case RPC_VBO_TRANSLATE_WAVE_BLOCKED: return "VBOTranslateWaveBlocked";
+		case RPC_VBO_TRANSLATE_NO_VAO_BLOCKED: return "VBOTranslateNoVAOBlocked";
+		case RPC_VBO_TRANSLATE_EXCLUDED_BLOCKED: return "VBOTranslateExcludedBlocked";
 		case RPC_FIXED_UPDATE_STEPS: return "FixedUpdateSteps";
 		case RPC_FIXED_UPDATE_DROPPED: return "FixedUpdateStepsDropped";
 		case RPC_RENDERED_VERTICES_KNOWN: return "SubmittedVerticesKnown";

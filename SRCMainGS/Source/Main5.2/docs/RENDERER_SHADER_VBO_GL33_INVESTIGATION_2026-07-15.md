@@ -681,3 +681,29 @@ During this validation the encrypted `MuError.log` rollover owner was also fixed
 The old code searched ciphertext for plaintext separators and re-encrypted an
 already encrypted tail, corrupting subsequent diagnostic sessions. Oversized
 logs now rotate to a clean encrypted file and reset the XOR key position.
+
+## Phase 14 diagnostics — translated-mesh downstream gates (2026-07-18)
+
+The Phase 12 first-failure chain correctly identified translated character and
+equipment rendering as the dominant VBO blocker, but that first failure masked
+the material/light/resource conditions behind it. Phase 14 adds profiler-only
+secondary counters when `Translate` is the first rejection. Render selection,
+CPU transforms, shader binding, materials and fallback are unchanged.
+
+Across twelve crowded-scene profiler windows, the average translated total was
+886.8 meshes/frame and the secondary categories were:
+
+- otherwise plain lit textured VBO candidate: 466.3/frame;
+- special/non-plain material: 146.0/frame;
+- unlit: 216.4/frame;
+- wave: 0.0/frame;
+- missing VAO: 52.0/frame;
+- excluded render flag: 6.1/frame.
+
+The categories sum to the translated total in every sampled window. At the worst
+observed 21 FPS window the exact split was 882.9 = 462.9 + 146.0 + 216.0 + 0.0 +
+52.0 + 6.0 meshes/frame. A future translated GPU prototype can therefore be
+bounded to the plain-candidate subset behind an opt-in switch. It must reproduce
+`BodyScale` and `BodyOrigin` exactly in the active Model shader and retain every
+material, unlit, missing-resource and excluded draw on the authoritative legacy
+path. The earlier set-effect flicker remains a mandatory visual regression case.

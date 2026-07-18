@@ -73,6 +73,14 @@ the dominant first-failure gate at 636.9 meshes/frame, and the scene still issue
 preserved the measured renderer architecture and did not remove the pre-existing
 crowded-scene bottleneck. It is a compatibility milestone, not an FPS claim.
 
+A follow-up diagnostic split the translated first-failure gate without changing
+render selection. Across twelve crowded-scene windows, translated rejection
+averaged 886.8 meshes/frame: 466.3 were otherwise plain lit textured candidates,
+146.0 were special-material draws, 216.4 were unlit, 52.0 had no VAO, 6.1 carried
+an excluded flag, and no wave draw was observed. The subcategories sum to the
+translated total in each stable window. This bounds a future translated prototype
+to the plain-candidate subset and keeps effect/material ownership on legacy.
+
 ## First actions
 
 1. Audit actual GLSL assets.
