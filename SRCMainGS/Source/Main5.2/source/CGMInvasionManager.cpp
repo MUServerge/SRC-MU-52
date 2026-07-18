@@ -64,6 +64,15 @@ namespace
 	const int   NOTIFY_CELL_DAILY = 6;
 	const int   NOTIFY_CELL_INVASION = 7;
 	const float NOTIFY_ICON_SIZE  = 18.f;	// on-screen size (virtual px)
+	const float NOTIFY_EFFECT_SIZE = 30.f;
+	const DWORD NOTIFY_EFFECT_FRAME_TIME = 70;
+	const int   NOTIFY_EFFECT_FRAME_COUNT = 18;
+	const char* NOTIFY_EFFECT_FRAME_NAMES[NOTIFY_EFFECT_FRAME_COUNT] =
+	{
+		"IB4", "IB6", "IB8", "IBA", "IBC", "IBE",
+		"IC0", "IC2", "IC4", "IC6", "IC8", "ICA",
+		"ID0", "ID4", "ID6", "ID8", "IDA", "IDC",
+	};
 
 	void ClampWidgetPosition(float& x, float& y)
 	{
@@ -157,6 +166,14 @@ void CGMInvasionManager::LoadImages()
 	LoadBitmap("Interface\\ActiveInvasion\\minus.tga",          IMAGE_ACTINV_MINUS,          GL_LINEAR);
 	LoadBitmap("Interface\\HUD\\Look-5\\UI_HUD_NOTIFICATIONS.tga", IMAGE_ACTINV_NOTIFY,      GL_LINEAR);
 
+	char szEffectPath[MAX_PATH];
+	for (int i = 0; i < NOTIFY_EFFECT_FRAME_COUNT; ++i)
+	{
+		sprintf_s(szEffectPath, "Interface\\Iberia\\LuerysTreasureBox\\LuerysTreasureBox_%s.tga",
+			NOTIFY_EFFECT_FRAME_NAMES[i]);
+		LoadBitmap(szEffectPath, IMAGE_ACTINV_NOTIFY_EFFECT_BEGIN + i, GL_LINEAR);
+	}
+
 	m_bLoaded = true;
 }
 
@@ -170,6 +187,11 @@ void CGMInvasionManager::UnloadImages()
 	DeleteBitmap(IMAGE_ACTINV_PLUS);
 	DeleteBitmap(IMAGE_ACTINV_MINUS);
 	DeleteBitmap(IMAGE_ACTINV_NOTIFY);
+
+	for (int i = IMAGE_ACTINV_NOTIFY_EFFECT_BEGIN; i <= IMAGE_ACTINV_NOTIFY_EFFECT_END; ++i)
+	{
+		DeleteBitmap(i);
+	}
 
 	m_bLoaded = false;
 }
@@ -573,6 +595,20 @@ void CGMInvasionManager::RenderNotifyIcon(float fAgX, float fAgY, float fAgW)
 	};
 
 	glColor4f(1.f, 1.f, 1.f, 1.f);
+
+	// The server-fed active invasion state already controls icon visibility. Reuse that
+	// same authoritative state for the glow and keep the effect centered behind the icon.
+	if (icons[0].visible)
+	{
+		const int effectFrame = (GetTickCount() / NOTIFY_EFFECT_FRAME_TIME) % NOTIFY_EFFECT_FRAME_COUNT;
+		const float effectX = m_NotifyIconX + (NOTIFY_ICON_SIZE - NOTIFY_EFFECT_SIZE) * 0.5f;
+		const float effectY = m_NotifyIconY + (NOTIFY_ICON_SIZE - NOTIFY_EFFECT_SIZE) * 0.5f;
+		const float sourceSize = (effectFrame == 0) ? 168.f : 232.f;
+
+		SEASON3B::RenderImageF(IMAGE_ACTINV_NOTIFY_EFFECT_BEGIN + effectFrame,
+			effectX, effectY, NOTIFY_EFFECT_SIZE, NOTIFY_EFFECT_SIZE,
+			0.f, 0.f, sourceSize, sourceSize);
+	}
 
 	for (size_t i = 0; i < sizeof(icons) / sizeof(icons[0]); ++i)
 	{

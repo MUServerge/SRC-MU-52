@@ -6,6 +6,18 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: replaced the Look5 skill cooldown color overlay with the Iberia
+  Pegasus 120-frame sequence. The displayed frame is derived directly from the
+  existing client skill-delay percentage, follows every rendered hotkey/current
+  skill icon responsively, and leaves gameplay timing and Look1-4 unchanged.
+  (CNewUISkillList::LoadImages, RenderSkillDelay, _TextureIndex.h)
+
+- Client UI: added the 18-frame Iberia Luerys Treasure Box animation behind
+  the Invasion HUD notification while a server-reported invasion is active.
+  The effect reuses the icon's responsive virtual-space anchor, stays centered
+  behind the existing notification atlas icon, and loads/unloads with the
+  Invasion manager's other UI textures. (CGMInvasionManager, _TextureIndex.h)
+
 - Client UI: corrected the Look5 long-notice coordinate mismatch that displaced
   and clipped Auto-Moving and MU Helper messages. The physical full-width banner
   now converts its text bounds back to the same virtual UI space used by the

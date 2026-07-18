@@ -44,6 +44,9 @@
 #define IMG_L5_EXP_DIV		(BITMAP_LOOK5_HUD_BEGIN + 3)	// ActionBarsView_I2BB
 #define IMG_L5_DECOR		(BITMAP_LOOK5_HUD_BEGIN + 4)	// ActionBarsView_I2BE (side decoration)
 
+static_assert(BITMAP_INTERFACE_IBERIA_COOLDOWN_END < BITMAP_EFFECT_TEXTURE_END,
+	"Iberia cooldown bitmap range overlaps the effect texture boundary");
+
 extern float g_fScreenRate_x;
 extern float g_fScreenRate_y;
 extern int  MouseUpdateTime;
@@ -3511,6 +3514,14 @@ void SEASON3B::CNewUISkillList::LoadImages()
 		LoadBitmap("Interface\\HUD\\Look-5\\UI_SelectedSkill.tga", IMAGE_SKILLBOX_EX7001, GL_LINEAR);
 		LoadBitmap("Interface\\HUD\\Look-5\\UI_SelectedSkill.tga", IMAGE_SKILLBOX_EX7002, GL_LINEAR);
 		LoadBitmap("Interface\\HUD\\Look-5\\Slot_Selected.tga", IMAGE_SLOT_SELECTED, GL_LINEAR);
+
+		char szCooldownPath[MAX_PATH];
+		for (int i = IMAGE_SKILL_COOLDOWN_BEGIN; i <= IMAGE_SKILL_COOLDOWN_END; ++i)
+		{
+			sprintf_s(szCooldownPath, "Interface\\Iberia\\Cooldow\\Pegasus_CooldownI%d.tga",
+				i - IMAGE_SKILL_COOLDOWN_BEGIN + 1);
+			LoadBitmap(szCooldownPath, i, GL_LINEAR);
+		}
 	}
 #else
 	LoadBitmap("Interface\\HUD\\Look-2\\Skill.jpg", IMAGE_SKILL1, GL_LINEAR); //-- 31310
@@ -3539,6 +3550,14 @@ void SEASON3B::CNewUISkillList::UnloadImages()
 	DeleteBitmap(IMAGE_SKILL3);
 	DeleteBitmap(IMAGE_NON_SKILL3);
 	DeleteBitmap(IMAGE_SLOT_SELECTED);
+
+	if (gmProtect->LookAndFeel == 5)
+	{
+		for (int i = IMAGE_SKILL_COOLDOWN_BEGIN; i <= IMAGE_SKILL_COOLDOWN_END; ++i)
+		{
+			DeleteBitmap(i);
+		}
+	}
 }
 
 bool SEASON3B::CNewUISkillList::UpdateMouseEvent()
@@ -5829,8 +5848,26 @@ void SEASON3B::CNewUISkillList::RenderSkillDelay(int iIndex, float x, float y, f
 		int iSkillType = CharacterAttribute->Skill[iIndex];
 
 		int iSkillMaxDelay = SkillAttribute[iSkillType].Delay;
+		if (iSkillMaxDelay <= 0)
+			return;
 
 		float fPersent = (float)(iSkillDelay / (float)iSkillMaxDelay);
+		if (fPersent > 1.f)
+			fPersent = 1.f;
+		else if (fPersent < 0.f)
+			fPersent = 0.f;
+
+		if (gmProtect->LookAndFeel == 5)
+		{
+			const int iFrameCount = IMAGE_SKILL_COOLDOWN_END - IMAGE_SKILL_COOLDOWN_BEGIN + 1;
+			const int iFrame = (int)((1.f - fPersent) * (float)(iFrameCount - 1));
+
+			EnableAlphaTest(true);
+			glColor4f(1.f, 1.f, 1.f, 1.f);
+			SEASON3B::RenderImageF(IMAGE_SKILL_COOLDOWN_BEGIN + iFrame,
+				x, y, width, height, 0.f, 0.f, 52.f, 52.f);
+			return;
+		}
 
 		EnableAlphaTest(true);
 		glColor4f(1.f, 0.5f, 0.5f, 0.5f);
