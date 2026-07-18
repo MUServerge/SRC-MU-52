@@ -6,6 +6,13 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: corrected the Look5 long-notice coordinate mismatch that displaced
+  and clipped Auto-Moving and MU Helper messages. The physical full-width banner
+  now converts its text bounds back to the same virtual UI space used by the
+  font renderer. Also raised the TAB minimap content one virtual pixel (about
+  two physical pixels at the tested scale) without moving its Iberia frame or
+  header. (ScaleForm::RenderLook5LongNotice, CNewUIMiniMap::runtime_move)
+
 - Client UI: rebuilt the TAB minimap presentation around the Iberia Minimap
   texture set. The responsive I21 frame preserves a dedicated centered map-name
   header, I23 skins the player direction marker, and XML-backed map icons use

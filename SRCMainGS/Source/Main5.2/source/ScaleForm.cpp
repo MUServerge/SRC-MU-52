@@ -86,13 +86,14 @@ namespace
 		const DWORD oldTextColor = g_pRenderText->GetTextColor();
 		const DWORD oldBgColor = g_pRenderText->GetBgColor();
 		const BYTE textAlpha = (BYTE)(255.0f * alpha + 0.5f);
-		const int textY = (int)(bannerY + (bannerHeight - (float)FontHeight) * 0.5f);
+		const float virtualBannerHeight = bannerHeight / g_fScreenRate_y;
+		const int textY = (int)((bannerY + (bannerHeight - (float)FontHeight) * 0.5f) / g_fScreenRate_y);
 
 		g_pRenderText->SetFont(g_Look5LongNotice.FontSize >= 20 ? g_hFontBold : g_hFont);
 		g_pRenderText->SetBgColor(0, 0, 0, 0);
 		g_pRenderText->SetTextColor(255, 204, 25, textAlpha);
 		g_pRenderText->RenderText(0, textY, g_Look5LongNotice.Text.c_str(),
-			WindowWidth, (int)bannerHeight, RT3_WRITE_CENTER);
+			GetWindowsX, (int)virtualBannerHeight, RT3_WRITE_CENTER);
 
 		g_pRenderText->SetFont(oldFont);
 		g_pRenderText->SetTextColor(oldTextColor);

@@ -34,6 +34,7 @@ namespace
 	const float IBERIA_MAP_INSET_X = 10.f;
 	const float IBERIA_MAP_INSET_TOP = 21.f;
 	const float IBERIA_MAP_INSET_BOTTOM = 10.f;
+	const float IBERIA_MAP_OFFSET_Y = -1.f;
 	const float IBERIA_ICON_SIZE = 18.f;
 	const float IBERIA_TOOLTIP_WIDTH = 136.f;
 	const float IBERIA_TOOLTIP_HEIGHT = 50.f;
@@ -565,7 +566,7 @@ void SEASON3B::CNewUIMiniMap::runtime_move()
 
 		const float frameScale = m_fIberiaFrameWidth / IBERIA_FRAME_WIDTH;
 		const float mapX = m_fIberiaFrameX + IBERIA_MAP_INSET_X * frameScale;
-		const float mapY = m_fIberiaFrameY + IBERIA_MAP_INSET_TOP * frameScale;
+		const float mapY = m_fIberiaFrameY + (IBERIA_MAP_INSET_TOP + IBERIA_MAP_OFFSET_Y) * frameScale;
 		const float mapWidth = m_fIberiaFrameWidth - (IBERIA_MAP_INSET_X * 2.f * frameScale);
 		const float mapHeight = m_fIberiaFrameHeight - ((IBERIA_MAP_INSET_TOP + IBERIA_MAP_INSET_BOTTOM) * frameScale);
 
