@@ -575,14 +575,16 @@ void CNewUIMyQuestInfoWindow::RenderTabBtn()
 	RenderPosX += (WIN_WINDOW_SIZEX - 190.f) * 0.5f;
 #endif
 
-	RenderImage(IMAGE_MYQUEST_TAB_BACK, RenderPosX + 10, m_Pos.y + 27, 166.f, 22.f);
+	RenderImageF(IMAGE_MYQUEST_TAB_BACK, RenderPosX + 10, m_Pos.y + 27, 166.f, 22.f,
+		0.f, 0.f, 664.f, 88.f);
 
 	g_pRenderText->SetFont(g_hFont);
 	g_pRenderText->SetBgColor(0);
 
 	if (m_eTabBtnIndex == TAB_QUEST)
 	{
-		RenderImage(IMAGE_MYQUEST_TAB_SMALL, RenderPosX + 10, m_Pos.y + 27, 48.f, 22.f);
+		RenderImageF(IMAGE_MYQUEST_TAB_SMALL, RenderPosX + 10, m_Pos.y + 27, 48.f, 22.f,
+			0.f, 0.f, 192.f, 88.f);
 		g_pRenderText->SetTextColor(255, 255, 255, 255);
 		g_pRenderText->RenderText(RenderPosX + 10, m_Pos.y + 34, GlobalText[1140], 48, 0, RT3_SORT_CENTER);
 		g_pRenderText->SetTextColor(181, 181, 181, 181);
@@ -591,7 +593,8 @@ void CNewUIMyQuestInfoWindow::RenderTabBtn()
 	}
 	else if (m_eTabBtnIndex == TAB_JOB_CHANGE)
 	{
-		RenderImage(IMAGE_MYQUEST_TAB_SMALL, RenderPosX + 57, m_Pos.y + 27, 48.f, 22.f);
+		RenderImageF(IMAGE_MYQUEST_TAB_SMALL, RenderPosX + 57, m_Pos.y + 27, 48.f, 22.f,
+			0.f, 0.f, 192.f, 88.f);
 		g_pRenderText->SetTextColor(255, 255, 255, 255);
 		g_pRenderText->RenderText(RenderPosX + 57, m_Pos.y + 34, GlobalText[2821], 48, 0, RT3_SORT_CENTER);
 		g_pRenderText->SetTextColor(181, 181, 181, 181);
@@ -600,7 +603,8 @@ void CNewUIMyQuestInfoWindow::RenderTabBtn()
 	}
 	else if (m_eTabBtnIndex == TAB_CASTLE_TEMPLE)
 	{
-		RenderImage(IMAGE_MYQUEST_TAB_BIG, RenderPosX + 104, m_Pos.y + 27, 72.f, 22.f);
+		RenderImageF(IMAGE_MYQUEST_TAB_BIG, RenderPosX + 104, m_Pos.y + 27, 72.f, 22.f,
+			0.f, 0.f, 288.f, 88.f);
 		g_pRenderText->SetTextColor(255, 255, 255, 255);
 		g_pRenderText->RenderText(RenderPosX + 104, m_Pos.y + 34, GlobalText[2824], 72, 0, RT3_SORT_CENTER);
 		g_pRenderText->SetTextColor(181, 181, 181, 181);

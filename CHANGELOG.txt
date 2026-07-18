@@ -6,6 +6,12 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: corrected the high-resolution Quest tab textures by rendering the
+  full 4x native source rectangles through RenderImageF. Quest_tab01/02/03 now
+  fit their unchanged responsive 166x22, 48x22 and 72x22 virtual tab geometry
+  instead of sampling only the upper-left portion. Button hit areas and quest
+  behavior are unchanged. (CNewUIMyQuestInfoWindow::RenderTabBtn)
+
 - Client UI: migrated the Invasion and Character HUD notifications to their
   individual Iberia normal/hover/disabled textures, added reserved Shield and
   Swords notifications without actions, and increased horizontal spacing in
