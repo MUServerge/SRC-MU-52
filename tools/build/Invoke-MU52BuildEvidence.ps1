@@ -21,9 +21,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $root "AGENTS.md")) -or
 if (-not $EvidenceRoot) {
     $EvidenceRoot = Join-Path ([IO.Path]::GetTempPath()) "MU52-BuildEvidence"
 }
-$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$output = Join-Path $EvidenceRoot $stamp
-New-Item -ItemType Directory -Path $output -Force | Out-Null
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
+$runId = "{0}-{1}" -f $stamp, ([Guid]::NewGuid().ToString("N").Substring(0, 8))
+$output = Join-Path $EvidenceRoot $runId
+if (Test-Path -LiteralPath $output) { throw "Evidence directory already exists: $output" }
+New-Item -ItemType Directory -Path $output | Out-Null
 
 $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
 if (-not (Test-Path -LiteralPath $vswhere)) {
@@ -34,12 +36,25 @@ if (-not $msbuild -or -not (Test-Path -LiteralPath $msbuild)) {
     throw "MSBuild.exe was not found by vswhere."
 }
 
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw "git.exe was not found." }
+$gitRoot = (& git -C $root rev-parse --show-toplevel 2>$null)
+if ($LASTEXITCODE -ne 0 -or -not $gitRoot) { throw "RepositoryRoot is not a Git worktree." }
+$gitRoot = (Resolve-Path -LiteralPath $gitRoot.Trim()).Path
+if ($gitRoot -ne $root) { throw "RepositoryRoot must be the Git worktree root: $gitRoot" }
 $head = (& git -C $root rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or -not $head) { throw "Failed to resolve the Git commit." }
 $branch = (& git -C $root branch --show-current).Trim()
+if ($LASTEXITCODE -ne 0) { throw "Failed to resolve the Git branch." }
 $status = @(& git -C $root status --short)
+if ($LASTEXITCODE -ne 0) { throw "Failed to read Git worktree status." }
 $remote = (& git -C $root remote get-url origin 2>$null)
+if ($LASTEXITCODE -ne 0) { $remote = "" }
 $msbuildVersion = (& $msbuild -version -nologo | Select-Object -Last 1).Trim()
 $results = @()
+$candidates = @(
+    (Join-Path $root "Build\Client\Main.exe"),
+    (Join-Path $root "Client\Main.exe")
+) | Select-Object -Unique
 
 foreach ($config in $Configuration) {
     $log = Join-Path $output "Main-$config-$Platform.log"
@@ -54,8 +69,33 @@ foreach ($config in $Configuration) {
         "/fl",
         "/flp:logfile=$log;verbosity=normal"
     )
+    $startedUtc = [DateTime]::UtcNow
+    $before = @{}
+    foreach ($file in $candidates) {
+        if (Test-Path -LiteralPath $file) {
+            $before[$file] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+        }
+    }
     & $msbuild @arguments
     $exitCode = $LASTEXITCODE
+    $configArtifacts = @()
+    if ($exitCode -eq 0) {
+        foreach ($file in $candidates) {
+            if (-not (Test-Path -LiteralPath $file)) { continue }
+            $item = Get-Item -LiteralPath $file
+            $hash = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
+            $changed = (-not $before.ContainsKey($file)) -or ($before[$file] -ne $hash) -or ($item.LastWriteTimeUtc -ge $startedUtc)
+            if (-not $changed) { continue }
+            $configArtifacts += [ordered]@{
+                configuration = $config
+                platform = $Platform
+                path = $item.FullName
+                length = $item.Length
+                modified_utc = $item.LastWriteTimeUtc.ToString("o")
+                sha256 = $hash
+            }
+        }
+    }
     $results += [ordered]@{
         configuration = $config
         platform = $Platform
@@ -63,23 +103,7 @@ foreach ($config in $Configuration) {
         exit_code = $exitCode
         succeeded = ($exitCode -eq 0)
         log = $log
-    }
-}
-
-$artifacts = @()
-$candidates = @(
-    (Join-Path $root "Build\Client\Main.exe"),
-    (Join-Path $root "Client\Main.exe")
-) | Select-Object -Unique
-foreach ($file in $candidates) {
-    if (Test-Path -LiteralPath $file) {
-        $item = Get-Item -LiteralPath $file
-        $artifacts += [ordered]@{
-            path = $item.FullName
-            length = $item.Length
-            modified_utc = $item.LastWriteTimeUtc.ToString("o")
-            sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash
-        }
+        artifacts = $configArtifacts
     }
 }
 
@@ -95,11 +119,9 @@ $evidence = [ordered]@{
     msbuild = $msbuild
     msbuild_version = $msbuildVersion
     results = $results
-    artifacts = $artifacts
 }
 $json = Join-Path $output "build-evidence.json"
 $evidence | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $json -Encoding UTF8
 
 $evidence | ConvertTo-Json -Depth 6
 if ($results.Where({ -not $_.succeeded }).Count -gt 0) { exit 1 }
-
