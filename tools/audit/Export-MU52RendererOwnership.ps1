@@ -5,6 +5,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+$OutputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
 $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 $client = Join-Path $root "SRCMainGS\Source\Main5.2"
 if (-not (Test-Path -LiteralPath $client)) { throw "Main5.2 client source was not found." }
@@ -17,8 +20,11 @@ $categories = [ordered]@{
     ProgramUseDelete = 'glUseProgram|GL_CURRENT_PROGRAM|glDeleteProgram|glDeleteShader'
     BufferCreate = 'glGenBuffers|glGenVertexArrays|glBufferData|glBufferSubData'
     BufferUseDelete = 'glBindBuffer|glBindVertexArray|glDeleteBuffers|glDeleteVertexArrays'
+    TextureLifecycle = 'glGenTextures|glBindTexture|glTexImage|glTexSubImage|glDeleteTextures'
+    FramebufferLifecycle = 'glGenFramebuffers|glBindFramebuffer|glFramebuffer|glDeleteFramebuffers|glGenRenderbuffers|glBindRenderbuffer|glRenderbufferStorage|glDeleteRenderbuffers'
+    SamplerLifecycle = 'glGenSamplers|glBindSampler|glSamplerParameter|glDeleteSamplers'
     UniformState = 'glGetUniformLocation|glUniform|glGetAttribLocation|glVertexAttrib'
-    FixedState = 'glEnable|glDisable|glBlendFunc|glDepthFunc|glCullFace|glScissor|glActiveTexture'
+    FixedState = 'glEnable|glDisable|glBlendFunc|glBlendEquation|glDepthFunc|glDepthMask|glColorMask|glCullFace|glScissor|glViewport|glActiveTexture'
 }
 
 $rows = @()
@@ -48,4 +54,3 @@ if ($OutputPath) {
     $rows | Export-Csv -LiteralPath $destination -NoTypeInformation -Encoding UTF8
 }
 $rows | Format-Table -AutoSize
-
