@@ -98,7 +98,7 @@ void SEASON3B::CNewUIMenuUser::LoadImages()
 	char szPath[128];
 	for (int i = 0; i < 24; ++i)
 	{
-		sprintf(szPath, "Interface\\Iberia_Menu\\%s.tga", s_szTexFile[i]);
+		sprintf(szPath, "Interface\\Iberia\\Menu\\%s.tga", s_szTexFile[i]);
 		LoadBitmap(szPath, BITMAP_INTERFACE_MAINMENU_BEGIN + i, GL_LINEAR);
 	}
 }

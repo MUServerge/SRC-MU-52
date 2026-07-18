@@ -6,6 +6,10 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client assets: updated the F5 game menu texture loader to use the organized
+  Interface\\Iberia\\Menu directory. Bitmap IDs, filenames and runtime OZT
+  decoding remain unchanged. (NewUIMenuUser::LoadImages)
+
 - Client UI: added responsive header dragging to the F5 game menu by reusing
   the Invasion widget's virtual-coordinate drag pattern. The title bar, except
   for its close X, now moves the window; the complete menu remains clamped to
