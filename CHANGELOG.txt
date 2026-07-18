@@ -6,6 +6,12 @@
  2026-07-18
 ------------------------------------------------------------
 
+- Client UI: opening the F5 game menu now closes every safely closable NewUI
+  window through CNewUISystem::HideAll, including Character, Inventory and its
+  Jewel/Core/Expansion companions, and also clears the legacy custom-window
+  layer. Persistent HUD/event overlays and protected message boxes retain their
+  existing lifecycle rules. (CNewUISystem::Show, INTERFACE_CUSTOM_MENU)
+
 - Client UI: fine-tuned the F5 menu chrome in virtual 640x480 space: moved the
   header text two pixels and the title-bar close X one pixel downward, and
   raised the bottom Close button three pixels. Render and hit-test rectangles

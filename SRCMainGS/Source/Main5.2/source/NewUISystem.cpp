@@ -1233,6 +1233,8 @@ void SEASON3B::CNewUISystem::Show(DWORD dwKey)
 			HideGroupOpenInterface(INTERFACE_EVENT_TIME);
 			break;
 		case SEASON3B::INTERFACE_CUSTOM_MENU:
+			HideAll();
+			gInterface->CloseAllWindowCustom();
 			m_NewUIMenuUser->OpenningProcess();
 			HideGroupOpenInterface(INTERFACE_CUSTOM_MENU);
 			break;
