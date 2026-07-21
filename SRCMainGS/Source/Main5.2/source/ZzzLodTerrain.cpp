@@ -140,6 +140,18 @@ static bool GL33TerrainEnabled()
 
 static bool RenderTerrainGrassQuadCore(const vec4_t* colors)
 {
+	// One-time entry diagnostic (Phase 14.4): logs on the first grass draw
+	// regardless of outcome, so the log disambiguates a fall-back: whether the
+	// grass branch was even reached, the -gl33terrain flag state, and whether
+	// terrain_core is loaded. If this line is absent, no grass was drawn at all.
+	static bool s_entryLogged = false;
+	if (!s_entryLogged)
+	{
+		s_entryLogged = true;
+		g_ErrorReport.Write("> [Shader] grass core check: -gl33terrain=%d, terrain_core program=%u\r\n",
+			GL33TerrainEnabled() ? 1 : 0, gShaderScene.GetProgram(eShaderS_TerrainCore));
+	}
+
 	if (!GL33TerrainEnabled())
 		return false;
 	if (gShaderScene.GetProgram(eShaderS_TerrainCore) == 0)
