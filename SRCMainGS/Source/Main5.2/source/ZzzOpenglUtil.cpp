@@ -36,6 +36,12 @@ vec3_t  MouseTarget;
 // The fixed-function matrix stays authoritative; this is a column-major float[16]
 // mirror for future shader-fed (uProj) draws. Zero behavior change today.
 float   g_ProjectionMatrix[16];
+
+// Phase 13.3: CPU copy of the current camera view (modelview) matrix, built in
+// BeginOpengl alongside the fixed-function glRotatef/glTranslatef camera setup.
+// Column-major float[16] mirror for future shader-fed (uView) draws. The
+// fixed-function MODELVIEW stays authoritative; zero behavior change today.
+float   g_ViewMatrix[16];
 float   g_fCameraCustomDistance = 0.f;
 bool    FogEnable = false;
 GLfloat FogDensity = 0.0004f;
@@ -699,6 +705,17 @@ void BeginOpengl(int x, int y, int Width, int Height, bool Screen)
 		glRotatef(CameraAngle[0], 1.f, 0.f, 0.f);
 	glRotatef(CameraAngle[2], 0.f, 0.f, 1.f);
 	glTranslatef(-CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
+
+	// Phase 13.3: mirror the same camera view into g_ViewMatrix on the CPU. The
+	// fixed-function MODELVIEW above stays authoritative; RenderMatrix::Rotate and
+	// Translate post-multiply with GL semantics, so this reproduces the modelview
+	// 1:1. Additive, no behavior change (fed to uView shaders in a later phase).
+	RenderMatrix::Identity(g_ViewMatrix);
+	RenderMatrix::Rotate(g_ViewMatrix, CameraAngle[1], 0.f, 1.f, 0.f);
+	if (CameraTopViewEnable == false)
+		RenderMatrix::Rotate(g_ViewMatrix, CameraAngle[0], 1.f, 0.f, 0.f);
+	RenderMatrix::Rotate(g_ViewMatrix, CameraAngle[2], 0.f, 0.f, 1.f);
+	RenderMatrix::Translate(g_ViewMatrix, -CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
 
 	glDisable(GL_ALPHA_TEST);
 	glEnable(GL_TEXTURE_2D);

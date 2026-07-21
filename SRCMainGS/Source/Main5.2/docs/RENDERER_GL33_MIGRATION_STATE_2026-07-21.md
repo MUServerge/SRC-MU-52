@@ -30,11 +30,13 @@ Give the new session this context:
 | audit | `docs/RENDERER_DEPRECATED_GL_AUDIT_2026-07-21.md` | n/a (doc) | n/a |
 | 13.1 | `RenderMatrix` CPU matrix backbone | ✅ MSVC Win32 | ✅ host unit test, 22 checks, `-Wall -Wextra` clean |
 | 13.2 | CPU projection mirror `g_ProjectionMatrix` in `gluPerspective2` | ✅ Release Win32 | ✅ scene identical (default + `-gl33compat`) |
+| 13.3 | CPU view mirror `g_ViewMatrix` in `BeginOpengl` | ✅ Release Win32 | ✅ scene identical (default + `-gl33compat`) |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
-Phase 13.2 is additive (builds a CPU copy of the projection, fixed-function
-`gluPerspective` stays authoritative, no draw changed).
+Phase 13.2 / 13.3 are additive (build CPU copies of the projection and view
+matrices; the fixed-function `gluPerspective` and MODELVIEW stay authoritative,
+no draw changed).
 
 Verification note: the user builds/runs the **Release** client only — Debug
 builds are not usable. Do not gate slice verification behind `_DEBUG`; verify by
@@ -60,36 +62,30 @@ scene identity in the Release run.
   profile on purpose. Do not request Core until the audit gate (§5 of the audit
   doc) is clean.
 
-## 4. Next step — Phase 13.3 (CPU view/camera mirror)
+## 4. Next step — Phase 13.4 (first real consumer of the CPU matrices)
 
-Phase 13.2 is done (projection CPU mirror). The next slice mirrors the camera
-**view (modelview) matrix** the same additive way, so both `uProj` and `uView`
-CPU copies exist for the terrain/character shaders in Phase 14.
+Phases 13.2 (projection) and 13.3 (view) are done: `g_ProjectionMatrix` and
+`g_ViewMatrix` (both extern-able, defined in `ZzzOpenglUtil.cpp`) now hold CPU
+copies of the current projection and camera view every frame, matching the
+fixed-function matrices 1:1, but nothing consumes them yet.
 
-There is **no `gluLookAt`** — `BeginOpengl(...)` in `ZzzOpenglUtil.cpp` builds the
-view on the MODELVIEW stack as:
+Phase 13.4 is the first slice that **uses** them, and therefore the first with
+real visual risk. The safe candidate is the `CShaderGL` BMD Model VBO path
+(`Client\Data\Effect\VBO\Model.vs/.fs`, already `330 core` with explicit
+uniforms), which currently composes its own matrices on the CPU. Plan:
 
-```
-glLoadIdentity();
-glRotatef(CameraAngle[1], 0,1,0);
-if (!CameraTopViewEnable) glRotatef(CameraAngle[0], 1,0,0);
-glRotatef(CameraAngle[2], 0,0,1);
-glTranslatef(-CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
-```
+1. Identify the Model path's proj/view/model uniforms and where they are set.
+2. Feed `g_ProjectionMatrix` and `g_ViewMatrix` into its `uProj`/`uView` (keep the
+   per-object model matrix as is), behind the existing opt-in gate
+   (`-vbotranslate`) so the default path is untouched until proven.
+3. Verify with `-gl33compat -vbotranslate`: translated meshes render identically.
 
-Slice: add a file-scope `float g_ViewMatrix[16]` and, right after that block,
-reproduce it with `RenderMatrix` (Identity → Rotate y → Rotate x (guarded) →
-Rotate z → Translate(-pos)). `RenderMatrix::Rotate/Translate` post-multiply with
-GL semantics, so the result matches the fixed-function MODELVIEW 1:1. Keep the
-`glRotatef/glTranslatef` calls authoritative — additive, zero behavior change.
+Keep the fixed-function matrix stack authoritative for every other path. Do not
+remove any `gluPerspective`/`glRotatef` yet — removal is a later phase, only
+after the shader path fully covers the same materials.
 
-Verification (Release only): scene identical, default and `-gl33compat`.
-
-Then Phase 13.4+: first real consumer — feed `uProj`/`uView` to one shader draw
-path (visual diff proves the CPU matrices are correct).
-
-Note: `ZzzOpenglUtil.cpp` is UTF-8; `ZzzOpenglUtil.h` is ISO-8859 — keep new
-declarations byte-safe or in the `.cpp`.
+Note: `ZzzOpenglUtil.cpp` is UTF-8; `ZzzOpenglUtil.h` is ISO-8859 — declare the
+externs for `g_ProjectionMatrix`/`g_ViewMatrix` byte-safe or in a UTF-8 header.
 
 Later phases (from the audit worklist): 14 terrain, 15 character/BMD fallback,
 16 effects/sprites/shadow/hair, 17 UI/3D previews, 18 Core switch.
