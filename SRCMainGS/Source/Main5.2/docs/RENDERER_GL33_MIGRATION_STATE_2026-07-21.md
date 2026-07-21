@@ -34,6 +34,7 @@ Give the new session this context:
 | 13.4 | Feed `uProj` from `g_ProjectionMatrix` in `RenderMeshVBO` (first consumer) | ✅ Release Win32 | ✅ VBO world objects + `-vbotranslate` identical (proves CPU projection 1:1) |
 | 13.5.1 | CPU MODELVIEW stack owner `g_ModelViewStack`; mirror world camera (`BeginOpengl`/`EndOpengl`); `g_ViewMatrix` derived from Top | ✅ Release x86 (0 warn/err) | invisible slice, no consumer — pending in-game scene-identical check |
 | 14.1 | Authored Core terrain shaders `terrain_core.vs/.fs` (inert, not wired) | n/a (GLSL assets, no C++) | n/a — not referenced by `CShaderScene`, zero behavior change |
+| 14.2 | `CShaderScene::Init` compile-link **probe** of `terrain_core` (logged, deleted, not bound); dropped non-portable uniform initializers from `terrain_core.fs` | ✅ Release x86 (0 warn/err) | pending: check log for `Core terrain probe ... compiled+linked OK`; scene must be identical |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
@@ -131,11 +132,14 @@ a post-`#version` define via `BuildProgramFromFiles(..., vertexDefine)`.
   uniforms (`uProj/uModelView/uNormalMatrix/texture1/brightness/contrast`),
   semantically identical to `terrain.vs/.fs`. Not referenced by `CShaderScene`
   yet → zero behavior change, nothing to build.
-- **14.2:** wire a Core terrain program slot into `CShaderScene` that
-  **compile-links `terrain_core` at Init and logs the result** (skill rule 8),
-  but is NOT bound for drawing. Proves the Core shaders compile/link on the
-  user's GPU with the scene unchanged. First build + runtime (log + scene
-  identical) checkpoint.
+- **14.2 (done, compiles):** `CShaderScene::Init` now runs a **compile-link probe**
+  of `terrain_core` (via `LoadProgram`), logs `Core terrain probe ... OK`/`FAILED`,
+  and deletes the probe — not stored in `m_Program`, not bound, scene unchanged.
+  Also dropped the non-portable uniform initializers (`= 1.0`) from
+  `terrain_core.fs` (invalid in strict `330 core`; the draw path sets them from
+  C++). **Runtime check:** confirm the log shows the probe compiled+linked OK on
+  the user's GPU, and the scene is identical. If it logs FAILED, read the GLSL
+  error the shader compiler emitted and fix `terrain_core.*` before 14.3.
 - **14.3:** build the terrain **VBO/VAO** (interleaved `aPos/aNormal/aTex/aColor`)
   alongside the existing feed, populated per frame from the same terrain vertex
   data, but not drawn. Additive.

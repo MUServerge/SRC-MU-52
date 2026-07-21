@@ -11,8 +11,11 @@ in vec3 FragPos;
 in vec4 VertColor;
 
 uniform sampler2D texture1;
-uniform float brightness = 1.0;
-uniform float contrast = 1.0;
+// No inline initializers: uniform default values are not portable in strict
+// 330 core (they were standardized in GLSL 4.20). The draw path sets brightness
+// and contrast from C++ (default 1.0), matching the compatibility terrain.fs.
+uniform float brightness;
+uniform float contrast;
 
 void main() {
     vec4 texColor = texture(texture1, TexCoord);

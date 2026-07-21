@@ -214,6 +214,27 @@ bool CShaderScene::Init()
 
 	g_ErrorReport.Write("> [Shader] Init %s\r\n",
 		allOk ? "OK" : "completed with errors (fixed-function fallback active)");
+
+	// Phase 14.2: compile-link validation probe for the Core-profile terrain
+	// shaders (terrain_core.vs/.fs). This proves they build on the current GPU/
+	// driver before any draw path adopts them. The probe program is NOT stored
+	// in m_Program and NOT bound for rendering, so the scene is unchanged; it is
+	// deleted immediately. A failure here is diagnostic only (logged, non-fatal).
+	{
+		const GLuint coreProbe = LoadProgram("terrain_core");
+		if (coreProbe != 0)
+		{
+			g_ErrorReport.Write("> [Shader] Core terrain probe 'terrain_core' compiled+linked OK (program %u, not bound)\r\n",
+				coreProbe);
+			if (glDeleteProgram != NULL)
+				glDeleteProgram(coreProbe);
+		}
+		else
+		{
+			g_ErrorReport.Write("> [Shader] Core terrain probe 'terrain_core' FAILED to build (Phase 14 Core path not yet viable on this GPU)\r\n");
+		}
+	}
+
 	return allOk;
 }
 
