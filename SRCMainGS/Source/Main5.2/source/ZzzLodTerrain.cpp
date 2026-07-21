@@ -231,8 +231,12 @@ static bool RenderTerrainGrassQuadCore(const vec4_t* colors)
 			gShaderScene.GetProgram(eShaderS_TerrainCore), (unsigned)err);
 	}
 
-	// Restore the compatibility terrain program for the remaining terrain draws.
-	gShaderScene.Use(eShaderS_Terrain);
+	// Restore the previously bound program (the compat terrain program) by popping
+	// the stack. IMPORTANT: use Unuse() to match the Use(eShaderS_TerrainCore)
+	// push above -- calling Use(eShaderS_Terrain) here would be a second push, which
+	// overflows the program stack and leaves terrain_core bound after the terrain
+	// pass, corrupting later UI/text rendering (black text, missing backgrounds).
+	gShaderScene.Unuse();
 	return true;
 }
 #endif // SHADER_PIPELINE
