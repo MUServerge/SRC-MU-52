@@ -35,7 +35,7 @@ Give the new session this context:
 | 13.5.1 | CPU MODELVIEW stack owner `g_ModelViewStack`; mirror world camera (`BeginOpengl`/`EndOpengl`); `g_ViewMatrix` derived from Top | ✅ Release x86 (0 warn/err) | invisible slice, no consumer — pending in-game scene-identical check |
 | 14.1 | Authored Core terrain shaders `terrain_core.vs/.fs` (inert, not wired) | n/a (GLSL assets, no C++) | n/a — not referenced by `CShaderScene`, zero behavior change |
 | 14.2 | `CShaderScene::Init` compile-link **probe** of `terrain_core` (logged, deleted, not bound); dropped non-portable uniform initializers from `terrain_core.fs` | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti (GL 4.6): log `Core terrain probe 'terrain_core' compiled+linked OK`, scene identical (AMD/Intel still to check) |
-| 14.3 | Promote `terrain_core` to a kept program: new `eShaderS_TerrainCore` enum slot + `s_ShaderBaseName` entry; removed the throwaway probe (loop loads/keeps it, not bound) | ✅ Release x86 (0 warn/err) | pending: log `Loaded 'terrain_core' (program N)`, scene identical |
+| 14.3 | Promote `terrain_core` to a kept program: new `eShaderS_TerrainCore` enum slot + `s_ShaderBaseName` entry; removed the throwaway probe (loop loads/keeps it, not bound) | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti: log `Loaded 'terrain_core' (program 9)`, `Init OK`, scene identical |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
