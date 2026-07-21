@@ -115,6 +115,98 @@ extern  float CameraDistance;
 static  float   g_fFrustumRange = -40.f;
 
 
+#ifdef SHADER_PIPELINE
+// Phase 14.4: opt-in (-gl33terrain) Core-profile grass draw. Renders the grass
+// quad via a VBO/VAO + the terrain_core program (explicit attributes/uniforms)
+// instead of the fixed-function GL_QUADS client-array path, to exercise the Core
+// terrain pipeline on one real draw. Default (flag off, or terrain_core
+// unavailable) falls back to the legacy path, so behavior is unchanged unless the
+// flag is passed. The terrain vertices are world-space, drawn under the world
+// camera, so uModelView = g_ViewMatrix and uProj = g_ProjectionMatrix (both built
+// in ZzzOpenglUtil.cpp); terrain.fs ignores normals so uNormalMatrix is identity.
+extern float g_ProjectionMatrix[16];
+extern float g_ViewMatrix[16];
+
+static bool GL33TerrainEnabled()
+{
+	static int cached = -1;
+	if (cached < 0)
+	{
+		const char* cmd = GetCommandLineA();
+		cached = (cmd != NULL && strstr(cmd, "-gl33terrain") != NULL) ? 1 : 0;
+	}
+	return cached != 0;
+}
+
+static bool RenderTerrainGrassQuadCore(const vec4_t* colors)
+{
+	if (!GL33TerrainEnabled())
+		return false;
+	if (gShaderScene.GetProgram(eShaderS_TerrainCore) == 0)
+		return false;
+
+	// Lazily create a small streaming quad: interleaved pos3/normal3/tex2/color4.
+	static GLuint s_vao = 0, s_vbo = 0, s_ebo = 0;
+	if (s_vao == 0)
+	{
+		const GLushort idx[6] = { 0, 1, 2, 0, 2, 3 };  // GL_QUADS 0,1,2,3 -> 2 tris
+		const GLsizei stride = 12 * sizeof(float);
+		glGenVertexArrays(1, &s_vao);
+		glBindVertexArray(s_vao);
+		glGenBuffers(1, &s_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
+		glBufferData(GL_ARRAY_BUFFER, 4 * 12 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+		glGenBuffers(1, &s_ebo);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)(0));
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+		glEnableVertexAttribArray(3);
+		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	}
+
+	float verts[4 * 12];
+	for (int i = 0; i < 4; ++i)
+	{
+		float* v = verts + i * 12;
+		v[0] = TerrainVertex[i][0]; v[1] = TerrainVertex[i][1]; v[2] = TerrainVertex[i][2];
+		v[3] = 0.f; v[4] = 0.f; v[5] = 1.f;                               // normal (unused)
+		v[6] = TerrainTextureCoord[i][0]; v[7] = TerrainTextureCoord[i][1];
+		v[8] = colors[i][0]; v[9] = colors[i][1]; v[10] = colors[i][2]; v[11] = colors[i][3];
+	}
+
+	if (!gShaderScene.Use(eShaderS_TerrainCore))
+		return false;
+
+	static const float kIdentity3[9] = { 1.f,0.f,0.f, 0.f,1.f,0.f, 0.f,0.f,1.f };
+	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
+	gShaderScene.SetMat4("uModelView", g_ViewMatrix);
+	gShaderScene.SetMat3("uNormalMatrix", kIdentity3);
+	gShaderScene.SetInt("texture1", 0);
+	gShaderScene.SetFloat("brightness", 1.f);
+	gShaderScene.SetFloat("contrast", 1.f);
+
+	glBindVertexArray(s_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (void*)0);
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	// Restore the compatibility terrain program for the remaining terrain draws.
+	gShaderScene.Use(eShaderS_Terrain);
+	return true;
+}
+#endif // SHADER_PIPELINE
+
+
 inline int TERRAIN_INDEX(int x, int y)
 {
 	return (y)*TERRAIN_SIZE + (x);
@@ -1958,6 +2050,14 @@ void RenderTerrainFace(float xf, float yf, int xi, int yi, float lodf)
 					colors[i][2] = PrimaryTerrainLight[terrain_index[i]][2];
 				}
 
+				bool drewGrassCore = false;
+#ifdef SHADER_PIPELINE
+				// Phase 14.4: opt-in Core-profile grass draw (-gl33terrain). Falls
+				// back to the legacy client-array GL_QUADS path below when off.
+				drewGrassCore = RenderTerrainGrassQuadCore(colors);
+#endif
+				if (!drewGrassCore)
+				{
 				glEnableClientState(GL_VERTEX_ARRAY);
 				glEnableClientState(GL_COLOR_ARRAY);
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -1971,6 +2071,7 @@ void RenderTerrainFace(float xf, float yf, int xi, int yi, float lodf)
 				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 				glDisableClientState(GL_COLOR_ARRAY);
 				glDisableClientState(GL_VERTEX_ARRAY);
+				}
 
 				//glBegin(GL_QUADS);
 				//glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);

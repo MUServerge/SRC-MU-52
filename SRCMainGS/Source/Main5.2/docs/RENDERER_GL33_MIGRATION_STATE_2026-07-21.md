@@ -36,6 +36,7 @@ Give the new session this context:
 | 14.1 | Authored Core terrain shaders `terrain_core.vs/.fs` (inert, not wired) | n/a (GLSL assets, no C++) | n/a — not referenced by `CShaderScene`, zero behavior change |
 | 14.2 | `CShaderScene::Init` compile-link **probe** of `terrain_core` (logged, deleted, not bound); dropped non-portable uniform initializers from `terrain_core.fs` | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti (GL 4.6): log `Core terrain probe 'terrain_core' compiled+linked OK`, scene identical (AMD/Intel still to check) |
 | 14.3 | Promote `terrain_core` to a kept program: new `eShaderS_TerrainCore` enum slot + `s_ShaderBaseName` entry; removed the throwaway probe (loop loads/keeps it, not bound) | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti: log `Loaded 'terrain_core' (program 9)`, `Init OK`, scene identical |
+| 14.4 | First Core-drawn geometry: grass `GL_QUADS` → VBO/VAO + `terrain_core` behind `-gl33terrain`; `CShaderScene::SetMat4/SetMat3` added; default path untouched | ✅ Release x86 (0 warn/err) | **VISUAL check needed**: run with `-gl33terrain`, grass must match the default run (no flag) per map |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
@@ -147,16 +148,23 @@ a post-`#version` define via `BuildProgramFromFiles(..., vertexDefine)`.
   (`Use()`/`GetProgram` fall back per program; `Init()`'s return is unused), so a
   GPU that rejects it only zeroes its own slot. Runtime check: log
   `Loaded 'terrain_core' (program N)`, scene identical.
-- **14.4 (next, first visible draw):** convert the **grass** `GL_QUADS`
-  client-array draw (`ZzzLodTerrain.cpp` ~line 1961) to a VBO/VAO + `terrain_core`
-  draw behind a new opt-in flag (e.g. `-gl33terrain`): a lazily-created static
-  VAO/VBO/EBO, per-quad `glBufferSubData` of interleaved `aPos/aNormal/aTex/aColor`
-  (normals unused by `terrain.fs`, pass 0), `GL_QUADS`→two triangles, uniforms
+- **14.4 (done, compiles — awaiting visual check):** grass `GL_QUADS` draw
+  (`ZzzLodTerrain.cpp` `RenderTerrainGrassQuadCore`) now routes through a
+  lazily-created static VAO/VBO/EBO + `terrain_core` when `-gl33terrain` is passed
+  and the program loaded, else the legacy client-array path. Interleaved
+  `pos3/normal3(0)/tex2/color4`, `GL_QUADS`→2 triangles, uniforms
   `uProj`=`g_ProjectionMatrix`, `uModelView`=`g_ViewMatrix`, `uNormalMatrix`=id,
-  `texture1`/`brightness`/`contrast`. Restore prior program/VAO/state after. This
-  is the first Core-drawn terrain geometry — the whole pipeline proven on one draw
-  before extending to ground/water/blend passes (14.5+). Default path untouched;
-  validate grass per map (Karutan wind, PK-field alpha blend).
+  `texture1=0`, `brightness=contrast=1`; switches to `eShaderS_TerrainCore` for the
+  draw and restores `eShaderS_Terrain` after. Added `CShaderScene::SetMat4/SetMat3`.
+  Default (no flag) is byte-for-byte the old path. **Verify with `-gl33terrain`:
+  grass must match the no-flag run** (Karutan wind, PK-field alpha blend). Known
+  limitations to watch: per-quad program switch (perf only, this is a proof path),
+  and the static VAO/VBO/EBO are not deleted at shutdown (acceptable for the gated
+  experiment; give them an owner before the path becomes default).
+- **14.5+:** once grass matches, extend the Core path to the ground fans and the
+  water/alpha/blend passes (converting their `glBegin(GL_TRIANGLE_FAN)` immediate
+  mode to the VBO), fold fog + alpha test into the shader, then make Core terrain
+  the default once every map validates.
 - **14.5+:** extend to water, grass, and the alpha/blend passes; fold fog and
   alpha test into the fragment shader; then make the Core terrain path default
   once every map validates.

@@ -414,6 +414,28 @@ void CShaderScene::SetVec3(const char* name, float x, float y, float z) const
 	}
 }
 
+void CShaderScene::SetMat4(const char* name, const float* m16) const
+{
+	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
+	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
+	if (loc >= 0)
+	{
+		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATRIX);
+		glUniformMatrix4fv(loc, 1, GL_FALSE, m16);
+	}
+}
+
+void CShaderScene::SetMat3(const char* name, const float* m9) const
+{
+	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
+	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
+	if (loc >= 0)
+	{
+		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATRIX);
+		glUniformMatrix3fv(loc, 1, GL_FALSE, m9);
+	}
+}
+
 void CShaderScene::Release()
 {
 	const bool canDelete = (wglGetCurrentContext() != NULL && glDeleteProgram != NULL);
