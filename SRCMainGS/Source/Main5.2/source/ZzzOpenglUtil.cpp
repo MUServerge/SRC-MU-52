@@ -12,6 +12,7 @@
 #include "NewUISystem.h"
 #include "CShaderGL.h"
 #include "CameraProjection.h"
+#include "RenderMatrix.h"
 
 
 float Distance;
@@ -29,6 +30,12 @@ vec3_t  CameraAngle;
 float   CameraMatrix[3][4];
 vec3_t  MousePosition;
 vec3_t  MouseTarget;
+
+// Phase 13.2: CPU copy of the current perspective projection, built alongside
+// the fixed-function gluPerspective in gluPerspective2 (RenderMatrix backbone).
+// The fixed-function matrix stays authoritative; this is a column-major float[16]
+// mirror for future shader-fed (uProj) draws. Zero behavior change today.
+float   g_ProjectionMatrix[16];
 float   g_fCameraCustomDistance = 0.f;
 bool    FogEnable = false;
 GLfloat FogDensity = 0.0004f;
@@ -204,6 +211,12 @@ void GetOpenGLMatrix(float Matrix[3][4])
 void gluPerspective2(float Fov, float Aspect, float ZNear, float ZFar)
 {
 	gluPerspective(Fov, Aspect, ZNear, ZFar);
+
+	// Phase 13.2: build a CPU copy of the same projection into g_ProjectionMatrix.
+	// The fixed-function gluPerspective call above stays authoritative; this is an
+	// additive mirror (column-major float[16]) for future shader-fed draws. No
+	// existing behavior changes.
+	RenderMatrix::Perspective(g_ProjectionMatrix, Fov, Aspect, ZNear, ZFar);
 
 	ScreenCenterX = OpenglWindowX + OpenglWindowWidth / 2;
 	ScreenCenterY = OpenglWindowY + OpenglWindowHeight / 2;

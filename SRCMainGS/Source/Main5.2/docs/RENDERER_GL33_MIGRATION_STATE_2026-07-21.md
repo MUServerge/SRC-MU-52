@@ -29,9 +29,16 @@ Give the new session this context:
 | 12 | ImGui backend `opengl2` → `opengl3` | ✅ MSVC Win32 | ✅ ImGui panels render correctly (RenderMesh tools, effect-handle UI) |
 | audit | `docs/RENDERER_DEPRECATED_GL_AUDIT_2026-07-21.md` | n/a (doc) | n/a |
 | 13.1 | `RenderMatrix` CPU matrix backbone | ✅ MSVC Win32 | ✅ host unit test, 22 checks, `-Wall -Wextra` clean |
+| 13.2 | CPU projection mirror `g_ProjectionMatrix` in `gluPerspective2` | ✅ Release Win32 | ✅ scene identical (default + `-gl33compat`) |
 
-Both code phases are behavior-preserving so far: Phase 12 only swaps the UI
-overlay backend; Phase 13.1 is purely additive (no existing call site changed).
+All code phases are behavior-preserving so far: Phase 12 only swaps the UI
+overlay backend; Phase 13.1 is purely additive (no existing call site changed);
+Phase 13.2 is additive (builds a CPU copy of the projection, fixed-function
+`gluPerspective` stays authoritative, no draw changed).
+
+Verification note: the user builds/runs the **Release** client only — Debug
+builds are not usable. Do not gate slice verification behind `_DEBUG`; verify by
+scene identity in the Release run.
 
 ## 3. Repo-specific gotchas a new session MUST know
 
@@ -53,25 +60,36 @@ overlay backend; Phase 13.1 is purely additive (no existing call site changed).
   profile on purpose. Do not request Core until the audit gate (§5 of the audit
   doc) is clean.
 
-## 4. Next step — Phase 13.2 (wire RenderMatrix in)
+## 4. Next step — Phase 13.3 (CPU view/camera mirror)
 
-Goal: begin replacing the fixed-function matrix stack with `RenderMatrix`,
-starting at the projection, without changing on-screen results.
+Phase 13.2 is done (projection CPU mirror). The next slice mirrors the camera
+**view (modelview) matrix** the same additive way, so both `uProj` and `uView`
+CPU copies exist for the terrain/character shaders in Phase 14.
 
-Suggested first slice (small, verifiable):
-- In `ZzzOpenglUtil.cpp` `gluPerspective2(...)`, additionally build the same
-  projection with `RenderMatrix::Perspective(fov, aspect, zNear, zFar)` into a new
-  file-scope `float g_ProjectionMatrix[16]`, while **keeping** the existing
-  `gluPerspective(...)` call authoritative. This makes a CPU copy of the
-  projection available for shaders with zero behavior change.
-- Optional debug assert (Windows only): compare `g_ProjectionMatrix` against
-  `glGetFloatv(GL_PROJECTION_MATRIX, ...)` to prove the CPU build matches the
-  driver's fixed-function matrix 1:1.
-- Note: `ZzzOpenglUtil.cpp` is UTF-8 today, but `ZzzOpenglUtil.h` is ISO-8859 —
-  add any new declaration in a byte-safe way or in a separate header.
+There is **no `gluLookAt`** — `BeginOpengl(...)` in `ZzzOpenglUtil.cpp` builds the
+view on the MODELVIEW stack as:
 
-Verification for 13.2: build Win32; run default and `-gl33compat`; confirm the
-scene looks identical and (if the assert is added) that it does not fire.
+```
+glLoadIdentity();
+glRotatef(CameraAngle[1], 0,1,0);
+if (!CameraTopViewEnable) glRotatef(CameraAngle[0], 1,0,0);
+glRotatef(CameraAngle[2], 0,0,1);
+glTranslatef(-CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
+```
+
+Slice: add a file-scope `float g_ViewMatrix[16]` and, right after that block,
+reproduce it with `RenderMatrix` (Identity → Rotate y → Rotate x (guarded) →
+Rotate z → Translate(-pos)). `RenderMatrix::Rotate/Translate` post-multiply with
+GL semantics, so the result matches the fixed-function MODELVIEW 1:1. Keep the
+`glRotatef/glTranslatef` calls authoritative — additive, zero behavior change.
+
+Verification (Release only): scene identical, default and `-gl33compat`.
+
+Then Phase 13.4+: first real consumer — feed `uProj`/`uView` to one shader draw
+path (visual diff proves the CPU matrices are correct).
+
+Note: `ZzzOpenglUtil.cpp` is UTF-8; `ZzzOpenglUtil.h` is ISO-8859 — keep new
+declarations byte-safe or in the `.cpp`.
 
 Later phases (from the audit worklist): 14 terrain, 15 character/BMD fallback,
 16 effects/sprites/shadow/hair, 17 UI/3D previews, 18 Core switch.
