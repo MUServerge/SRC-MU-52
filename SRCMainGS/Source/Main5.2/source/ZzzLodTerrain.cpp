@@ -200,6 +200,18 @@ static bool RenderTerrainGrassQuadCore(const vec4_t* colors)
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+	// One-time self-diagnostic (Phase 14.4): confirm from the log that the Core
+	// grass path actually executed under -gl33terrain and whether the draw raised
+	// a GL error, so the slice is verifiable without an in-engine screenshot.
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		const GLenum err = glGetError();
+		g_ErrorReport.Write("> [Shader] Core grass path active (terrain_core program %u), first draw glGetError=0x%04X\r\n",
+			gShaderScene.GetProgram(eShaderS_TerrainCore), (unsigned)err);
+	}
+
 	// Restore the compatibility terrain program for the remaining terrain draws.
 	gShaderScene.Use(eShaderS_Terrain);
 	return true;
