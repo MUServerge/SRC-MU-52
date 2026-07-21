@@ -42,6 +42,15 @@ float   g_ProjectionMatrix[16];
 // Column-major float[16] mirror for future shader-fed (uView) draws. The
 // fixed-function MODELVIEW stays authoritative; zero behavior change today.
 float   g_ViewMatrix[16];
+
+// Phase 13.5: authoritative CPU mirror of the fixed-function MODELVIEW stack.
+// Each fixed-function modelview op (glPushMatrix/glPopMatrix/glLoadIdentity/
+// glRotatef/glTranslatef) is mirrored onto this stack at its call site so the
+// current CPU modelview is available in a Core profile (no GL_MODELVIEW_MATRIX
+// readback). Sites are migrated incrementally; the fixed-function stack stays
+// authoritative until every site is covered and a consumer swaps to Top().
+// g_ViewMatrix is kept as a derived snapshot of the world-camera Top().
+RenderMatrix::Stack g_ModelViewStack;
 float   g_fCameraCustomDistance = 0.f;
 bool    FogEnable = false;
 GLfloat FogDensity = 0.0004f;
@@ -706,16 +715,20 @@ void BeginOpengl(int x, int y, int Width, int Height, bool Screen)
 	glRotatef(CameraAngle[2], 0.f, 0.f, 1.f);
 	glTranslatef(-CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
 
-	// Phase 13.3: mirror the same camera view into g_ViewMatrix on the CPU. The
-	// fixed-function MODELVIEW above stays authoritative; RenderMatrix::Rotate and
-	// Translate post-multiply with GL semantics, so this reproduces the modelview
-	// 1:1. Additive, no behavior change (fed to uView shaders in a later phase).
-	RenderMatrix::Identity(g_ViewMatrix);
-	RenderMatrix::Rotate(g_ViewMatrix, CameraAngle[1], 0.f, 1.f, 0.f);
+	// Phase 13.5: mirror the same MODELVIEW ops onto the CPU stack, 1:1 with the
+	// fixed-function calls above (glPushMatrix -> Push, glLoadIdentity -> Load-
+	// Identity, glRotatef/glTranslatef -> Rotate/Translate, GL post-multiply
+	// semantics). EndOpengl mirrors the matching glPopMatrix. g_ViewMatrix is kept
+	// as a derived snapshot of the resulting world-camera view. The fixed-function
+	// stack stays authoritative; additive, no behavior change (no consumer yet).
+	g_ModelViewStack.Push();
+	g_ModelViewStack.LoadIdentity();
+	g_ModelViewStack.Rotate(CameraAngle[1], 0.f, 1.f, 0.f);
 	if (CameraTopViewEnable == false)
-		RenderMatrix::Rotate(g_ViewMatrix, CameraAngle[0], 1.f, 0.f, 0.f);
-	RenderMatrix::Rotate(g_ViewMatrix, CameraAngle[2], 0.f, 0.f, 1.f);
-	RenderMatrix::Translate(g_ViewMatrix, -CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
+		g_ModelViewStack.Rotate(CameraAngle[0], 1.f, 0.f, 0.f);
+	g_ModelViewStack.Rotate(CameraAngle[2], 0.f, 0.f, 1.f);
+	g_ModelViewStack.Translate(-CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
+	RenderMatrix::Copy(g_ViewMatrix, g_ModelViewStack.Top());
 
 	glDisable(GL_ALPHA_TEST);
 	glEnable(GL_TEXTURE_2D);
@@ -756,6 +769,10 @@ void EndOpengl()
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
+
+	// Phase 13.5: mirror the MODELVIEW glPopMatrix above onto the CPU stack so it
+	// stays balanced with the BeginOpengl Push (projection is not CPU-mirrored).
+	g_ModelViewStack.Pop();
 }
 
 void UpdateMousePositionn()

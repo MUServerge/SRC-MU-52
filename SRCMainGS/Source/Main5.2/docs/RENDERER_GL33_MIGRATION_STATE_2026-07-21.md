@@ -32,6 +32,7 @@ Give the new session this context:
 | 13.2 | CPU projection mirror `g_ProjectionMatrix` in `gluPerspective2` | ✅ Release Win32 | ✅ scene identical (default + `-gl33compat`) |
 | 13.3 | CPU view mirror `g_ViewMatrix` in `BeginOpengl` | ✅ Release Win32 | ✅ scene identical (default + `-gl33compat`) |
 | 13.4 | Feed `uProj` from `g_ProjectionMatrix` in `RenderMeshVBO` (first consumer) | ✅ Release Win32 | ✅ VBO world objects + `-vbotranslate` identical (proves CPU projection 1:1) |
+| 13.5.1 | CPU MODELVIEW stack owner `g_ModelViewStack`; mirror world camera (`BeginOpengl`/`EndOpengl`); `g_ViewMatrix` derived from Top | ✅ Release x86 (0 warn/err) | invisible slice, no consumer — pending in-game scene-identical check |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
@@ -95,19 +96,32 @@ NewUI preview, per-object `Render3D`), not a single global. That is Phase 15
 (character/BMD) work, done additively the same way (mirror first, consume later),
 not a 13.x one-liner.
 
-### Actual next step
+### Actual next step — modelview-stack backbone (chosen path)
 
-Two defensible options — pick per priority:
+Direction chosen: build the CPU MODELVIEW stack backbone additively, then swap
+`uView` only after every modelview site is mirrored. Progress:
 
-- **Phase 14 (terrain)** from the worklist: convert `ZzzLodTerrain` client arrays
-  to VBO+VAO and rewrite `terrain.vs/.fs` `330 compatibility → core` (fold fog and
-  alpha test into the shader). Highest visual risk; the projection backbone
-  (`g_ProjectionMatrix`) is now available to feed its `uProj`.
-- **Modelview-stack backbone**: introduce a `RenderMatrix::Stack` instance and
-  mirror the MODELVIEW ops additively at each camera site, proving each with the
-  same `glGetFloatv` 1:1 comparison, before any `uView` consumer swaps.
+- **13.5.1 (done, compiles):** `g_ModelViewStack` owner added; world camera
+  (`BeginOpengl` push/identity/rotate/translate, `EndOpengl` pop) mirrored;
+  `g_ViewMatrix` is now a derived snapshot of `Top()`. No consumer yet.
+- **13.5.2 (next):** mirror the **NewUI 3D preview** modelview
+  (`NewUI3DRenderMng.cpp:130-132`: `glLoadIdentity` + per-object `Render3D`
+  transforms) onto the stack. This is the site that makes a global `uView` swap
+  unsafe today, so it must be covered.
+- **13.5.3:** mirror per-object / nested `glPushMatrix`/`glTranslatef` sites that
+  wrap BMD draws (audit §2.2: 15 files, 62 push/pop). Each slice is behavior-
+  identical (gl* calls stay; stack is mirrored alongside).
+- **13.5.N (consumer swap):** once `g_ModelViewStack.Top()` provably equals the
+  live `GL_MODELVIEW_MATRIX` at every VBO draw (world + previews), swap
+  `RenderMeshVBO`'s `uView` source from the `glGetFloatv` readback to `Top()`,
+  mirroring the 13.4 projection swap. This is the first visible-risk slice of the
+  view migration.
 
 Do not remove any `gluPerspective`/`glRotatef` yet.
+
+Build note: the MSBuild compile (Release/x86,
+`MSBuild.exe Main.sln -p:Configuration=Release -p:Platform=x86 -m`) is run per
+slice to confirm it compiles; the in-game Release run is the behavioral gate.
 
 Note: `ZzzOpenglUtil.cpp`/`ZzzBMD.cpp` are UTF-8; `ZzzOpenglUtil.h` is ISO-8859 —
 declare externs byte-safe (as `extern float g_ProjectionMatrix[16];` in
