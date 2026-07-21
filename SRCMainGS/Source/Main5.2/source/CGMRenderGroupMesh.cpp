@@ -6,7 +6,7 @@
 #include "NewUICommonMessageBox.h"
 #include "UIControlRender.h"
 #include "imgui_impl_win32.h"
-#include "imgui_impl_opengl2.h"
+#include "imgui_impl_opengl3.h"
 #include "CGMRenderGroupMesh.h"
 #include "NewUISystem.h"
 #include "Utilities/Log/muConsoleDebug.h"
@@ -684,7 +684,7 @@ void CGMRenderGroupMesh::runtime_make_interface()
 
 	SEASON3B::RenderLocalItem3D(RenderFrameX + 44.f, RenderFrameY + 108.f, 84.f, 117.f, (&edit_mesh)->Index, (item_level << 3));
 
-	ImGui_ImplOpenGL2_NewFrame();
+	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 
 	ImGui::NewFrame();
@@ -701,7 +701,7 @@ void CGMRenderGroupMesh::runtime_make_interface()
 
 	ImGui::Render();
 
-	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void CGMRenderGroupMesh::runtime_make_text(float RenderFrameX, float RenderFrameY)

@@ -1258,7 +1258,7 @@
     <ClCompile Include="..\dependencies\ImGui\imgui_widgets.cpp">
       <Filter>MU\Client\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\dependencies\ImGui\backends\imgui_impl_opengl2.cpp">
+    <ClCompile Include="..\dependencies\ImGui\backends\imgui_impl_opengl3.cpp">
       <Filter>MU\Client\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\dependencies\ImGui\backends\imgui_impl_win32.cpp">

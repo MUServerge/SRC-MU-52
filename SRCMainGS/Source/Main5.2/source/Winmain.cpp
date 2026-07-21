@@ -72,7 +72,7 @@
 #pragma comment(lib, "wzAudio.lib")
 #ifdef IMPLEMENT_IMGUI_WIN32
 #include "imgui_impl_win32.h"
-#include "imgui_impl_opengl2.h"
+#include "imgui_impl_opengl3.h"
 #endif // IMPLEMENT_IMGUI_WIN32
 #include "ConnectVersionHex.h"
 #include "CShaderGL.h"
@@ -962,14 +962,14 @@ void CreateImGuiWindow()
 
 	ImGui_ImplWin32_Init(gwinhandle->GethWnd());
 
-	ImGui_ImplOpenGL2_Init();
+	ImGui_ImplOpenGL3_Init();
 #endif // IMPLEMENT_IMGUI_WIN32
 }
 
 void DestroyImGuiWindow()
 {
 #ifdef IMPLEMENT_IMGUI_WIN32
-	ImGui_ImplOpenGL2_Shutdown();
+	ImGui_ImplOpenGL3_Shutdown();
 
 	ImGui_ImplWin32_Shutdown();
 
