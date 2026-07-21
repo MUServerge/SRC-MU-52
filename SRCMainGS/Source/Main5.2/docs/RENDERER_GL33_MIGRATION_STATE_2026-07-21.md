@@ -70,23 +70,48 @@ Phases 13.2 (projection) and 13.3 (view) are done: `g_ProjectionMatrix` and
 copies of the current projection and camera view every frame, matching the
 fixed-function matrices 1:1, but nothing consumes them yet.
 
-Phase 13.4 is the first slice that **uses** them, and therefore the first with
-real visual risk. The safe candidate is the `CShaderGL` BMD Model VBO path
-(`Client\Data\Effect\VBO\Model.vs/.fs`, already `330 core` with explicit
-uniforms), which currently composes its own matrices on the CPU. Plan:
+Phase 13.4 (done) fed **`uProj`** from `g_ProjectionMatrix` in `RenderMeshVBO`
+(`ZzzBMD.cpp`). It is safe because projection is a single global value and every
+camera site — the world camera (`BeginOpengl`) and the NewUI 3D preview
+(`NewUI3DRenderMng.cpp:129`) — routes through `gluPerspective2`, so
+`g_ProjectionMatrix` always holds the projection of the camera about to draw.
 
-1. Identify the Model path's proj/view/model uniforms and where they are set.
-2. Feed `g_ProjectionMatrix` and `g_ViewMatrix` into its `uProj`/`uView` (keep the
-   per-object model matrix as is), behind the existing opt-in gate
-   (`-vbotranslate`) so the default path is untouched until proven.
-3. Verify with `-gl33compat -vbotranslate`: translated meshes render identically.
+### `uView` is NOT a safe global swap (do not attempt a one-line `modelView = g_ViewMatrix`)
 
-Keep the fixed-function matrix stack authoritative for every other path. Do not
-remove any `gluPerspective`/`glRotatef` yet — removal is a later phase, only
-after the shader path fully covers the same materials.
+The MODELVIEW at `RenderMeshVBO` is **per-camera**, not a single global:
 
-Note: `ZzzOpenglUtil.cpp` is UTF-8; `ZzzOpenglUtil.h` is ISO-8859 — declare the
-externs for `g_ProjectionMatrix`/`g_ViewMatrix` byte-safe or in a UTF-8 header.
+- World pass: MODELVIEW == pure camera view (bones carry world placement), which
+  `g_ViewMatrix` mirrors. Fine on its own.
+- **NewUI 3D previews** (`NewUI3DRenderMng.cpp:130-132`): set their own MODELVIEW
+  with `glLoadIdentity()` + per-object `Render3D()` transforms, and **never call
+  `BeginOpengl`**, so `g_ViewMatrix` is never updated for them. Feeding
+  `g_ViewMatrix` here would render every inventory/character/shop preview with the
+  world camera → broken previews.
+
+This is exactly why the current code reads `GL_MODELVIEW_MATRIX` back per draw.
+The view-matrix migration therefore requires a **CPU modelview stack**
+(`RenderMatrix::Stack`) mirrored at *every* modelview site (`BeginOpengl`, the
+NewUI preview, per-object `Render3D`), not a single global. That is Phase 15
+(character/BMD) work, done additively the same way (mirror first, consume later),
+not a 13.x one-liner.
+
+### Actual next step
+
+Two defensible options — pick per priority:
+
+- **Phase 14 (terrain)** from the worklist: convert `ZzzLodTerrain` client arrays
+  to VBO+VAO and rewrite `terrain.vs/.fs` `330 compatibility → core` (fold fog and
+  alpha test into the shader). Highest visual risk; the projection backbone
+  (`g_ProjectionMatrix`) is now available to feed its `uProj`.
+- **Modelview-stack backbone**: introduce a `RenderMatrix::Stack` instance and
+  mirror the MODELVIEW ops additively at each camera site, proving each with the
+  same `glGetFloatv` 1:1 comparison, before any `uView` consumer swaps.
+
+Do not remove any `gluPerspective`/`glRotatef` yet.
+
+Note: `ZzzOpenglUtil.cpp`/`ZzzBMD.cpp` are UTF-8; `ZzzOpenglUtil.h` is ISO-8859 —
+declare externs byte-safe (as `extern float g_ProjectionMatrix[16];` in
+`ZzzBMD.cpp`) or in a UTF-8 header.
 
 Later phases (from the audit worklist): 14 terrain, 15 character/BMD fallback,
 16 effects/sprites/shadow/hair, 17 UI/3D previews, 18 Core switch.
