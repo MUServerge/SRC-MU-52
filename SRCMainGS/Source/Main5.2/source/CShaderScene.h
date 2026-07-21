@@ -30,6 +30,8 @@ enum eShaderSProgram
 {
 	eShaderS_Terrain = 0,
 	eShaderS_Character,
+	eShaderS_TerrainCore,   // Phase 14: Core-profile terrain (terrain_core.vs/.fs),
+	                        // loaded but not bound for drawing yet.
 	eShaderS_MaxValue,
 };
 

@@ -35,6 +35,7 @@ Give the new session this context:
 | 13.5.1 | CPU MODELVIEW stack owner `g_ModelViewStack`; mirror world camera (`BeginOpengl`/`EndOpengl`); `g_ViewMatrix` derived from Top | ✅ Release x86 (0 warn/err) | invisible slice, no consumer — pending in-game scene-identical check |
 | 14.1 | Authored Core terrain shaders `terrain_core.vs/.fs` (inert, not wired) | n/a (GLSL assets, no C++) | n/a — not referenced by `CShaderScene`, zero behavior change |
 | 14.2 | `CShaderScene::Init` compile-link **probe** of `terrain_core` (logged, deleted, not bound); dropped non-portable uniform initializers from `terrain_core.fs` | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti (GL 4.6): log `Core terrain probe 'terrain_core' compiled+linked OK`, scene identical (AMD/Intel still to check) |
+| 14.3 | Promote `terrain_core` to a kept program: new `eShaderS_TerrainCore` enum slot + `s_ShaderBaseName` entry; removed the throwaway probe (loop loads/keeps it, not bound) | ✅ Release x86 (0 warn/err) | pending: log `Loaded 'terrain_core' (program N)`, scene identical |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
@@ -140,13 +141,22 @@ a post-`#version` define via `BuildProgramFromFiles(..., vertexDefine)`.
   C++). **Runtime check:** confirm the log shows the probe compiled+linked OK on
   the user's GPU, and the scene is identical. If it logs FAILED, read the GLSL
   error the shader compiler emitted and fix `terrain_core.*` before 14.3.
-- **14.3:** build the terrain **VBO/VAO** (interleaved `aPos/aNormal/aTex/aColor`)
-  alongside the existing feed, populated per frame from the same terrain vertex
-  data, but not drawn. Additive.
-- **14.4:** behind a new opt-in flag (e.g. `-gl33terrain`), draw the ground pass
-  via the VBO + `terrain_core` program (feeding `uProj`=`g_ProjectionMatrix`,
-  `uModelView` from the camera, `uNormalMatrix`), converting `GL_QUADS` → two
-  triangles. Default path untouched. Validate per map.
+- **14.3 (done, compiles):** promoted `terrain_core` from a throwaway probe to a
+  **kept** `CShaderScene` program (`eShaderS_TerrainCore`), loaded and logged like
+  terrain/character, but not bound for drawing. Safe: its load is independent
+  (`Use()`/`GetProgram` fall back per program; `Init()`'s return is unused), so a
+  GPU that rejects it only zeroes its own slot. Runtime check: log
+  `Loaded 'terrain_core' (program N)`, scene identical.
+- **14.4 (next, first visible draw):** convert the **grass** `GL_QUADS`
+  client-array draw (`ZzzLodTerrain.cpp` ~line 1961) to a VBO/VAO + `terrain_core`
+  draw behind a new opt-in flag (e.g. `-gl33terrain`): a lazily-created static
+  VAO/VBO/EBO, per-quad `glBufferSubData` of interleaved `aPos/aNormal/aTex/aColor`
+  (normals unused by `terrain.fs`, pass 0), `GL_QUADS`→two triangles, uniforms
+  `uProj`=`g_ProjectionMatrix`, `uModelView`=`g_ViewMatrix`, `uNormalMatrix`=id,
+  `texture1`/`brightness`/`contrast`. Restore prior program/VAO/state after. This
+  is the first Core-drawn terrain geometry — the whole pipeline proven on one draw
+  before extending to ground/water/blend passes (14.5+). Default path untouched;
+  validate grass per map (Karutan wind, PK-field alpha blend).
 - **14.5+:** extend to water, grass, and the alpha/blend passes; fold fog and
   alpha test into the fragment shader; then make the Core terrain path default
   once every map validates.

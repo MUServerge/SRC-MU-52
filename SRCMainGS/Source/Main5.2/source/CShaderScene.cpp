@@ -13,8 +13,9 @@ namespace
 	// File base names per program, matching the package layout.
 	const char* const s_ShaderBaseName[eShaderS_MaxValue] =
 	{
-		"terrain",    // eShaderS_Terrain
-		"character",  // eShaderS_Character
+		"terrain",       // eShaderS_Terrain
+		"character",     // eShaderS_Character
+		"terrain_core",  // eShaderS_TerrainCore
 	};
 }
 
@@ -215,26 +216,12 @@ bool CShaderScene::Init()
 	g_ErrorReport.Write("> [Shader] Init %s\r\n",
 		allOk ? "OK" : "completed with errors (fixed-function fallback active)");
 
-	// Phase 14.2: compile-link validation probe for the Core-profile terrain
-	// shaders (terrain_core.vs/.fs). This proves they build on the current GPU/
-	// driver before any draw path adopts them. The probe program is NOT stored
-	// in m_Program and NOT bound for rendering, so the scene is unchanged; it is
-	// deleted immediately. A failure here is diagnostic only (logged, non-fatal).
-	{
-		const GLuint coreProbe = LoadProgram("terrain_core");
-		if (coreProbe != 0)
-		{
-			g_ErrorReport.Write("> [Shader] Core terrain probe 'terrain_core' compiled+linked OK (program %u, not bound)\r\n",
-				coreProbe);
-			if (glDeleteProgram != NULL)
-				glDeleteProgram(coreProbe);
-		}
-		else
-		{
-			g_ErrorReport.Write("> [Shader] Core terrain probe 'terrain_core' FAILED to build (Phase 14 Core path not yet viable on this GPU)\r\n");
-		}
-	}
-
+	// Phase 14.3: eShaderS_TerrainCore ('terrain_core') is now a normally loaded
+	// program (handled by the loop above), kept in m_Program for a future draw
+	// path. It is not bound for rendering yet, so the scene is unchanged. Its
+	// load status is logged like the others; a failure only zeroes its own slot
+	// (Use()/GetProgram fall back), leaving terrain/character untouched, and
+	// Init()'s return value is not consumed by the caller (Winmain).
 	return allOk;
 }
 
