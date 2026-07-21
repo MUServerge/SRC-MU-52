@@ -1237,6 +1237,9 @@
     <ClCompile Include="RenderProfiler.cpp">
       <Filter>MU\Client\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RenderMatrix.cpp">
+      <Filter>MU\Client\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="supportingfeature.cpp">
       <Filter>MU\Client\Source Files</Filter>
     </ClCompile>
@@ -2560,6 +2563,9 @@
       <Filter>MU\Client\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RenderProfiler.h">
+      <Filter>MU\Client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderMatrix.h">
       <Filter>MU\Client\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="supportingfeature.h">
