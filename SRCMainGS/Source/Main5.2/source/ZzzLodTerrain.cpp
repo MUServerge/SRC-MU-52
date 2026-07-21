@@ -133,7 +133,14 @@ static bool GL33TerrainEnabled()
 	if (cached < 0)
 	{
 		const char* cmd = GetCommandLineA();
-		cached = (cmd != NULL && strstr(cmd, "-gl33terrain") != NULL) ? 1 : 0;
+		bool on = (cmd != NULL && strstr(cmd, "-gl33terrain") != NULL);
+		// Launcher-independent toggle: also enable if a marker file exists in the
+		// client's working directory (where MuError.log is written). Some launchers
+		// do not forward command-line flags to the client, so the file is the
+		// reliable way to opt in. Create an empty 'gl33terrain.enable' to turn it on.
+		if (!on && GetFileAttributesA("gl33terrain.enable") != INVALID_FILE_ATTRIBUTES)
+			on = true;
+		cached = on ? 1 : 0;
 	}
 	return cached != 0;
 }
