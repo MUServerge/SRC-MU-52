@@ -33,6 +33,7 @@ Give the new session this context:
 | 13.3 | CPU view mirror `g_ViewMatrix` in `BeginOpengl` | ✅ Release Win32 | ✅ scene identical (default + `-gl33compat`) |
 | 13.4 | Feed `uProj` from `g_ProjectionMatrix` in `RenderMeshVBO` (first consumer) | ✅ Release Win32 | ✅ VBO world objects + `-vbotranslate` identical (proves CPU projection 1:1) |
 | 13.5.1 | CPU MODELVIEW stack owner `g_ModelViewStack`; mirror world camera (`BeginOpengl`/`EndOpengl`); `g_ViewMatrix` derived from Top | ✅ Release x86 (0 warn/err) | invisible slice, no consumer — pending in-game scene-identical check |
+| 14.1 | Authored Core terrain shaders `terrain_core.vs/.fs` (inert, not wired) | n/a (GLSL assets, no C++) | n/a — not referenced by `CShaderScene`, zero behavior change |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
@@ -96,28 +97,58 @@ NewUI preview, per-object `Render3D`), not a single global. That is Phase 15
 (character/BMD) work, done additively the same way (mirror first, consume later),
 not a 13.x one-liner.
 
-### Actual next step — modelview-stack backbone (chosen path)
+### Modelview-stack backbone (PAUSED — scope deferred)
 
-Direction chosen: build the CPU MODELVIEW stack backbone additively, then swap
-`uView` only after every modelview site is mirrored. Progress:
+`13.5.1` (done, compiles): `g_ModelViewStack` owner added; world camera
+(`BeginOpengl` push/identity/rotate/translate, `EndOpengl` pop) mirrored;
+`g_ViewMatrix` is now a derived snapshot of `Top()`. No consumer yet.
 
-- **13.5.1 (done, compiles):** `g_ModelViewStack` owner added; world camera
-  (`BeginOpengl` push/identity/rotate/translate, `EndOpengl` pop) mirrored;
-  `g_ViewMatrix` is now a derived snapshot of `Top()`. No consumer yet.
-- **13.5.2 (next):** mirror the **NewUI 3D preview** modelview
-  (`NewUI3DRenderMng.cpp:130-132`: `glLoadIdentity` + per-object `Render3D`
-  transforms) onto the stack. This is the site that makes a global `uView` swap
-  unsafe today, so it must be covered.
-- **13.5.3:** mirror per-object / nested `glPushMatrix`/`glTranslatef` sites that
-  wrap BMD draws (audit §2.2: 15 files, 62 push/pop). Each slice is behavior-
-  identical (gl* calls stay; stack is mirrored alongside).
-- **13.5.N (consumer swap):** once `g_ModelViewStack.Top()` provably equals the
-  live `GL_MODELVIEW_MATRIX` at every VBO draw (world + previews), swap
-  `RenderMeshVBO`'s `uView` source from the `glGetFloatv` readback to `Top()`,
-  mirroring the 13.4 projection swap. This is the first visible-risk slice of the
-  view migration.
+Remaining work is **paused**: mirroring every modelview site (the NewUI preview
+plus **16 `Render3D` implementations** and audit §2.2's 62 `glPush/PopMatrix`
+across 15 files) is large, and hand-mirroring desyncs easily. When resumed, do it
+via a **wrapper API** (`RM_LoadIdentity/Push/Pop/Rotate/Translate/…` that call the
+`gl*` op *and* update `g_ModelViewStack` in one place), migrate sites
+mechanically, then swap `RenderMeshVBO`'s `uView` from the `glGetFloatv` readback
+to `Top()`. Belongs with Phase 15/17 (character/BMD + UI previews).
 
 Do not remove any `gluPerspective`/`glRotatef` yet.
+
+### Actual next step — Phase 14 (terrain), chosen path
+
+**Terrain architecture (as-is).** `ZzzLodTerrain.cpp` draws ground/water/grass via
+a **mix** of immediate mode (many `glBegin(GL_TRIANGLE_FAN)` + `Vertex*` helpers)
+and **client arrays** (`glVertexPointer`/`glColorPointer`/`glTexCoordPointer` +
+`glDrawArrays(GL_QUADS)`, ~line 1961). It binds `CShaderScene::Use(eShaderS_Terrain)`
+(`terrain.vs/.fs`, `#version 330 compatibility`, reading `gl_ModelViewProjectionMatrix`,
+`gl_Vertex`, `gl_NormalMatrix`, `gl_Normal`, `gl_MultiTexCoord0`, `gl_Color`).
+`CShaderScene` loads programs by base name from `s_ShaderBaseName[]` and supports
+a post-`#version` define via `BuildProgramFromFiles(..., vertexDefine)`.
+
+**Phase 14 slice plan (each additive/behavior-preserving until the explicit switch):**
+
+- **14.1 (done, inert):** authored Core-profile shaders `Client\Shaders\terrain_core.vs`
+  / `terrain_core.fs` — explicit attributes (`aPos/aNormal/aTex/aColor`) and
+  uniforms (`uProj/uModelView/uNormalMatrix/texture1/brightness/contrast`),
+  semantically identical to `terrain.vs/.fs`. Not referenced by `CShaderScene`
+  yet → zero behavior change, nothing to build.
+- **14.2:** wire a Core terrain program slot into `CShaderScene` that
+  **compile-links `terrain_core` at Init and logs the result** (skill rule 8),
+  but is NOT bound for drawing. Proves the Core shaders compile/link on the
+  user's GPU with the scene unchanged. First build + runtime (log + scene
+  identical) checkpoint.
+- **14.3:** build the terrain **VBO/VAO** (interleaved `aPos/aNormal/aTex/aColor`)
+  alongside the existing feed, populated per frame from the same terrain vertex
+  data, but not drawn. Additive.
+- **14.4:** behind a new opt-in flag (e.g. `-gl33terrain`), draw the ground pass
+  via the VBO + `terrain_core` program (feeding `uProj`=`g_ProjectionMatrix`,
+  `uModelView` from the camera, `uNormalMatrix`), converting `GL_QUADS` → two
+  triangles. Default path untouched. Validate per map.
+- **14.5+:** extend to water, grass, and the alpha/blend passes; fold fog and
+  alpha test into the fragment shader; then make the Core terrain path default
+  once every map validates.
+
+Highest visual risk in the whole migration — validate per map, and water / grass /
+alpha specifically, on NVIDIA/AMD/Intel when available.
 
 Build note: the MSBuild compile (Release/x86,
 `MSBuild.exe Main.sln -p:Configuration=Release -p:Platform=x86 -m`) is run per
