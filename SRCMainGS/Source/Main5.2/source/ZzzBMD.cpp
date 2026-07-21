@@ -32,6 +32,10 @@ extern float MouseX;
 extern float MouseY;
 extern bool MouseLButton;
 
+// Phase 13.4: CPU projection mirror built in ZzzOpenglUtil.cpp gluPerspective2.
+// Declared byte-safe here (ZzzOpenglUtil.h is ISO-8859; keep it untouched).
+extern float g_ProjectionMatrix[16];
+
 
 vec4_t BoneQuaternion[MAX_BONES];
 short  BoundingVertices[MAX_BONES];
@@ -3826,6 +3830,13 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 		glGetFloatv(GL_MODELVIEW_MATRIX, localModelView);
 		glGetFloatv(GL_PROJECTION_MATRIX, localProjection);
 	}
+
+	// Phase 13.4: first real consumer of the CPU matrix backbone. Feed uProj from
+	// g_ProjectionMatrix (built 1:1 alongside gluPerspective in gluPerspective2)
+	// instead of the fixed-function readback. Projection is always global (never
+	// per-object), so this is the safe first swap; uView still reads the driver's
+	// MODELVIEW (see Phase 13.5). Identical rendering proves the CPU build matches.
+	projection = g_ProjectionMatrix;
 
 	// Uniform values persist per linked program. Within this snapshot lifetime,
 	// upload the identical camera matrices only on the first use of each VBO
