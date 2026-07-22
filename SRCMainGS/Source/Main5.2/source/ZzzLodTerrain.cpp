@@ -212,6 +212,11 @@ static bool RenderTerrainGrassQuadCore(const vec4_t* colors)
 	gShaderScene.SetFloat("brightness", 1.f);
 	gShaderScene.SetFloat("contrast", 1.f);
 
+	// Clear any GL error left by earlier legacy draws (MU's fixed-function code
+	// never calls glGetError, so errors accumulate) so the one-time check below
+	// reflects ONLY this Core draw. Bounded to avoid spinning on a lost context.
+	for (int e = 0; e < 8 && glGetError() != GL_NO_ERROR; ++e) {}
+
 	glBindVertexArray(s_vao);
 	glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
@@ -219,15 +224,15 @@ static bool RenderTerrainGrassQuadCore(const vec4_t* colors)
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-	// One-time self-diagnostic (Phase 14.4): confirm from the log that the Core
-	// grass path actually executed under -gl33terrain and whether the draw raised
-	// a GL error, so the slice is verifiable without an in-engine screenshot.
+	// One-time self-diagnostic (Phase 14.4): with the error cleared just above,
+	// this value is caused by THIS draw only, so the log verifies the Core grass
+	// path executed cleanly without an in-engine screenshot.
 	static bool s_logged = false;
 	if (!s_logged)
 	{
 		s_logged = true;
 		const GLenum err = glGetError();
-		g_ErrorReport.Write("> [Shader] Core grass path active (terrain_core program %u), first draw glGetError=0x%04X\r\n",
+		g_ErrorReport.Write("> [Shader] Core grass path active (terrain_core program %u), this-draw glGetError=0x%04X\r\n",
 			gShaderScene.GetProgram(eShaderS_TerrainCore), (unsigned)err);
 	}
 
