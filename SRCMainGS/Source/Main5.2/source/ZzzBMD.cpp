@@ -2400,7 +2400,6 @@ void BMD::RenderBodyShadow(int BlendMesh, int HiddenMesh, int StartMeshNumber, i
 	}
 
 	EndRender();
-	glDisable(GL_POLYGON_OFFSET_FILL);
 	EnableDepthMask();
 	EnableCullFace();
 	glDisable(GL_STENCIL_TEST);
