@@ -145,17 +145,21 @@ static bool GL33TerrainEnabled()
 	return cached != 0;
 }
 
-static bool RenderTerrainGrassQuadCore(const vec4_t* colors)
+// Phase 14.5: shared Core-profile draw for a terrain quad (grass and ground base
+// tile). Reads the current TerrainVertex[4]/TerrainTextureCoord[4] globals (set by
+// the caller just like the legacy Vertex0..3 helpers) and the 4 passed colors,
+// and draws two triangles through terrain_core. Returns false (caller keeps the
+// legacy path) when -gl33terrain is off or terrain_core is unavailable.
+static bool RenderTerrainQuadCore(const vec4_t* colors)
 {
-	// One-time entry diagnostic (Phase 14.4): logs on the first grass draw
-	// regardless of outcome, so the log disambiguates a fall-back: whether the
-	// grass branch was even reached, the -gl33terrain flag state, and whether
-	// terrain_core is loaded. If this line is absent, no grass was drawn at all.
+	// One-time entry diagnostic: logs on the first terrain-quad draw regardless of
+	// outcome, so the log disambiguates a fall-back: whether the branch was even
+	// reached, the -gl33terrain flag state, and whether terrain_core is loaded.
 	static bool s_entryLogged = false;
 	if (!s_entryLogged)
 	{
 		s_entryLogged = true;
-		g_ErrorReport.Write("> [Shader] grass core check: -gl33terrain=%d, terrain_core program=%u\r\n",
+		g_ErrorReport.Write("> [Shader] terrain core check: -gl33terrain=%d, terrain_core program=%u\r\n",
 			GL33TerrainEnabled() ? 1 : 0, gShaderScene.GetProgram(eShaderS_TerrainCore));
 	}
 
@@ -232,7 +236,7 @@ static bool RenderTerrainGrassQuadCore(const vec4_t* colors)
 	{
 		s_logged = true;
 		const GLenum err = glGetError();
-		g_ErrorReport.Write("> [Shader] Core grass path active (terrain_core program %u), this-draw glGetError=0x%04X\r\n",
+		g_ErrorReport.Write("> [Shader] Core terrain path active (terrain_core program %u), this-draw glGetError=0x%04X\r\n",
 			gShaderScene.GetProgram(eShaderS_TerrainCore), (unsigned)err);
 	}
 
@@ -1845,12 +1849,34 @@ void RenderFace(int Texture, int mx, int my)
 	}
 
 	BindTexture(BITMAP_MAPTILE + Texture);
+
+	bool drewGroundCore = false;
+#ifdef SHADER_PIPELINE
+	// Phase 14.5: opt-in Core-profile ground base tile (-gl33terrain). Same quad as
+	// Vertex0..3 (TerrainVertex/TerrainTextureCoord + PrimaryTerrainLight per corner),
+	// drawn through terrain_core; falls back to the legacy fan below when off.
+	{
+		vec4_t groundColors[4];
+		const int gidx[4] = { TerrainIndex1, TerrainIndex2, TerrainIndex3, TerrainIndex4 };
+		for (int i = 0; i < 4; ++i)
+		{
+			groundColors[i][0] = PrimaryTerrainLight[gidx[i]][0];
+			groundColors[i][1] = PrimaryTerrainLight[gidx[i]][1];
+			groundColors[i][2] = PrimaryTerrainLight[gidx[i]][2];
+			groundColors[i][3] = 1.f;
+		}
+		drewGroundCore = RenderTerrainQuadCore(groundColors);
+	}
+#endif
+	if (!drewGroundCore)
+	{
 	glBegin(GL_TRIANGLE_FAN);
 	Vertex0();
 	Vertex1();
 	Vertex2();
 	Vertex3();
 	glEnd();
+	}
 }
 
 void RenderFace_After(int Texture, int mx, int my)
@@ -2094,7 +2120,7 @@ void RenderTerrainFace(float xf, float yf, int xi, int yi, float lodf)
 #ifdef SHADER_PIPELINE
 				// Phase 14.4: opt-in Core-profile grass draw (-gl33terrain). Falls
 				// back to the legacy client-array GL_QUADS path below when off.
-				drewGrassCore = RenderTerrainGrassQuadCore(colors);
+				drewGrassCore = RenderTerrainQuadCore(colors);
 #endif
 				if (!drewGrassCore)
 				{

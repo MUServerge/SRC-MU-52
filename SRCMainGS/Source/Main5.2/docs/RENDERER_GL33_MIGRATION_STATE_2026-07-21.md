@@ -36,7 +36,8 @@ Give the new session this context:
 | 14.1 | Authored Core terrain shaders `terrain_core.vs/.fs` (inert, not wired) | n/a (GLSL assets, no C++) | n/a — not referenced by `CShaderScene`, zero behavior change |
 | 14.2 | `CShaderScene::Init` compile-link **probe** of `terrain_core` (logged, deleted, not bound); dropped non-portable uniform initializers from `terrain_core.fs` | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti (GL 4.6): log `Core terrain probe 'terrain_core' compiled+linked OK`, scene identical (AMD/Intel still to check) |
 | 14.3 | Promote `terrain_core` to a kept program: new `eShaderS_TerrainCore` enum slot + `s_ShaderBaseName` entry; removed the throwaway probe (loop loads/keeps it, not bound) | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti: log `Loaded 'terrain_core' (program 9)`, `Init OK`, scene identical |
-| 14.4 | First Core-drawn geometry: grass `GL_QUADS` → VBO/VAO + `terrain_core` behind `-gl33terrain`; `CShaderScene::SetMat4/SetMat3` added; default path untouched | ✅ Release x86 (0 warn/err) | **VISUAL check needed**: run with `-gl33terrain`, grass must match the default run (no flag) per map |
+| 14.4 | First Core-drawn geometry: grass `GL_QUADS` → VBO/VAO + `terrain_core` behind `-gl33terrain`; `CShaderScene::SetMat4/SetMat3` added; default path untouched | ✅ Release x86 (0 warn/err) | ✅ NVIDIA: `Core terrain path active ... this-draw glGetError=0x0000`; UI regression from a program-stack leak fixed in 14.4.4 |
+| 14.5 | Ground base tile fan → shared `RenderTerrainQuadCore` (renamed from grass helper) under `-gl33terrain`; grass + ground now both Core-drawn | ✅ Release x86 (0 warn/err) | **VISUAL check needed**: with `-gl33terrain`, ground must match the no-flag run per map (no patchwork vs legacy alpha-layer tiles) |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
@@ -161,10 +162,19 @@ a post-`#version` define via `BuildProgramFromFiles(..., vertexDefine)`.
   limitations to watch: per-quad program switch (perf only, this is a proof path),
   and the static VAO/VBO/EBO are not deleted at shutdown (acceptable for the gated
   experiment; give them an owner before the path becomes default).
-- **14.5+:** once grass matches, extend the Core path to the ground fans and the
-  water/alpha/blend passes (converting their `glBegin(GL_TRIANGLE_FAN)` immediate
-  mode to the VBO), fold fog + alpha test into the shader, then make Core terrain
-  the default once every map validates.
+- **14.5 (done, compiles):** the grass helper was generalized to
+  `RenderTerrainQuadCore(colors)` (reads `TerrainVertex`/`TerrainTextureCoord`
+  globals + 4 colors) and the **ground base tile** fan (`RenderFace`, the
+  `Vertex0..3` `GL_TRIANGLE_FAN`) now routes through it under `-gl33terrain`, with
+  ground colors from `PrimaryTerrainLight[TerrainIndex1..4]`. Grass and the base
+  ground tile are both Core-drawn now; alpha-layer/blend/special tiles still use
+  the legacy fan. Verify visually: with `-gl33terrain` the ground must match the
+  no-flag run (no color/brightness patchwork between Core base tiles and legacy
+  alpha tiles). Perf note: still one program switch per quad (proof path).
+- **14.6+:** convert the alpha-layer, water and blend terrain passes (the other
+  `glBegin(GL_TRIANGLE_FAN)` sites and `Vertex__alpha*`), fold fog + alpha test
+  into the fragment shader, batch tiles to drop the per-quad program switch, then
+  make Core terrain the default once every map validates.
 - **14.5+:** extend to water, grass, and the alpha/blend passes; fold fog and
   alpha test into the fragment shader; then make the Core terrain path default
   once every map validates.
