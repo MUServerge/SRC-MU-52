@@ -2369,18 +2369,6 @@ void BMD::RenderBodyShadow(int BlendMesh, int HiddenMesh, int StartMeshNumber, i
 	// flips frame to frame as the model moves/animates, dropping triangles in and out - that is
 	// the shimmer. Draw the shadow double-sided; restore the scene default afterwards.
 	DisableCullFace();
-
-	// Second, larger shimmer cause: CalcShadowPosition snaps each shadow vertex to
-	// RequestTerrainHeight(x,y)+5, but the shadow triangles do not follow the terrain
-	// tessellation, so the interpolated shadow depth crosses the ground surface inside
-	// a triangle and z-fights the terrain (fragments drop in and out as the model
-	// animates). A depth-space polygon offset biases the whole shadow toward the camera
-	// at rasterization (slope-scaled by the first arg, plus a constant by the second),
-	// so it consistently wins the depth test against the ground. It writes no depth
-	// (DepthMask off above), so real objects still occlude it normally.
-	glEnable(GL_POLYGON_OFFSET_FILL);
-	glPolygonOffset(-2.0f, -2.0f);
-
 	BeginRender(1.f);
 
 	int startMesh = 0;
