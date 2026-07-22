@@ -145,6 +145,135 @@ static bool GL33TerrainEnabled()
 	return cached != 0;
 }
 
+// ===========================================================================
+// Phase 14.5 (full terrain Core pass). terrain_core is bound ONCE for the whole
+// terrain render (TerrainCoreBegin, from RenderTerrain); every tile fan is then
+// collected through the emit helpers below (tTexCoord/tColor/tVertex, which the
+// Vertex* functions call) and drawn as a GL_TRIANGLE_FAN. All terrain stays on
+// one program -> no fixed-function coplanar overlay -> no z-fight, and no per-quad
+// program switch. Active only under -gl33terrain; otherwise the emit helpers fall
+// through to fixed-function immediate mode (g_bTerrainCoreActive == false).
+// ===========================================================================
+enum { TERRAIN_FAN_MAX = 24 };
+static bool   g_bTerrainCoreActive = false;
+static float  s_fanVerts[TERRAIN_FAN_MAX * 12];   // interleaved pos3/nrm3/tex2/col4
+static int    s_fanCount = 0;
+static float  s_curTex[2] = { 0.f, 0.f };
+static float  s_curCol[4] = { 1.f, 1.f, 1.f, 1.f };
+static GLuint s_fanVao = 0, s_fanVbo = 0;
+
+// Immediate-mode-style emit helpers. In Core mode they accumulate the current
+// vertex into the active fan; otherwise they call fixed-function GL unchanged.
+static inline void tTexCoord(float u, float v)
+{
+	if (g_bTerrainCoreActive) { s_curTex[0] = u; s_curTex[1] = v; return; }
+	glTexCoord2f(u, v);
+}
+static inline void tColor4(float r, float g, float b, float a)
+{
+	if (g_bTerrainCoreActive) { s_curCol[0]=r; s_curCol[1]=g; s_curCol[2]=b; s_curCol[3]=a; return; }
+	glColor4f(r, g, b, a);
+}
+static inline void tColor3fv(const float* c)
+{
+	if (g_bTerrainCoreActive) { s_curCol[0]=c[0]; s_curCol[1]=c[1]; s_curCol[2]=c[2]; s_curCol[3]=1.f; return; }
+	glColor3fv(c);
+}
+static inline void tVertex(const float* p)
+{
+	if (g_bTerrainCoreActive)
+	{
+		if (s_fanCount < TERRAIN_FAN_MAX)
+		{
+			float* d = s_fanVerts + s_fanCount * 12;
+			d[0]=p[0]; d[1]=p[1]; d[2]=p[2];
+			d[3]=0.f; d[4]=0.f; d[5]=1.f;
+			d[6]=s_curTex[0]; d[7]=s_curTex[1];
+			d[8]=s_curCol[0]; d[9]=s_curCol[1]; d[10]=s_curCol[2]; d[11]=s_curCol[3];
+			++s_fanCount;
+		}
+		return;
+	}
+	glVertex3fv(p);
+}
+
+// Fan begin/end used at each terrain draw site (replace glBegin(GL_TRIANGLE_FAN)
+// / glEnd). Legacy immediate mode when the Core path is inactive.
+static inline void TerrainFanBegin()
+{
+	if (g_bTerrainCoreActive) { s_fanCount = 0; return; }
+	glBegin(GL_TRIANGLE_FAN);
+}
+static void TerrainFanEnd()
+{
+	if (g_bTerrainCoreActive)
+	{
+		if (s_fanCount >= 3)
+		{
+			glBindBuffer(GL_ARRAY_BUFFER, s_fanVbo);
+			glBufferSubData(GL_ARRAY_BUFFER, 0, s_fanCount * 12 * (int)sizeof(float), s_fanVerts);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, s_fanCount);
+		}
+		return;
+	}
+	glEnd();
+}
+
+// Bind terrain_core once for the terrain pass and set the shared uniforms; sets
+// g_bTerrainCoreActive so the emit helpers route to the Core fan collector.
+static bool TerrainCoreBegin()
+{
+	if (!GL33TerrainEnabled() || gShaderScene.GetProgram(eShaderS_TerrainCore) == 0)
+		return false;
+	if (!gShaderScene.Use(eShaderS_TerrainCore))
+		return false;
+
+	if (s_fanVao == 0)
+	{
+		const GLsizei stride = 12 * sizeof(float);
+		glGenVertexArrays(1, &s_fanVao);
+		glBindVertexArray(s_fanVao);
+		glGenBuffers(1, &s_fanVbo);
+		glBindBuffer(GL_ARRAY_BUFFER, s_fanVbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(s_fanVerts), NULL, GL_DYNAMIC_DRAW);
+		glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)(0));
+		glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2); glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+		glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
+	}
+	glBindVertexArray(s_fanVao);
+
+	static const float kIdentity3[9] = { 1.f,0.f,0.f, 0.f,1.f,0.f, 0.f,0.f,1.f };
+	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
+	gShaderScene.SetMat4("uModelView", g_ViewMatrix);
+	gShaderScene.SetMat3("uNormalMatrix", kIdentity3);
+	gShaderScene.SetInt("texture1", 0);
+	gShaderScene.SetFloat("brightness", 1.f);
+	gShaderScene.SetFloat("contrast", 1.f);
+
+	g_bTerrainCoreActive = true;
+
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		g_ErrorReport.Write("> [Shader] Core terrain pass active (terrain_core program %u, single bind)\r\n",
+			gShaderScene.GetProgram(eShaderS_TerrainCore));
+	}
+	return true;
+}
+
+// End the Core terrain pass: unbind and restore the previously bound program.
+static void TerrainCoreEnd()
+{
+	if (!g_bTerrainCoreActive)
+		return;
+	g_bTerrainCoreActive = false;
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+}
+
 // Phase 14.5: shared Core-profile draw for a terrain quad (grass and ground base
 // tile). Reads the current TerrainVertex[4]/TerrainTextureCoord[4] globals (set by
 // the caller just like the legacy Vertex0..3 helpers) and the 4 passed colors,
