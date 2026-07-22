@@ -1690,202 +1690,202 @@ inline void Interpolation(int mx, int my)
 
 inline void Vertex0()
 {
-	glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
-	glColor3fv(PrimaryTerrainLight[TerrainIndex1]);
-	glVertex3fv(TerrainVertex[0]);
+	tTexCoord(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
+	tColor3fv(PrimaryTerrainLight[TerrainIndex1]);
+	tVertex(TerrainVertex[0]);
 }
 
 inline void Vertex1()
 {
-	glTexCoord2f(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
-	glColor3fv(PrimaryTerrainLight[TerrainIndex2]);
-	glVertex3fv(TerrainVertex[1]);
+	tTexCoord(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
+	tColor3fv(PrimaryTerrainLight[TerrainIndex2]);
+	tVertex(TerrainVertex[1]);
 }
 
 inline void Vertex2()
 {
-	glTexCoord2f(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
-	glColor3fv(PrimaryTerrainLight[TerrainIndex3]);
-	glVertex3fv(TerrainVertex[2]);
+	tTexCoord(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
+	tColor3fv(PrimaryTerrainLight[TerrainIndex3]);
+	tVertex(TerrainVertex[2]);
 }
 
 inline void Vertex3()
 {
-	glTexCoord2f(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
-	glColor3fv(PrimaryTerrainLight[TerrainIndex4]);
-	glVertex3fv(TerrainVertex[3]);
+	tTexCoord(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
+	tColor3fv(PrimaryTerrainLight[TerrainIndex4]);
+	tVertex(TerrainVertex[3]);
 }
 
 inline void Vertex01()
 {
-	glTexCoord2f(TerrainTextureCoord01[0], TerrainTextureCoord01[1]);
-	glColor3fv(PrimaryTerrainLight[Index01]);
-	glVertex3fv(TerrainVertex01);
+	tTexCoord(TerrainTextureCoord01[0], TerrainTextureCoord01[1]);
+	tColor3fv(PrimaryTerrainLight[Index01]);
+	tVertex(TerrainVertex01);
 }
 
 inline void Vertex12()
 {
-	glTexCoord2f(TerrainTextureCoord12[0], TerrainTextureCoord12[1]);
-	glColor3fv(PrimaryTerrainLight[Index12]);
-	glVertex3fv(TerrainVertex12);
+	tTexCoord(TerrainTextureCoord12[0], TerrainTextureCoord12[1]);
+	tColor3fv(PrimaryTerrainLight[Index12]);
+	tVertex(TerrainVertex12);
 }
 
 inline void Vertex23()
 {
-	glTexCoord2f(TerrainTextureCoord23[0], TerrainTextureCoord23[1]);
-	glColor3fv(PrimaryTerrainLight[Index23]);
-	glVertex3fv(TerrainVertex23);
+	tTexCoord(TerrainTextureCoord23[0], TerrainTextureCoord23[1]);
+	tColor3fv(PrimaryTerrainLight[Index23]);
+	tVertex(TerrainVertex23);
 }
 
 inline void Vertex30()
 {
-	glTexCoord2f(TerrainTextureCoord30[0], TerrainTextureCoord30[1]);
-	glColor3fv(PrimaryTerrainLight[Index30]);
-	glVertex3fv(TerrainVertex30);
+	tTexCoord(TerrainTextureCoord30[0], TerrainTextureCoord30[1]);
+	tColor3fv(PrimaryTerrainLight[Index30]);
+	tVertex(TerrainVertex30);
 }
 
 inline void Vertex02()
 {
-	glTexCoord2f(TerrainTextureCoord02[0], TerrainTextureCoord02[1]);
-	glColor3fv(PrimaryTerrainLight[Index02]);
-	glVertex3fv(TerrainVertex02);
+	tTexCoord(TerrainTextureCoord02[0], TerrainTextureCoord02[1]);
+	tColor3fv(PrimaryTerrainLight[Index02]);
+	tVertex(TerrainVertex02);
 }
 
 inline void VertexAlpha0()
 {
-	glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
+	tTexCoord(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
 	float* Light = &PrimaryTerrainLight[TerrainIndex1][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex1]);
-	glVertex3fv(TerrainVertex[0]);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex1]);
+	tVertex(TerrainVertex[0]);
 }
 
 inline void VertexAlpha1()
 {
-	glTexCoord2f(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
+	tTexCoord(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
 	float* Light = &PrimaryTerrainLight[TerrainIndex2][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex2]);
-	glVertex3fv(TerrainVertex[1]);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex2]);
+	tVertex(TerrainVertex[1]);
 }
 
 inline void VertexAlpha2()
 {
-	glTexCoord2f(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
+	tTexCoord(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
 	float* Light = &PrimaryTerrainLight[TerrainIndex3][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex3]);
-	glVertex3fv(TerrainVertex[2]);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex3]);
+	tVertex(TerrainVertex[2]);
 }
 
 inline void VertexAlpha3()
 {
-	glTexCoord2f(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
+	tTexCoord(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
 	float* Light = &PrimaryTerrainLight[TerrainIndex4][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex4]);
-	glVertex3fv(TerrainVertex[3]);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex4]);
+	tVertex(TerrainVertex[3]);
 }
 
 inline void VertexAlpha01()
 {
-	glTexCoord2f(TerrainTextureCoord01[0], TerrainTextureCoord01[1]);
+	tTexCoord(TerrainTextureCoord01[0], TerrainTextureCoord01[1]);
 	float* Light = &PrimaryTerrainLight[Index01][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha01);
-	glVertex3fv(TerrainVertex01);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha01);
+	tVertex(TerrainVertex01);
 }
 
 inline void VertexAlpha12()
 {
-	glTexCoord2f(TerrainTextureCoord12[0], TerrainTextureCoord12[1]);
+	tTexCoord(TerrainTextureCoord12[0], TerrainTextureCoord12[1]);
 	float* Light = &PrimaryTerrainLight[Index12][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha12);
-	glVertex3fv(TerrainVertex12);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha12);
+	tVertex(TerrainVertex12);
 }
 
 inline void VertexAlpha23()
 {
-	glTexCoord2f(TerrainTextureCoord23[0], TerrainTextureCoord23[1]);
+	tTexCoord(TerrainTextureCoord23[0], TerrainTextureCoord23[1]);
 	float* Light = &PrimaryTerrainLight[Index23][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha23);
-	glVertex3fv(TerrainVertex23);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha23);
+	tVertex(TerrainVertex23);
 }
 
 inline void VertexAlpha30()
 {
-	glTexCoord2f(TerrainTextureCoord30[0], TerrainTextureCoord30[1]);
+	tTexCoord(TerrainTextureCoord30[0], TerrainTextureCoord30[1]);
 	float* Light = &PrimaryTerrainLight[Index30][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha30);
-	glVertex3fv(TerrainVertex30);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha30);
+	tVertex(TerrainVertex30);
 }
 
 inline void VertexAlpha02()
 {
-	glTexCoord2f(TerrainTextureCoord02[0], TerrainTextureCoord02[1]);
+	tTexCoord(TerrainTextureCoord02[0], TerrainTextureCoord02[1]);
 	float* Light = &PrimaryTerrainLight[Index02][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha02);
-	glVertex3fv(TerrainVertex02);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha02);
+	tVertex(TerrainVertex02);
 }
 
 inline void VertexBlend0()
 {
-	glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
+	tTexCoord(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
 	float Light = TerrainMappingAlpha[TerrainIndex1];
-	glColor3f(Light, Light, Light);
-	glVertex3fv(TerrainVertex[0]);
+	tColor4(Light, Light, Light, 1.f);
+	tVertex(TerrainVertex[0]);
 }
 
 inline void VertexBlend1()
 {
-	glTexCoord2f(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
+	tTexCoord(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
 	float Light = TerrainMappingAlpha[TerrainIndex2];
-	glColor3f(Light, Light, Light);
-	glVertex3fv(TerrainVertex[1]);
+	tColor4(Light, Light, Light, 1.f);
+	tVertex(TerrainVertex[1]);
 }
 
 inline void VertexBlend2()
 {
-	glTexCoord2f(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
+	tTexCoord(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
 	float Light = TerrainMappingAlpha[TerrainIndex3];
-	glColor3f(Light, Light, Light);
-	glVertex3fv(TerrainVertex[2]);
+	tColor4(Light, Light, Light, 1.f);
+	tVertex(TerrainVertex[2]);
 }
 
 inline void VertexBlend3()
 {
-	glTexCoord2f(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
+	tTexCoord(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
 	float Light = TerrainMappingAlpha[TerrainIndex4];
-	glColor3f(Light, Light, Light);
-	glVertex3fv(TerrainVertex[3]);
+	tColor4(Light, Light, Light, 1.f);
+	tVertex(TerrainVertex[3]);
 }
 
 void Vertex__alpha0(float Alpha, bool Normal)
 {
-	glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
-	glColor4f(PrimaryTerrainLight[TerrainIndex1][0], PrimaryTerrainLight[TerrainIndex1][1], PrimaryTerrainLight[TerrainIndex1][2], Alpha);
-	glVertex3fv(TerrainVertex[0]);
-	if (Normal) glNormal3fv(TerrainNormal[TerrainIndex1]);
+	tTexCoord(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
+	tColor4(PrimaryTerrainLight[TerrainIndex1][0], PrimaryTerrainLight[TerrainIndex1][1], PrimaryTerrainLight[TerrainIndex1][2], Alpha);
+	tVertex(TerrainVertex[0]);
+	if (Normal && !g_bTerrainCoreActive) glNormal3fv(TerrainNormal[TerrainIndex1]);
 }
 
 void Vertex__alpha1(float Alpha, bool Normal)
 {
-	glTexCoord2f(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
-	glColor4f(PrimaryTerrainLight[TerrainIndex2][0], PrimaryTerrainLight[TerrainIndex2][1], PrimaryTerrainLight[TerrainIndex2][2], Alpha);
-	glVertex3fv(TerrainVertex[1]);
-	if (Normal) glNormal3fv(TerrainNormal[TerrainIndex2]);
+	tTexCoord(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
+	tColor4(PrimaryTerrainLight[TerrainIndex2][0], PrimaryTerrainLight[TerrainIndex2][1], PrimaryTerrainLight[TerrainIndex2][2], Alpha);
+	tVertex(TerrainVertex[1]);
+	if (Normal && !g_bTerrainCoreActive) glNormal3fv(TerrainNormal[TerrainIndex2]);
 }
 
 void Vertex__alpha2(float Alpha, bool Normal)
 {
-	glTexCoord2f(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
-	glColor4f(PrimaryTerrainLight[TerrainIndex3][0], PrimaryTerrainLight[TerrainIndex3][1], PrimaryTerrainLight[TerrainIndex3][2], Alpha);
-	glVertex3fv(TerrainVertex[2]);
-	if (Normal) glNormal3fv(TerrainNormal[TerrainIndex3]);
+	tTexCoord(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
+	tColor4(PrimaryTerrainLight[TerrainIndex3][0], PrimaryTerrainLight[TerrainIndex3][1], PrimaryTerrainLight[TerrainIndex3][2], Alpha);
+	tVertex(TerrainVertex[2]);
+	if (Normal && !g_bTerrainCoreActive) glNormal3fv(TerrainNormal[TerrainIndex3]);
 }
 
 void Vertex__alpha3(float Alpha, bool Normal)
 {
-	glTexCoord2f(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
-	glColor4f(PrimaryTerrainLight[TerrainIndex4][0], PrimaryTerrainLight[TerrainIndex4][1], PrimaryTerrainLight[TerrainIndex4][2], Alpha);
-	glVertex3fv(TerrainVertex[3]);
+	tTexCoord(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
+	tColor4(PrimaryTerrainLight[TerrainIndex4][0], PrimaryTerrainLight[TerrainIndex4][1], PrimaryTerrainLight[TerrainIndex4][2], Alpha);
+	tVertex(TerrainVertex[3]);
 
-	if (Normal) glNormal3fv(TerrainNormal[TerrainIndex4]);
+	if (Normal && !g_bTerrainCoreActive) glNormal3fv(TerrainNormal[TerrainIndex4]);
 }
 
 void RenderFace(int Texture, int mx, int my)
