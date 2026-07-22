@@ -2364,22 +2364,20 @@ void BMD::RenderBodyShadow(int BlendMesh, int HiddenMesh, int StartMeshNumber, i
 
 	DisableTexture();
 	DisableDepthMask();
-
-	// Match the reference 5.2 client (SRC ThangCuoi) shadow, which does not shimmer:
-	// draw a translucent (~35% black) BLENDED shadow with the stencil buffer
-	// incrementing, instead of an opaque-black double-sided pass. With an opaque
-	// shadow every coverage flip of the near-degenerate silhouette triangles shows as
-	// hard black on/off (the shimmer); a blended shadow hides it and the stencil keeps
-	// overlapping flattened triangles from stacking. Culling stays as the scene set it
-	// (the reference does not disable it). State is self-contained: this overrides the
-	// caller's colour/blend (the fork caller sets opaque black + DisableAlphaBlend).
+	// Keep the double-sided draw (culling off) so the flattened shadow always renders
+	// regardless of its unreliable triangle winding -- removing this culled every
+	// shadow triangle and the shadow vanished. The shimmer fix is the TRANSLUCENT
+	// blend below (borrowed from the reference 5.2 client SRC ThangCuoi): an opaque
+	// black shadow showed every coverage flip of the near-degenerate silhouette
+	// triangles as hard black on/off; a soft blended shadow hides it. Alpha 0.2 per
+	// pass ~= the reference's single 0.35 since a double-sided flat sheet draws each
+	// pixel twice. Self-contained state (overrides the caller's opaque colour +
+	// DisableAlphaBlend), restored after.
+	DisableCullFace();
 	EnableAlphaTest(false);
 	EnableAlphaBlend();
-	glColor4f(0.0f, 0.0f, 0.0f, 0.35f);
+	glColor4f(0.0f, 0.0f, 0.0f, 0.2f);
 	BeginRender(1.f);
-
-	glEnable(GL_STENCIL_TEST);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
 
 	int startMesh = 0;
 	int endMesh = NumMeshs;
@@ -2411,6 +2409,7 @@ void BMD::RenderBodyShadow(int BlendMesh, int HiddenMesh, int StartMeshNumber, i
 
 	EndRender();
 	EnableDepthMask();
+	EnableCullFace();
 	glDisable(GL_STENCIL_TEST);
 }
 
