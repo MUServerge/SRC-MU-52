@@ -37,7 +37,7 @@ Give the new session this context:
 | 14.2 | `CShaderScene::Init` compile-link **probe** of `terrain_core` (logged, deleted, not bound); dropped non-portable uniform initializers from `terrain_core.fs` | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti (GL 4.6): log `Core terrain probe 'terrain_core' compiled+linked OK`, scene identical (AMD/Intel still to check) |
 | 14.3 | Promote `terrain_core` to a kept program: new `eShaderS_TerrainCore` enum slot + `s_ShaderBaseName` entry; removed the throwaway probe (loop loads/keeps it, not bound) | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti: log `Loaded 'terrain_core' (program 9)`, `Init OK`, scene identical |
 | 14.4 | First Core-drawn geometry: grass `GL_QUADS` → VBO/VAO + `terrain_core` behind `-gl33terrain`; `CShaderScene::SetMat4/SetMat3` added; default path untouched | ✅ Release x86 (0 warn/err) | ✅ NVIDIA: `Core terrain path active ... this-draw glGetError=0x0000`; UI regression from a program-stack leak fixed in 14.4.4 |
-| 14.5 | Ground base tile fan → shared `RenderTerrainQuadCore` (renamed from grass helper) under `-gl33terrain`; grass + ground now both Core-drawn | ✅ Release x86 (0 warn/err) | **VISUAL check needed**: with `-gl33terrain`, ground must match the no-flag run per map (no patchwork vs legacy alpha-layer tiles) |
+| 14.5 | Ground base tile fan → shared `RenderTerrainQuadCore` under `-gl33terrain` | ✅ built | ❌ **REVERTED** — coplanar z-fight: Core base tile vs fixed-function alpha overlays flickered black/white on camera move. Helper kept (grass uses it). |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
