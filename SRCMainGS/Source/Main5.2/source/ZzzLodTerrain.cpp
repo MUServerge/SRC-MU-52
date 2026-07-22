@@ -1951,21 +1951,21 @@ void RenderFace(int Texture, int mx, int my)
 		if ((TerrainWall[TerrainIndex1] & TW_ATT5) != 0)
 		{
 			BindTexture(BITMAP_map_texture08);
-			glBegin(GL_TRIANGLE_FAN);
+			TerrainFanBegin();
 			Vertex__alpha0(0.4000000, true);
 			Vertex__alpha1(0.4000000, true);
 			Vertex__alpha2(0.4000000, true);
 			Vertex__alpha3(0.4000000, true);
-			glEnd();
+			TerrainFanEnd();
 
 			EnableAlphaTest(true);
 			BindTexture(BITMAP_MAPTILE + Texture);
-			glBegin(GL_TRIANGLE_FAN);
+			TerrainFanBegin();
 			Vertex__alpha0((1.000000 - 0.4000000), false);
 			Vertex__alpha1((1.000000 - 0.4000000), false);
 			Vertex__alpha2((1.000000 - 0.4000000), false);
 			Vertex__alpha3((1.000000 - 0.4000000), false);
-			glEnd();
+			TerrainFanEnd();
 			return;
 		}
 	}
@@ -1978,12 +1978,12 @@ void RenderFace(int Texture, int mx, int my)
 	}
 
 	BindTexture(BITMAP_MAPTILE + Texture);
-	glBegin(GL_TRIANGLE_FAN);
+	TerrainFanBegin();
 	Vertex0();
 	Vertex1();
 	Vertex2();
 	Vertex3();
-	glEnd();
+	TerrainFanEnd();
 }
 
 void RenderFace_After(int Texture, int mx, int my)
@@ -1999,12 +1999,12 @@ void RenderFace_After(int Texture, int mx, int my)
 
 			BindTexture(BITMAP_MAPTILE + Texture);
 
-			glBegin(GL_TRIANGLE_FAN);
+			TerrainFanBegin();
 			Vertex0();
 			Vertex1();
 			Vertex2();
 			Vertex3();
-			glEnd();
+			TerrainFanEnd();
 		}
 	}
 }
@@ -2016,12 +2016,12 @@ void RenderFaceAlpha(int Texture, int mx, int my)
 		EnableAlphaTest();
 		BindTexture(BITMAP_MAPTILE + Texture);
 
-		glBegin(GL_TRIANGLE_FAN);
+		TerrainFanBegin();
 		VertexAlpha0();
 		VertexAlpha1();
 		VertexAlpha2();
 		VertexAlpha3();
-		glEnd();
+		TerrainFanEnd();
 	}
 
 }
@@ -2033,12 +2033,12 @@ void RenderFaceBlend(int Texture, int mx, int my)
 		EnableAlphaBlend();
 		BindTexture(BITMAP_MAPTILE + Texture);
 
-		glBegin(GL_TRIANGLE_FAN);
+		TerrainFanBegin();
 		VertexBlend0();
 		VertexBlend1();
 		VertexBlend2();
 		VertexBlend3();
-		glEnd();
+		TerrainFanEnd();
 	}
 }
 
@@ -2223,13 +2223,22 @@ void RenderTerrainFace(float xf, float yf, int xi, int yi, float lodf)
 					colors[i][2] = PrimaryTerrainLight[terrain_index[i]][2];
 				}
 
-				bool drewGrassCore = false;
 #ifdef SHADER_PIPELINE
-				// Phase 14.4: opt-in Core-profile grass draw (-gl33terrain). Falls
-				// back to the legacy client-array GL_QUADS path below when off.
-				drewGrassCore = RenderTerrainQuadCore(colors);
+				if (g_bTerrainCoreActive)
+				{
+					// Grass quad through the single-bind Core terrain pass. GL_QUADS
+					// order 0,1,2,3 == a 4-vertex GL_TRIANGLE_FAN (same two triangles).
+					TerrainFanBegin();
+					for (int gi = 0; gi < 4; ++gi)
+					{
+						tTexCoord(TerrainTextureCoord[gi][0], TerrainTextureCoord[gi][1]);
+						tColor4(colors[gi][0], colors[gi][1], colors[gi][2], colors[gi][3]);
+						tVertex(TerrainVertex[gi]);
+					}
+					TerrainFanEnd();
+				}
+				else
 #endif
-				if (!drewGrassCore)
 				{
 				glEnableClientState(GL_VERTEX_ARRAY);
 				glEnableClientState(GL_COLOR_ARRAY);
@@ -3378,7 +3387,12 @@ void RenderTerrain(bool EditFlag)
 	// which are drawn inside RenderTerrainFace). Game render only - the map
 	// editor path keeps the plain fixed-function look. Use() binds nothing and
 	// returns false if the terrain program failed to load, so we fall back safely.
-	bool bTerrainShader = (!EditFlag) && gShaderScene.Use(eShaderS_Terrain);
+	// Phase 14.5: prefer the single-bind Core terrain pass (every tile through
+	// terrain_core, so no fixed-function coplanar overlay -> no z-fight). Falls back
+	// to the compat terrain program, then fixed-function, so the default run
+	// (no -gl33terrain) is unchanged.
+	bool bTerrainCore = (!EditFlag) && TerrainCoreBegin();
+	bool bTerrainShader = (!bTerrainCore) && (!EditFlag) && gShaderScene.Use(eShaderS_Terrain);
 #endif // SHADER_PIPELINE
 
 	TerrainFlag = TERRAIN_MAP_NORMAL;
@@ -3398,7 +3412,9 @@ void RenderTerrain(bool EditFlag)
 		}
 #ifdef SHADER_PIPELINE
 		// Stop shading before the 3D pointers/markers below.
-		if (bTerrainShader)
+		if (bTerrainCore)
+			TerrainCoreEnd();
+		else if (bTerrainShader)
 			gShaderScene.Unuse();
 #endif // SHADER_PIPELINE
 		DisableDepthTest();
