@@ -3,6 +3,27 @@
 ============================================================
 
 ------------------------------------------------------------
+ 2026-07-22
+------------------------------------------------------------
+
+- Client shadow (KNOWN ISSUE, left temporarily): the projected character/object
+  ground shadow (BMD::RenderBodyShadow) shimmers - the flattened mesh's
+  near-degenerate silhouette triangles flip pixel coverage frame to frame, worst
+  on the Apostle Devin NPC and on the character up close. Confirmed NOT z-fighting
+  (polygon offset and disabling depth test both had no effect in earlier rounds).
+  A reference 5.2 client (SRC ThangCuoi) avoids the visible shimmer by drawing the
+  shadow TRANSLUCENT (blended ~35% black) with a stencil increment instead of the
+  opaque-black double-sided pass used here. Adopting that translucent approach was
+  attempted; with the current state setup the shadow does not render at all
+  (dropping DisableCullFace culled the whole shadow; the reference's stencil path
+  also relies on an ambient glStencilFunc / stencil clear this fork does not set).
+  Left in the non-rendering (effectively off) state for now - acceptable
+  temporarily since the shimmer was the complaint. Proper fix still pending:
+  replicate the reference's full translucent + stencil context (stencil func +
+  per-frame clear, single-sided winding), or move the shadow onto a render-to-
+  texture + blur path. (ZzzBMD.cpp RenderBodyShadow)
+
+------------------------------------------------------------
  2026-07-18
 ------------------------------------------------------------
 
