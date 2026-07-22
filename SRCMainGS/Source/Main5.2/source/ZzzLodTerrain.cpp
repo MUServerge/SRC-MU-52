@@ -1849,34 +1849,12 @@ void RenderFace(int Texture, int mx, int my)
 	}
 
 	BindTexture(BITMAP_MAPTILE + Texture);
-
-	bool drewGroundCore = false;
-#ifdef SHADER_PIPELINE
-	// Phase 14.5: opt-in Core-profile ground base tile (-gl33terrain). Same quad as
-	// Vertex0..3 (TerrainVertex/TerrainTextureCoord + PrimaryTerrainLight per corner),
-	// drawn through terrain_core; falls back to the legacy fan below when off.
-	{
-		vec4_t groundColors[4];
-		const int gidx[4] = { TerrainIndex1, TerrainIndex2, TerrainIndex3, TerrainIndex4 };
-		for (int i = 0; i < 4; ++i)
-		{
-			groundColors[i][0] = PrimaryTerrainLight[gidx[i]][0];
-			groundColors[i][1] = PrimaryTerrainLight[gidx[i]][1];
-			groundColors[i][2] = PrimaryTerrainLight[gidx[i]][2];
-			groundColors[i][3] = 1.f;
-		}
-		drewGroundCore = RenderTerrainQuadCore(groundColors);
-	}
-#endif
-	if (!drewGroundCore)
-	{
 	glBegin(GL_TRIANGLE_FAN);
 	Vertex0();
 	Vertex1();
 	Vertex2();
 	Vertex3();
 	glEnd();
-	}
 }
 
 void RenderFace_After(int Texture, int mx, int my)
