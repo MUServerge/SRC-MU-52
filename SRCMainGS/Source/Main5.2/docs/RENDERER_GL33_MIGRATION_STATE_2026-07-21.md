@@ -259,6 +259,43 @@ declare externs byte-safe (as `extern float g_ProjectionMatrix[16];` in
 Later phases (from the audit worklist): 14 terrain, 15 character/BMD fallback,
 16 effects/sprites/shadow/hair, 17 UI/3D previews, 18 Core switch.
 
+### Phase 16 — Effects / Sprites / Hair (ACTIVE)
+
+The highest-flicker-risk surface (FPS memory documents effect/blend meshes as the
+ones that historically flickered). Unlike terrain/character, these draws use NO
+scene shader today — they are pure fixed-function, and they depend on a real
+**texture-env** (`glTexEnvi(GL_TEXTURE_ENV_MODE, GL_ADD)` for additive glows and
+`GL_MODULATE`, `ZzzEffectParticle.cpp:9041/9044`), plus per-draw blend modes.
+
+Immediate-mode inventory: `ZzzEffectNoUse.cpp` (8 glBegin: GL_QUADS + GL_TRIANGLES),
+`ZzzEffectJoint.cpp` (4), `ZzzEffectBlurSpark.cpp` (2), `Sprite.cpp` (2,
+GL_TRIANGLE_FAN, 2D screen verts, textured + untextured branches),
+`SideHair.cpp` (4). Emit shape: `glTexCoord2f` + `glColor3fv`/`glColor4ub` +
+`glVertex3fv` (world) or `glVertex2f` (screen). Some untextured, some no colour.
+
+Plan (mirror terrain/character: inert shader first, then per-pass emit-collector
+behind an opt-in marker, verify, default):
+
+- **16.1 (done, inert):** authored `effect_core.vs/.fs`. Explicit attributes
+  (`aPos/aTex/aColor`), `uProj/uModelView`; the fragment shader reproduces the
+  fixed-function tex-env combine (`uTexEnvMode` 0=MODULATE/1=ADD/2=REPLACE),
+  `uUseTexture` for the untextured branches, and an optional `uAlphaRef` discard.
+  Alpha **blend** stays fixed-function (glBlendFunc is program-independent) — only
+  the texel*primary combine and alpha-test move into the shader. Not referenced by
+  `CShaderScene` → zero behavior change.
+- **16.2 (next):** add `eShaderS_EffectCore` to `CShaderScene` (load + keep + log,
+  not bound) — mirror 14.3/15.2. Runtime check: log `Loaded 'effect_core'`.
+- **16.3:** convert ONE low-risk, self-contained effect draw (candidate: a simple
+  world GL_QUADS billboard in `ZzzEffectNoUse.cpp`) to a VBO + `effect_core` emit
+  path behind a new marker `Client\gl33effect.enable`, single bind per effect
+  pass, `uTexEnvMode`/blend set from the draw's state. Verify identical.
+- **16.4+:** extend per effect family — joints/trails, blur/spark, hair — one at a
+  time, verifying each in the Release run (these are the flicker-prone ones; do
+  NOT batch-convert). Sprite.cpp 2D is arguably Phase 17 (UI); defer unless a 3D
+  effect needs it.
+- **16.N:** default on once every effect family validates. The character shadow
+  (`RenderBodyShadow`, translucent+stencil, currently off) rides along here.
+
 ## 5. RenderMatrix API quick reference
 
 `source/RenderMatrix.h`, namespace `RenderMatrix`, column-major `float[16]`
