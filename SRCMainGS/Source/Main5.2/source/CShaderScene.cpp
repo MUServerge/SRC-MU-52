@@ -17,6 +17,7 @@ namespace
 		"character",     // eShaderS_Character
 		"terrain_core",  // eShaderS_TerrainCore
 		"character_core",// eShaderS_CharacterCore
+		"effect_core",   // eShaderS_EffectCore
 	};
 }
 
@@ -217,6 +218,9 @@ bool CShaderScene::Init()
 	g_ErrorReport.Write("> [Shader] Init %s\r\n",
 		allOk ? "OK" : "completed with errors (fixed-function fallback active)");
 
+	// Phase 16.2: eShaderS_EffectCore ('effect_core') is loaded and kept the same
+	// way, for the upcoming Core effect/sprite/hair draw path. Not bound yet.
+	//
 	// Phase 15.2: eShaderS_CharacterCore ('character_core') is loaded and kept the
 	// same way as terrain_core, for the upcoming Core BMD draw path. It is not
 	// bound for rendering yet, so the scene is unchanged.

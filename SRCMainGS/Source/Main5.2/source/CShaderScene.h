@@ -8,6 +8,7 @@
 //   Shaders/character.vs + character.fs   (eShaderS_Character)
 //   Shaders/terrain_core.*                (eShaderS_TerrainCore,   330 core)
 //   Shaders/character_core.*              (eShaderS_CharacterCore, 330 core)
+//   Shaders/effect_core.*                 (eShaderS_EffectCore,    330 core)
 //
 // Each pair is loaded from "Shaders/<name>" first, then "Data/Shaders/<name>".
 //
@@ -34,7 +35,9 @@ enum eShaderSProgram
 	eShaderS_Character,
 	eShaderS_TerrainCore,   // Phase 14: Core-profile terrain (terrain_core.vs/.fs).
 	eShaderS_CharacterCore, // Phase 15: Core-profile character/BMD
-	                        // (character_core.vs/.fs), loaded but not bound yet.
+	                        // (character_core.vs/.fs).
+	eShaderS_EffectCore,    // Phase 16: Core-profile effects/sprites/hair
+	                        // (effect_core.vs/.fs), loaded but not bound yet.
 	eShaderS_MaxValue,
 };
 
