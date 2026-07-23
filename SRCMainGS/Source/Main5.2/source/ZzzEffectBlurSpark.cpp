@@ -385,22 +385,44 @@ void RenderObjectBlurs()
 							continue;
 					}
 
+					const float LightA = (b->Number - j) / (float)b->Number;
+					const float TexU0 = (j) / (float)b->Number;
+					const float LightB = (b->Number - (j + 1)) / (float)b->Number;
+					const float TexU1 = (j + 1) / (float)b->Number;
+
+#ifdef SHADER_PIPELINE
+					// Phase 16.4: same per-segment blur quad as RenderBlurs, for the
+					// object/monster blur trail. World-space verts, per-vertex colour,
+					// GL_MODULATE, no alpha test; blend stays fixed-function.
+					{
+						const float pos[4 * 3] = {
+							b->p1[j][0],     b->p1[j][1],     b->p1[j][2],
+							b->p2[j][0],     b->p2[j][1],     b->p2[j][2],
+							b->p2[j + 1][0], b->p2[j + 1][1], b->p2[j + 1][2],
+							b->p1[j + 1][0], b->p1[j + 1][1], b->p1[j + 1][2],
+						};
+						const float tex[4 * 2] = { TexU0,1.f,  TexU0,0.f,  TexU1,0.f,  TexU1,1.f };
+						const float col[4 * 4] = {
+							b->Light[0]*LightA, b->Light[1]*LightA, b->Light[2]*LightA, 1.f,
+							b->Light[0]*LightA, b->Light[1]*LightA, b->Light[2]*LightA, 1.f,
+							b->Light[0]*LightB, b->Light[1]*LightB, b->Light[2]*LightB, 1.f,
+							b->Light[0]*LightB, b->Light[1]*LightB, b->Light[2]*LightB, 1.f,
+						};
+						if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, pos, tex, col, 4, 0, true, -1.f))
+							continue;
+					}
+#endif // SHADER_PIPELINE
+
 					glBegin(GL_TRIANGLE_FAN);
-					float Light;
-					float TexU;
-					Light = (b->Number - j) / (float)b->Number;
-					glColor3f(b->Light[0] * Light, b->Light[1] * Light, b->Light[2] * Light);
-					TexU = (j) / (float)b->Number;
-					glTexCoord2f(TexU, 1.f);
+					glColor3f(b->Light[0] * LightA, b->Light[1] * LightA, b->Light[2] * LightA);
+					glTexCoord2f(TexU0, 1.f);
 					glVertex3fv(b->p1[j]);
-					glTexCoord2f(TexU, 0.f);
+					glTexCoord2f(TexU0, 0.f);
 					glVertex3fv(b->p2[j]);
-					Light = (b->Number - (j + 1)) / (float)b->Number;
-					glColor3f(b->Light[0] * Light, b->Light[1] * Light, b->Light[2] * Light);
-					TexU = (j + 1) / (float)b->Number;
-					glTexCoord2f(TexU, 0.f);
+					glColor3f(b->Light[0] * LightB, b->Light[1] * LightB, b->Light[2] * LightB);
+					glTexCoord2f(TexU1, 0.f);
 					glVertex3fv(b->p2[j + 1]);
-					glTexCoord2f(TexU, 1.f);
+					glTexCoord2f(TexU1, 1.f);
 					glVertex3fv(b->p1[j + 1]);
 					glEnd();
 				}
