@@ -283,18 +283,39 @@ behind an opt-in marker, verify, default):
   Alpha **blend** stays fixed-function (glBlendFunc is program-independent) — only
   the texel*primary combine and alpha-test move into the shader. Not referenced by
   `CShaderScene` → zero behavior change.
-- **16.2 (next):** add `eShaderS_EffectCore` to `CShaderScene` (load + keep + log,
-  not bound) — mirror 14.3/15.2. Runtime check: log `Loaded 'effect_core'`.
-- **16.3:** convert ONE low-risk, self-contained effect draw (candidate: a simple
-  world GL_QUADS billboard in `ZzzEffectNoUse.cpp`) to a VBO + `effect_core` emit
-  path behind a new marker `Client\gl33effect.enable`, single bind per effect
-  pass, `uTexEnvMode`/blend set from the draw's state. Verify identical.
-- **16.4+:** extend per effect family — joints/trails, blur/spark, hair — one at a
-  time, verifying each in the Release run (these are the flicker-prone ones; do
-  NOT batch-convert). Sprite.cpp 2D is arguably Phase 17 (UI); defer unless a 3D
-  effect needs it.
-- **16.N:** default on once every effect family validates. The character shadow
-  (`RenderBodyShadow`, translucent+stencil, currently off) rides along here.
+- **16.2 (done, verified):** added `eShaderS_EffectCore` to `CShaderScene`; log
+  `Loaded 'effect_core' (program 15)`. Not bound.
+- **16.3 (done, verified):** the shared draw helper `EffectCoreDrawArrays(mode,
+  pos, tex, col, count, texEnvMode, useTexture, alphaRef)` lives in
+  `ZzzOpenglUtil.cpp` — a self-contained PER-DRAW bind of `effect_core` (Use/Unuse
+  restoring the previous program), one shared VAO with three streams, `uModelView`
+  read back from `GL_MODELVIEW_MATRIX`. Per-draw (not pass-level) because effects
+  interleave with fixed-function draws — the 15.4 shadow-crash lesson. Blend stays
+  fixed-function; only geometry + tex-env combine + alpha-test move to the shader.
+  Opt-in gate `GL33EffectEnabled()` (`-gl33effect` / `gl33effect.enable`). First
+  consumer: `ZzzEffectBlurSpark.cpp` `RenderBlurs` (weapon-swing blur). NOTE: the
+  original `ZzzEffectNoUse.cpp` candidate is dead code (no callers), so a live
+  effect was chosen instead. Log `Core effect path active (... per-draw bind)`.
+- **16.4 (done, verified):** `RenderObjectBlurs` (object/monster blur) through the
+  same helper.
+- **16.5 (done, verified):** `CSideHair::RenderLine` (side-hair/cloth strand,
+  subtractive blend) through the same helper.
+- **16.6 (NEXT — resume here):** particles `ZzzEffectParticle.cpp`. This is the
+  most visible effect family (skills, aura, fire, sparks) and the FIRST user of
+  the `uTexEnvMode=1` (GL_ADD) additive path — the tex-env sites are at
+  `ZzzEffectParticle.cpp:9041` (GL_ADD) / `:9044` (GL_MODULATE). It has 0 glBegin
+  (already client-array `glDrawArrays`), so it converts like the BMD path: build
+  pos/tex/col arrays, call `EffectCoreDrawArrays` with the right `uTexEnvMode` per
+  the glTexEnvi mode. Verify additive glows match exactly (this is the flicker-
+  prone additive-blend area — go carefully, per family).
+- **16.7:** joints/trails `ZzzEffectJoint.cpp` — the MOST complex (4+ blend modes:
+  AlphaBlend/Test/Minus/Blend2, mixed immediate `glBegin(GL_QUADS)` at ~7592 and
+  client-array `glDrawArrays(GL_QUADS)` at ~7670/7727). Do LAST in the family, one
+  draw at a time.
+- **16.8:** remaining immediate-mode billboards (`RenderFog`, `RenderSky3`,
+  `CSWaterTerrain`, `ZzzObject`), then default on once every family validates. The
+  character shadow (`RenderBodyShadow`, translucent+stencil, currently off) rides
+  along here. `Sprite.cpp` 2D is Phase 17 (UI).
 
 ## 5. RenderMatrix API quick reference
 
