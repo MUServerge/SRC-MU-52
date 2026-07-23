@@ -231,8 +231,11 @@ effect/blend meshes):
   substitute. **Verify: with `gl33char.enable` present vs absent the character
   render must be identical** (players, monsters, equipment, wings, chrome/metal
   set armor, alpha/transparent, bright/color meshes). Then make it default.
-- **15.6+ (future):** once ON==OFF validated across maps, make the Core character
-  path default (drop the gate).
+- **15.6 (done, default ON):** validated in-game across maps (parity, no crash),
+  so `GL33CharEnabled()` now defaults ON. Legacy fallback kept as an opt-OUT
+  safety valve: `-nogl33char` / a `gl33char.disable` marker file restores the
+  compatibility character path without a rebuild. The old opt-in `gl33char.enable`
+  marker is obsolete. **Phase 15 (Character/BMD) is complete.**
 
 Do NOT convert per-mesh blend/chrome/effect logic blindly — those are the parts
 that historically flickered; verify each in the Release run.
