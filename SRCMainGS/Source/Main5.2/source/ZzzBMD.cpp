@@ -1454,14 +1454,14 @@ void CharacterCoreEnd()
 // Draw one mesh's triangle list through character_core. Returns false when the
 // Core path is not armed, so the caller runs the legacy client-array draw.
 // 'pos' is vec3 per vertex, 'tex' vec2, 'col' vec4; 'useVertexColor' mirrors the
-// legacy GL_COLOR_ARRAY decision and 'textured' mirrors its DisableTexture().
+// legacy GL_COLOR_ARRAY decision (gl_Color in the compatibility character.vs).
 //
 // Self-contained: binds character_core + the Core VAO for this draw only, then
 // restores the previously bound program (the pass's compatibility character
 // program) and the default VAO, so the surrounding shadow/effect fixed-function
 // draws never execute under the explicit-attribute Core program.
 bool CharacterCoreDrawTriangles(const float* pos, const float* tex, const float* col,
-	int vertexCount, bool useVertexColor, bool textured)
+	int vertexCount, bool useVertexColor)
 {
 	if (!g_bCharCoreActive || vertexCount <= 0 || pos == NULL || tex == NULL)
 		return false;
@@ -1499,7 +1499,6 @@ bool CharacterCoreDrawTriangles(const float* pos, const float* tex, const float*
 	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
 	gShaderScene.SetMat4("uModelView", modelView);
 	gShaderScene.SetInt("texture1", 0);
-	gShaderScene.SetInt("uUseTexture", textured ? 1 : 0);
 
 	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
 
@@ -2063,16 +2062,15 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					{
 #ifdef SHADER_PIPELINE
 						// Phase 15.4: Core-profile draw of the very same CPU arrays when
-						// the character pass bound character_core. 'textured' mirrors the
-						// legacy DisableTexture() calls (RENDER_COLOR / RENDER_BRIGHT are
-						// the untextured materials); 'enableColor' mirrors GL_COLOR_ARRAY.
+						// the character pass armed character_core. 'enableColor' mirrors
+						// the legacy GL_COLOR_ARRAY decision (gl_Color); the texture is
+						// always sampled, exactly like the compatibility character.fs.
 						if (CharacterCoreDrawTriangles(
 								(const float*)vertices,
 								(const float*)textCoords,
 								(const float*)colors,
 								target_vertex_index + 1,
-								enableColor,
-								renderFlags != RENDER_COLOR && renderFlags != RENDER_BRIGHT))
+								enableColor))
 						{
 							g_RenderProfiler.AddCounter(RPC_LEGACY_BMD_MESH_DRAWS);
 							return;
