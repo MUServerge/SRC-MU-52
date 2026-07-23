@@ -38,6 +38,7 @@ Give the new session this context:
 | 14.3 | Promote `terrain_core` to a kept program: new `eShaderS_TerrainCore` enum slot + `s_ShaderBaseName` entry; removed the throwaway probe (loop loads/keeps it, not bound) | ✅ Release x86 (0 warn/err) | ✅ NVIDIA RTX 3050 Ti: log `Loaded 'terrain_core' (program 9)`, `Init OK`, scene identical |
 | 14.4 | First Core-drawn geometry: grass `GL_QUADS` → VBO/VAO + `terrain_core` behind `-gl33terrain`; `CShaderScene::SetMat4/SetMat3` added; default path untouched | ✅ Release x86 (0 warn/err) | ✅ NVIDIA: `Core terrain path active ... this-draw glGetError=0x0000`; UI regression from a program-stack leak fixed in 14.4.4 |
 | 14.5 | ~~Ground base tile only~~ → **full terrain Core pass**: single-bind `terrain_core` (`TerrainCoreBegin/End`) + emit helpers (`tTexCoord/tColor/tVertex`) + fan collector; all ~25 `Vertex*` helpers and every ground/grass fan site routed through it; old per-quad `RenderTerrainQuadCore` removed | ✅ Release x86 (0/0) | ✅ NVIDIA: log `Core terrain pass active (terrain_core program 9, single bind)`; ground+grass identical, **no z-fight** (base-only 14.5 was reverted first — coplanar mix; full conversion fixes it) |
+| 15.1 | Authored Core character shaders `character_core.vs/.fs` (inert, not wired): explicit `aPos/aTex/aColor` + `uProj/uModelView` | n/a (GLSL assets, no C++) | n/a — not referenced by `CShaderScene`, zero behavior change |
 
 All code phases are behavior-preserving so far: Phase 12 only swaps the UI
 overlay backend; Phase 13.1 is purely additive (no existing call site changed);
@@ -171,10 +172,42 @@ a post-`#version` define via `BuildProgramFromFiles(..., vertexDefine)`.
   the legacy fan. Verify visually: with `-gl33terrain` the ground must match the
   no-flag run (no color/brightness patchwork between Core base tiles and legacy
   alpha tiles). Perf note: still one program switch per quad (proof path).
-- **14.6+:** convert the alpha-layer, water and blend terrain passes (the other
-  `glBegin(GL_TRIANGLE_FAN)` sites and `Vertex__alpha*`), fold fog + alpha test
-  into the fragment shader, batch tiles to drop the per-quad program switch, then
-  make Core terrain the default once every map validates.
+- **14 DONE:** terrain (ground base/alpha/blend + grass) fully renders through the
+  single-bind `terrain_core` pass under `-gl33terrain`, verified in-game on NVIDIA
+  (no z-fight, identical). Follow-ups when convenient: fold fog + alpha test into
+  the shader, batch tiles, validate AMD/Intel, then make it default.
+
+### Phase 15 — Character / BMD (ACTIVE)
+
+Structurally the same as terrain: `character.vs/.fs` are `330 compatibility`
+(`gl_ModelViewProjectionMatrix * gl_Vertex`, `gl_MultiTexCoord0`, `gl_Color`), fed
+by the legacy immediate-mode BMD draw `BMD::RenderMesh` (`ZzzBMD.cpp:1327`,
+`glBegin(GL_TRIANGLES)` at ~2155, per-vertex `glTexCoord/glColor/glVertex`,
+CPU-skinned via `VertexTransform`). Key difference from terrain: the modelview is
+**per-character** (each character pushes its own translate/rotate), so `uModelView`
+must be set per object (read back `GL_MODELVIEW_MATRIX` per character, as the
+`CShaderGL` `RenderMeshVBO` path already does), not once per pass.
+
+Plan (mirror the terrain emit-collector; keep CPU skinning — do NOT chase the
+GPU-skinning VBO path, which the FPS memory documents as flicker-prone on
+effect/blend meshes):
+
+- **15.1 (done):** authored `character_core.vs/.fs` (inert).
+- **15.2 (next):** add `eShaderS_CharacterCore` to `CShaderScene` (load + keep +
+  log, not bound) — mirror 14.3. Runtime check: log `Loaded 'character_core'`.
+- **15.3:** add a character emit-collector in `ZzzBMD.cpp` (pos3/tex2/color4,
+  `GL_TRIANGLES`, larger buffer than terrain) + `tChar*` emit helpers + a
+  `CharacterCoreBegin/End` that binds `character_core` once for the character pass
+  and a per-character `SetCharacterModelView()` that uploads `uModelView` from the
+  read-back matrix. Gate behind `-gl33char` (new marker `Client\gl33char.enable`).
+- **15.4:** route `RenderMesh`'s `glBegin(GL_TRIANGLES)` block through the emit
+  helpers; wire the character pass (where `CShaderScene.Use(eShaderS_Character)` is
+  called, `ZzzScene.cpp:2653`) to `CharacterCoreBegin/End`. Verify per model:
+  players, monsters, equipment, wings, blend/chrome meshes, alpha.
+- **15.5+:** effects/wings tex-env, then default once validated.
+
+Do NOT convert per-mesh blend/chrome/effect logic blindly — those are the parts
+that historically flickered; verify each in the Release run.
 - **14.5+:** extend to water, grass, and the alpha/blend passes; fold fog and
   alpha test into the fragment shader; then make the Core terrain path default
   once every map validates.
