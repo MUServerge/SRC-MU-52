@@ -2657,12 +2657,12 @@ bool RenderMainScene()
 		// untouched. Use() binds nothing and returns false if the program is
 		// missing, keeping the fixed-function fallback.
 		bool bCharShader = gShaderScene.Use(eShaderS_Character);
-		// Phase 15.4: with '-gl33char' (or the Client\gl33char.enable marker) arm
-		// the Core body-draw path. It does NOT rebind the pass program: the
-		// compatibility character program above stays bound for the pass's shadow
-		// and part-effect draws, and each body mesh binds character_core only for
-		// its own draw and restores this program afterwards. Gate off / program
-		// missing -> the pass is byte-for-byte the legacy compatibility path.
+		// Phase 15.6: arm the Core body-draw path (default ON; opt out with
+		// '-nogl33char' / gl33char.disable). It does NOT rebind the pass program:
+		// the compatibility character program above stays bound for the pass's
+		// shadow and part-effect draws, and each body mesh binds character_core
+		// only for its own draw and restores this program afterwards. Opted out /
+		// program missing -> the pass is byte-for-byte the legacy compat path.
 		bool bCharCore = CharacterCoreBegin();
 #endif // SHADER_PIPELINE
 

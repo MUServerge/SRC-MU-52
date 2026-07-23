@@ -1363,24 +1363,28 @@ void BMD::RenderMeshEffect(int i, int iType, int iSubType, vec3_t Angle, VOID* o
 // deliberately not used - it short-circuits earlier in RenderMeshInternal and is
 // unaffected by this slice.
 //
-// Gated behind '-gl33char' / the 'gl33char.enable' marker file. With the gate
-// off, every call site below falls through to the untouched legacy path.
+// Default ON (Phase 15.6); opt out with '-nogl33char' or a 'gl33char.disable'
+// marker file, in which case every call site below falls through to the
+// untouched legacy path.
 // ===========================================================================
 
-// Opt-in toggle, mirroring GL33TerrainEnabled(): '-gl33char' on the command line
-// or an empty marker file 'gl33char.enable' in the client working directory
-// (some launchers do not forward command-line flags, so the file is the reliable
-// way to opt in).
+// Phase 15.6: the Core character path is now the DEFAULT (validated in-game
+// across maps: parity with the compatibility character program, no crash). A
+// legacy fallback is kept as an opt-OUT safety valve: '-nogl33char' on the
+// command line, or an empty marker file 'gl33char.disable' in the client working
+// directory (some launchers do not forward command-line flags, so the file is
+// the reliable override). If a future map/material regresses, drop the file to
+// restore the fixed-function/compatibility path without a rebuild.
 bool GL33CharEnabled()
 {
 	static int cached = -1;
 	if (cached < 0)
 	{
 		const char* cmd = GetCommandLineA();
-		bool on = (cmd != NULL && strstr(cmd, "-gl33char") != NULL);
-		if (!on && GetFileAttributesA("gl33char.enable") != INVALID_FILE_ATTRIBUTES)
-			on = true;
-		cached = on ? 1 : 0;
+		bool off = (cmd != NULL && strstr(cmd, "-nogl33char") != NULL);
+		if (!off && GetFileAttributesA("gl33char.disable") != INVALID_FILE_ATTRIBUTES)
+			off = true;
+		cached = off ? 0 : 1;
 	}
 	return cached != 0;
 }
