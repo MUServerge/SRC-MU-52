@@ -777,7 +777,12 @@ enum
 	// BarFrame (animated), Porcento. Replaces the old Webzen/MU/121518 title
 	// art in CUIMng::CreateTitleSceneUI / CreateWebzenScene.
 	BITMAP_MUA2_LOADING_BEGIN,
-	BITMAP_MUA2_LOADING_END = BITMAP_MUA2_LOADING_BEGIN + 4,
+	// 7 textures: Back01, Back02, Bar, BarFrame, Porcento, Loading, number1
+	// (UIMng::LoadTitleScene loads BEGIN+0..+6). Reserving only +4 let the last
+	// two slots (Loading, number1) alias the first two NPC over-head icons, which
+	// mutually force-unloaded each other at runtime (the 32540/32541 "File not
+	// found" log lines).
+	BITMAP_MUA2_LOADING_END = BITMAP_MUA2_LOADING_BEGIN + 6,
 	// Over-head NPC icons (Data\Interface\NpcIcons\*.ozt). Slots are assigned
 	// on demand, one per distinct icon file, cached by filename.
 	BITMAP_NPCICON_BEGIN,
