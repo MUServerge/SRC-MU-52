@@ -11,6 +11,7 @@
 #include "Zzzinfomation.h"
 #include "NewUISystem.h"
 #include "CShaderGL.h"
+#include "CShaderScene.h"
 #include "CameraProjection.h"
 #include "RenderMatrix.h"
 
@@ -52,6 +53,127 @@ float   g_ViewMatrix[16];
 // g_ViewMatrix is kept as a derived snapshot of the world-camera Top().
 RenderMatrix::Stack g_ModelViewStack;
 float   g_fCameraCustomDistance = 0.f;
+
+#ifdef SHADER_PIPELINE
+// ===========================================================================
+// Phase 16.3: shared Core-profile effect draw helper. Effects (ZzzEffect*,
+// SideHair, ...) are pure fixed-function today and are scattered across many
+// small draws interleaved with other fixed-function work, so - like the Phase
+// 15 character path, and unlike the homogeneous terrain pass - each effect draw
+// binds effect_core JUST for itself and restores the previous program, never a
+// pass-level bind (that would put the following fixed-function draws under an
+// explicit-attribute Core program and crash the driver, as the 15.4 shadow
+// crash showed).
+//
+// Alpha BLEND stays fixed-function (glBlendFunc is program-independent), set by
+// the caller as today; this helper only moves the geometry emission, the
+// texture-env combine (uTexEnvMode) and the alpha-test discard (uAlphaRef) into
+// the shader. CPU-side vertex data is uploaded unchanged.
+//
+// Opt-IN for now ('-gl33effect' or a 'gl33effect.enable' marker file): effects
+// are the flicker-prone surface, so this phase stays behind a flag and is
+// converted one effect family at a time until each is validated in the Release
+// run, before it becomes default.
+// ===========================================================================
+bool GL33EffectEnabled()
+{
+	static int cached = -1;
+	if (cached < 0)
+	{
+		const char* cmd = GetCommandLineA();
+		bool on = (cmd != NULL && strstr(cmd, "-gl33effect") != NULL);
+		if (!on && GetFileAttributesA("gl33effect.enable") != INVALID_FILE_ATTRIBUTES)
+			on = true;
+		cached = on ? 1 : 0;
+	}
+	return cached != 0;
+}
+
+namespace
+{
+	GLuint s_effectVao = 0;
+	GLuint s_effectVboPos = 0, s_effectVboTex = 0, s_effectVboCol = 0;
+
+	bool EffectCoreEnsureBuffers()
+	{
+		if (s_effectVao != 0)
+			return true;
+		if (glGenVertexArrays == NULL)
+			return false;
+		glGenVertexArrays(1, &s_effectVao);
+		glBindVertexArray(s_effectVao);
+		glGenBuffers(1, &s_effectVboPos);
+		glBindBuffer(GL_ARRAY_BUFFER, s_effectVboPos);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(0);
+		glGenBuffers(1, &s_effectVboTex);
+		glBindBuffer(GL_ARRAY_BUFFER, s_effectVboTex);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(1);
+		glGenBuffers(1, &s_effectVboCol);
+		glBindBuffer(GL_ARRAY_BUFFER, s_effectVboCol);
+		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(2);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		return true;
+	}
+}
+
+// Draw one effect primitive through effect_core. 'mode' is a GL primitive
+// (GL_TRIANGLE_FAN, GL_TRIANGLES, ...); 'pos' is vec3/vertex, 'tex' vec2, 'col'
+// vec4 (always provided - the caller fills it from the fixed-function current
+// colour when the legacy draw had no per-vertex colour). texEnvMode is 0
+// MODULATE / 1 ADD / 2 REPLACE; alphaRef < 0 disables the discard. uModelView is
+// read back from GL_MODELVIEW_MATRIX so the caller's push/translate/rotate is
+// honoured. Returns false when the Core effect path is off or unavailable, so
+// the caller runs its untouched legacy immediate-mode draw.
+bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	const float* col, int vertexCount, int texEnvMode, bool useTexture, float alphaRef)
+{
+	if (!GL33EffectEnabled() || vertexCount <= 0 || pos == NULL || tex == NULL || col == NULL)
+		return false;
+	if (gShaderScene.GetProgram(eShaderS_EffectCore) == 0)
+		return false;
+	if (!EffectCoreEnsureBuffers())
+		return false;
+	if (!gShaderScene.Use(eShaderS_EffectCore))
+		return false;
+
+	glBindVertexArray(s_effectVao);
+	glBindBuffer(GL_ARRAY_BUFFER, s_effectVboPos);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (int)sizeof(float), pos, GL_STREAM_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, s_effectVboTex);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (int)sizeof(float), tex, GL_STREAM_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, s_effectVboCol);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (int)sizeof(float), col, GL_STREAM_DRAW);
+
+	float modelView[16];
+	glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
+	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
+	gShaderScene.SetMat4("uModelView", modelView);
+	gShaderScene.SetInt("texture1", 0);
+	gShaderScene.SetInt("uTexEnvMode", texEnvMode);
+	gShaderScene.SetInt("uUseTexture", useTexture ? 1 : 0);
+	gShaderScene.SetFloat("uAlphaRef", alphaRef);
+
+	glDrawArrays(mode, 0, vertexCount);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		g_ErrorReport.Write("> [Shader] Core effect path active (effect_core program %u, per-draw bind)\r\n",
+			gShaderScene.GetProgram(eShaderS_EffectCore));
+	}
+	return true;
+}
+#endif // SHADER_PIPELINE
+
 bool    FogEnable = false;
 GLfloat FogDensity = 0.0004f;
 
