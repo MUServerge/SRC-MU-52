@@ -2656,13 +2656,14 @@ bool RenderMainScene()
 		// previews render much later (RenderInterface / NewUISystem), so they are
 		// untouched. Use() binds nothing and returns false if the program is
 		// missing, keeping the fixed-function fallback.
-		// Phase 15.4: with '-gl33char' (or the Client\gl33char.enable marker) the
-		// whole pass binds the Core-profile character_core instead, once, and every
-		// BMD mesh streams its CPU arrays into that program's VAO. Falls back to
-		// the compatibility character program when the gate is off or the Core
-		// program is unavailable, so the default run is unchanged.
+		bool bCharShader = gShaderScene.Use(eShaderS_Character);
+		// Phase 15.4: with '-gl33char' (or the Client\gl33char.enable marker) arm
+		// the Core body-draw path. It does NOT rebind the pass program: the
+		// compatibility character program above stays bound for the pass's shadow
+		// and part-effect draws, and each body mesh binds character_core only for
+		// its own draw and restores this program afterwards. Gate off / program
+		// missing -> the pass is byte-for-byte the legacy compatibility path.
 		bool bCharCore = CharacterCoreBegin();
-		bool bCharShader = bCharCore ? false : gShaderScene.Use(eShaderS_Character);
 #endif // SHADER_PIPELINE
 
 		RenderCharactersClient();
@@ -2670,7 +2671,7 @@ bool RenderMainScene()
 #ifdef SHADER_PIPELINE
 		if (bCharCore)
 			CharacterCoreEnd();
-		else if (bCharShader)
+		if (bCharShader)
 			gShaderScene.Unuse();
 #endif // SHADER_PIPELINE
 

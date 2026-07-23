@@ -1394,12 +1394,15 @@ static GLuint s_charVboPos = 0, s_charVboTex = 0, s_charVboCol = 0;
 
 bool CharacterCoreIsActive() { return g_bCharCoreActive; }
 
-// Bind character_core once for the character pass and set the pass-level state.
+// Arm the Core character path for the pass. Does NOT bind character_core or a
+// VAO globally: the RenderCharactersClient pass also draws shadows and
+// part-effects that still submit fixed-function client arrays, and those would
+// crash under an explicit-attribute Core program. Instead each body mesh binds
+// character_core just for its own draw (CharacterCoreDrawTriangles) and restores
+// the previously bound program, so the surrounding legacy draws are untouched.
 bool CharacterCoreBegin()
 {
 	if (!GL33CharEnabled() || gShaderScene.GetProgram(eShaderS_CharacterCore) == 0)
-		return false;
-	if (!gShaderScene.Use(eShaderS_CharacterCore))
 		return false;
 
 	if (s_charVao == 0)
@@ -1420,16 +1423,15 @@ bool CharacterCoreBegin()
 		glGenBuffers(1, &s_charVboCol);
 		glBindBuffer(GL_ARRAY_BUFFER, s_charVboCol);
 		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
-		// Left disabled: enabled per draw only when the legacy path would have
-		// enabled GL_COLOR_ARRAY, so a stale/short colour buffer is never read.
+		// Enabled per draw only when the legacy path would have enabled
+		// GL_COLOR_ARRAY, so a stale/short colour buffer is never read.
 		glDisableVertexAttribArray(2);
-	}
-	glBindVertexArray(s_charVao);
 
-	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
-	gShaderScene.SetInt("texture1", 0);
-	gShaderScene.SetInt("uUseTexture", 1);
-	gShaderScene.SetInt("uUseVertexColor", 1);
+		// Leave the default VAO bound so the pass's fixed-function client-array
+		// draws (shadows, effects) are unaffected until a body mesh draws.
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
 
 	g_bCharCoreActive = true;
 
@@ -1437,32 +1439,35 @@ bool CharacterCoreBegin()
 	if (!s_logged)
 	{
 		s_logged = true;
-		g_ErrorReport.Write("> [Shader] Core character pass active (character_core program %u, single bind)\r\n",
+		g_ErrorReport.Write("> [Shader] Core character path active (character_core program %u, per-body bind)\r\n",
 			gShaderScene.GetProgram(eShaderS_CharacterCore));
 	}
 	return true;
 }
 
-// End the Core character pass: unbind and restore the previously bound program.
+// Disarm the Core character path at the end of the pass.
 void CharacterCoreEnd()
 {
-	if (!g_bCharCoreActive)
-		return;
 	g_bCharCoreActive = false;
-	glBindVertexArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	gShaderScene.Unuse();
 }
 
 // Draw one mesh's triangle list through character_core. Returns false when the
-// Core pass is not active, so the caller runs the legacy client-array draw.
+// Core path is not armed, so the caller runs the legacy client-array draw.
 // 'pos' is vec3 per vertex, 'tex' vec2, 'col' vec4; 'useVertexColor' mirrors the
 // legacy GL_COLOR_ARRAY decision and 'textured' mirrors its DisableTexture().
+//
+// Self-contained: binds character_core + the Core VAO for this draw only, then
+// restores the previously bound program (the pass's compatibility character
+// program) and the default VAO, so the surrounding shadow/effect fixed-function
+// draws never execute under the explicit-attribute Core program.
 bool CharacterCoreDrawTriangles(const float* pos, const float* tex, const float* col,
 	int vertexCount, bool useVertexColor, bool textured)
 {
 	if (!g_bCharCoreActive || vertexCount <= 0 || pos == NULL || tex == NULL)
 		return false;
+
+	if (!gShaderScene.Use(eShaderS_CharacterCore))
+		return false; // leaves the previous program bound; caller uses legacy path
 
 	glBindVertexArray(s_charVao);
 
@@ -1487,12 +1492,22 @@ bool CharacterCoreDrawTriangles(const float* pos, const float* tex, const float*
 		gShaderScene.SetVec4("uConstColor", current[0], current[1], current[2], current[3]);
 	}
 
+	// uProj is per-pass but uniform state lives in the program object, so set it
+	// each draw (cheap, cached location); uModelView is per character.
 	float modelView[16];
 	glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
+	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
 	gShaderScene.SetMat4("uModelView", modelView);
+	gShaderScene.SetInt("texture1", 0);
 	gShaderScene.SetInt("uUseTexture", textured ? 1 : 0);
 
 	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+
+	// Restore the pass's previous program and the default VAO so the following
+	// shadow/effect client-array draws are safe.
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
 	return true;
 }
 #endif // SHADER_PIPELINE
