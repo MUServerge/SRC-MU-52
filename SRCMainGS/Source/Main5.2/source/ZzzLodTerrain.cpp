@@ -116,12 +116,12 @@ static  float   g_fFrustumRange = -40.f;
 
 
 #ifdef SHADER_PIPELINE
-// Phase 14.4: opt-in (-gl33terrain) Core-profile grass draw. Renders the grass
-// quad via a VBO/VAO + the terrain_core program (explicit attributes/uniforms)
-// instead of the fixed-function GL_QUADS client-array path, to exercise the Core
-// terrain pipeline on one real draw. Default (flag off, or terrain_core
-// unavailable) falls back to the legacy path, so behavior is unchanged unless the
-// flag is passed. The terrain vertices are world-space, drawn under the world
+// Phase 14: Core-profile terrain pass (grass + ground base/alpha/blend) via a
+// VBO/VAO + the terrain_core program (explicit attributes/uniforms) instead of
+// the fixed-function GL_QUADS / immediate-mode client-array path. Default ON
+// since it is in-game verified (see GL33TerrainEnabled); the legacy path stays
+// as an opt-OUT fallback. If terrain_core is unavailable on a GPU, the emit
+// helpers fall through to fixed-function, so behavior is safe. The terrain
 // camera, so uModelView = g_ViewMatrix and uProj = g_ProjectionMatrix (both built
 // in ZzzOpenglUtil.cpp); terrain.fs ignores normals so uNormalMatrix is identity.
 extern float g_ProjectionMatrix[16];
@@ -132,15 +132,19 @@ static bool GL33TerrainEnabled()
 	static int cached = -1;
 	if (cached < 0)
 	{
+		// Phase 14 is done and in-game verified (no z-fight, identical to legacy),
+		// so the Core terrain pass is now the DEFAULT, matching the Core character
+		// path (Phase 15.6). A legacy fallback is kept as an opt-OUT safety valve:
+		// '-nogl33terrain' on the command line, or an empty 'gl33terrain.disable'
+		// marker file in the client working directory (some launchers do not
+		// forward command-line flags, so the file is the reliable override). If a
+		// map regresses, drop the file to restore the fixed-function terrain path
+		// without a rebuild.
 		const char* cmd = GetCommandLineA();
-		bool on = (cmd != NULL && strstr(cmd, "-gl33terrain") != NULL);
-		// Launcher-independent toggle: also enable if a marker file exists in the
-		// client's working directory (where MuError.log is written). Some launchers
-		// do not forward command-line flags to the client, so the file is the
-		// reliable way to opt in. Create an empty 'gl33terrain.enable' to turn it on.
-		if (!on && GetFileAttributesA("gl33terrain.enable") != INVALID_FILE_ATTRIBUTES)
-			on = true;
-		cached = on ? 1 : 0;
+		bool off = (cmd != NULL && strstr(cmd, "-nogl33terrain") != NULL);
+		if (!off && GetFileAttributesA("gl33terrain.disable") != INVALID_FILE_ATTRIBUTES)
+			off = true;
+		cached = off ? 0 : 1;
 	}
 	return cached != 0;
 }
