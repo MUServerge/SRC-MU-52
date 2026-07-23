@@ -16,6 +16,7 @@ namespace
 		"terrain",       // eShaderS_Terrain
 		"character",     // eShaderS_Character
 		"terrain_core",  // eShaderS_TerrainCore
+		"character_core",// eShaderS_CharacterCore
 	};
 }
 
@@ -216,6 +217,10 @@ bool CShaderScene::Init()
 	g_ErrorReport.Write("> [Shader] Init %s\r\n",
 		allOk ? "OK" : "completed with errors (fixed-function fallback active)");
 
+	// Phase 15.2: eShaderS_CharacterCore ('character_core') is loaded and kept the
+	// same way as terrain_core, for the upcoming Core BMD draw path. It is not
+	// bound for rendering yet, so the scene is unchanged.
+	//
 	// Phase 14.3: eShaderS_TerrainCore ('terrain_core') is now a normally loaded
 	// program (handled by the loop above), kept in m_Program for a future draw
 	// path. It is not bound for rendering yet, so the scene is unchanged. Its

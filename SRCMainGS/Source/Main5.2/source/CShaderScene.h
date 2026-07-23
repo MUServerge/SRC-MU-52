@@ -6,6 +6,8 @@
 //
 //   Shaders/terrain.vs   + terrain.fs     (eShaderS_Terrain)
 //   Shaders/character.vs + character.fs   (eShaderS_Character)
+//   Shaders/terrain_core.*                (eShaderS_TerrainCore,   330 core)
+//   Shaders/character_core.*              (eShaderS_CharacterCore, 330 core)
 //
 // Each pair is loaded from "Shaders/<name>" first, then "Data/Shaders/<name>".
 //
@@ -30,8 +32,9 @@ enum eShaderSProgram
 {
 	eShaderS_Terrain = 0,
 	eShaderS_Character,
-	eShaderS_TerrainCore,   // Phase 14: Core-profile terrain (terrain_core.vs/.fs),
-	                        // loaded but not bound for drawing yet.
+	eShaderS_TerrainCore,   // Phase 14: Core-profile terrain (terrain_core.vs/.fs).
+	eShaderS_CharacterCore, // Phase 15: Core-profile character/BMD
+	                        // (character_core.vs/.fs), loaded but not bound yet.
 	eShaderS_MaxValue,
 };
 
