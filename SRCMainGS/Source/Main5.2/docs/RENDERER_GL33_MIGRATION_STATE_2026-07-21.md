@@ -172,10 +172,12 @@ a post-`#version` define via `BuildProgramFromFiles(..., vertexDefine)`.
   the legacy fan. Verify visually: with `-gl33terrain` the ground must match the
   no-flag run (no color/brightness patchwork between Core base tiles and legacy
   alpha tiles). Perf note: still one program switch per quad (proof path).
-- **14 DONE:** terrain (ground base/alpha/blend + grass) fully renders through the
-  single-bind `terrain_core` pass under `-gl33terrain`, verified in-game on NVIDIA
-  (no z-fight, identical). Follow-ups when convenient: fold fog + alpha test into
-  the shader, batch tiles, validate AMD/Intel, then make it default.
+- **14 DONE + DEFAULT ON (2026-07-23):** terrain (ground base/alpha/blend + grass)
+  fully renders through the single-bind `terrain_core` pass, verified in-game on
+  NVIDIA (no z-fight, identical). `GL33TerrainEnabled()` now defaults ON with an
+  opt-OUT safety valve (`-nogl33terrain` / `gl33terrain.disable`); the old opt-in
+  `gl33terrain.enable` marker is obsolete. Follow-ups when convenient: fold fog +
+  alpha test into the shader, batch tiles, validate AMD/Intel.
 
 ### Phase 15 — Character / BMD (ACTIVE)
 
