@@ -13,6 +13,14 @@
 #include "SideHair.h"
 #include "ZzzCharacter.h"
 
+#ifdef SHADER_PIPELINE
+// Phase 16.5: shared Core-profile effect draw, defined in ZzzOpenglUtil.cpp.
+// Declared here (not in the ISO-8859 ZzzOpenglUtil.h) to keep that header
+// byte-untouched. Returns false when the Core effect path is off/unavailable.
+bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	const float* col, int vertexCount, int texEnvMode, bool useTexture, float alphaRef);
+#endif // SHADER_PIPELINE
+
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -146,6 +154,39 @@ void CSideHair::RenderLine( vec3_t v1, vec3_t v2, vec3_t c1, vec3_t c2)
 	CrossProduct( m_vLight, d, vOrtho);
 	VectorNormalize( vOrtho);
 	VectorScale( vOrtho, 10.f, vOrtho);
+
+#ifdef SHADER_PIPELINE
+	// Phase 16.5: route the side-hair/cloth strand quad through effect_core
+	// (GL_TRIANGLE_FAN over the same 4 world-space corners in order). Constant
+	// white colour (set above), GL_MODULATE, no alpha test; the subtractive blend
+	// (EnableAlphaBlendMinus above) stays fixed-function. Legacy quad below runs
+	// when the Core effect path is off.
+	{
+		float curCol[4] = { 1.f, 1.f, 1.f, 1.f };
+		glGetFloatv(GL_CURRENT_COLOR, curCol);
+		const float pos[4 * 3] = {
+			p1[0]-vOrtho[0], p1[1]-vOrtho[1], p1[2]-vOrtho[2],
+			p2[0]-vOrtho[0], p2[1]-vOrtho[1], p2[2]-vOrtho[2],
+			p2[0]+vOrtho[0], p2[1]+vOrtho[1], p2[2]+vOrtho[2],
+			p1[0]+vOrtho[0], p1[1]+vOrtho[1], p1[2]+vOrtho[2],
+		};
+		const float tex[4 * 2] = {
+			0.f, 0.f+fTextureMove+fTextureV,
+			0.f, 1.f-fTextureMove+fTextureV,
+			1.f, 1.f-fTextureMove+fTextureV,
+			1.f, 0.f+fTextureMove+fTextureV,
+		};
+		const float col[4 * 4] = {
+			curCol[0],curCol[1],curCol[2],curCol[3],
+			curCol[0],curCol[1],curCol[2],curCol[3],
+			curCol[0],curCol[1],curCol[2],curCol[3],
+			curCol[0],curCol[1],curCol[2],curCol[3],
+		};
+		if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, pos, tex, col, 4, 0, true, -1.f))
+			return;
+	}
+#endif // SHADER_PIPELINE
+
 	glBegin(GL_QUADS);
 	//glColor3fv( c1);
     glTexCoord2f(0.f,0.f+fTextureMove+fTextureV);glVertex3f(p1[0]-vOrtho[0],p1[1]-vOrtho[1],p1[2]-vOrtho[2]);
