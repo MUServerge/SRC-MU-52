@@ -21,6 +21,8 @@
 #include "PhysicsManager.h"
 #include "MuCrypto/MuCrypto.h"
 #include "RenderProfiler.h"
+#include "CShaderScene.h"
+#include "./Utilities/Log/ErrorReport.h"
 // NOTE: CShaderGL.h (which pulls in glm and disables the Win32 min/max macros) is
 // included further down, right before the VBO/shader code that needs it, so it does
 // not affect bare max()/min() usage in the rest of this translation unit.
@@ -1323,6 +1325,199 @@ void BMD::RenderMeshEffect(int i, int iType, int iSubType, vec3_t Angle, VOID* o
 		}
 	}
 }
+
+#ifdef SHADER_PIPELINE
+// ===========================================================================
+// Phase 15.3: Core-profile character/BMD draw path (infrastructure only).
+//
+// Mirrors the Phase 14.5 terrain design: character_core is bound ONCE for the
+// character pass (CharacterCoreBegin), every BMD mesh's GL_TRIANGLES block is
+// collected into one interleaved VBO through the emit helpers below
+// (cTexCoord2f / cColor3fv / cColor4f / cVertex3fv) and drawn with a single
+// glDrawArrays per mesh. One program for the whole pass -> no per-mesh program
+// switch and no fixed-function overlay mixed into the same depth range.
+//
+// Difference from terrain: the modelview is PER CHARACTER (each object pushes
+// its own translate/rotate before drawing its meshes), so uModelView cannot be
+// a pass-level constant. CharacterCoreSetModelView() reads GL_MODELVIEW_MATRIX
+// back and uploads it; it must be called once per object, after that object's
+// transform is on the matrix stack and before its meshes are emitted - the same
+// contract the CShaderGL RenderMeshVBO path already uses. uProj is the
+// pass-level g_ProjectionMatrix.
+//
+// CPU skinning stays authoritative (VertexTransform / LightTransform), exactly
+// as in the legacy immediate-mode path; this collector replaces only the
+// geometry *emission*. The GPU-skinning VBO path is deliberately NOT used here.
+//
+// Nothing calls into this block yet - Phase 15.4 routes RenderMeshInternal and
+// the character pass through it - so the scene is unchanged by this slice.
+// ===========================================================================
+
+// Opt-in toggle, mirroring GL33TerrainEnabled(): '-gl33char' on the command line
+// or an empty marker file 'gl33char.enable' in the client working directory
+// (some launchers do not forward command-line flags, so the file is the reliable
+// way to opt in).
+bool GL33CharEnabled()
+{
+	static int cached = -1;
+	if (cached < 0)
+	{
+		const char* cmd = GetCommandLineA();
+		bool on = (cmd != NULL && strstr(cmd, "-gl33char") != NULL);
+		if (!on && GetFileAttributesA("gl33char.enable") != INVALID_FILE_ATTRIBUTES)
+			on = true;
+		cached = on ? 1 : 0;
+	}
+	return cached != 0;
+}
+
+// Interleaved pos3/tex2/col4, matching character_core.vs (aPos/aTex/aColor).
+enum { CHAR_TRIS_MAX_VERTS = 3 * 4096, CHAR_TRIS_FLOATS = 9 };
+static bool   g_bCharCoreActive = false;
+static float  s_charVerts[CHAR_TRIS_MAX_VERTS * CHAR_TRIS_FLOATS];
+static int    s_charCount = 0;
+static float  s_charTex[2] = { 0.f, 0.f };
+static float  s_charCol[4] = { 1.f, 1.f, 1.f, 1.f };
+static GLuint s_charVao = 0, s_charVbo = 0;
+
+bool CharacterCoreIsActive() { return g_bCharCoreActive; }
+
+static void CharTrisFlush()
+{
+	if (s_charCount <= 0)
+		return;
+	glBindBuffer(GL_ARRAY_BUFFER, s_charVbo);
+	glBufferSubData(GL_ARRAY_BUFFER, 0,
+		s_charCount * CHAR_TRIS_FLOATS * (int)sizeof(float), s_charVerts);
+	glDrawArrays(GL_TRIANGLES, 0, s_charCount);
+	s_charCount = 0;
+}
+
+// Immediate-mode-shaped emit helpers. In Core mode they accumulate into the
+// current batch; otherwise they call fixed-function GL unchanged, so routing a
+// call site through them is behavior-preserving while the path is off.
+static inline void cTexCoord2f(float u, float v)
+{
+	if (g_bCharCoreActive) { s_charTex[0] = u; s_charTex[1] = v; return; }
+	glTexCoord2f(u, v);
+}
+static inline void cColor3fv(const float* c)
+{
+	if (g_bCharCoreActive) { s_charCol[0]=c[0]; s_charCol[1]=c[1]; s_charCol[2]=c[2]; s_charCol[3]=1.f; return; }
+	glColor3fv(c);
+}
+static inline void cColor3f(float r, float g, float b)
+{
+	if (g_bCharCoreActive) { s_charCol[0]=r; s_charCol[1]=g; s_charCol[2]=b; s_charCol[3]=1.f; return; }
+	glColor3f(r, g, b);
+}
+static inline void cColor4f(float r, float g, float b, float a)
+{
+	if (g_bCharCoreActive) { s_charCol[0]=r; s_charCol[1]=g; s_charCol[2]=b; s_charCol[3]=a; return; }
+	glColor4f(r, g, b, a);
+}
+static inline void cVertex3fv(const float* p)
+{
+	if (g_bCharCoreActive)
+	{
+		// The render state is constant inside one mesh block, so flushing a full
+		// buffer mid-block is safe (it only splits the draw).
+		if (s_charCount >= CHAR_TRIS_MAX_VERTS)
+			CharTrisFlush();
+		float* d = s_charVerts + s_charCount * CHAR_TRIS_FLOATS;
+		d[0]=p[0]; d[1]=p[1]; d[2]=p[2];
+		d[3]=s_charTex[0]; d[4]=s_charTex[1];
+		d[5]=s_charCol[0]; d[6]=s_charCol[1]; d[7]=s_charCol[2]; d[8]=s_charCol[3];
+		++s_charCount;
+		return;
+	}
+	glVertex3fv(p);
+}
+
+// Replace glBegin(GL_TRIANGLES) / glEnd around a mesh block.
+static inline void CharTrisBegin()
+{
+	if (g_bCharCoreActive) { s_charCount = 0; return; }
+	glBegin(GL_TRIANGLES);
+}
+static inline void CharTrisEnd()
+{
+	if (g_bCharCoreActive) { CharTrisFlush(); return; }
+	glEnd();
+}
+
+// The legacy RENDER_BRIGHT material calls DisableTexture(); the Core shader has
+// no fixed-function texture enable, so the pass tells the shader instead.
+static void CharacterCoreSetTextured(bool textured)
+{
+	if (!g_bCharCoreActive)
+		return;
+	gShaderScene.SetInt("uUseTexture", textured ? 1 : 0);
+}
+
+// Per-object modelview upload (see the header comment). Reads the matrix the
+// caller has just built on the fixed-function stack, so it stays correct for
+// every placement path (world objects, translated meshes, previews).
+void CharacterCoreSetModelView()
+{
+	if (!g_bCharCoreActive)
+		return;
+	float modelView[16];
+	glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
+	gShaderScene.SetMat4("uModelView", modelView);
+}
+
+// Bind character_core once for the character pass and set the shared uniforms.
+bool CharacterCoreBegin()
+{
+	if (!GL33CharEnabled() || gShaderScene.GetProgram(eShaderS_CharacterCore) == 0)
+		return false;
+	if (!gShaderScene.Use(eShaderS_CharacterCore))
+		return false;
+
+	if (s_charVao == 0)
+	{
+		const GLsizei stride = CHAR_TRIS_FLOATS * sizeof(float);
+		glGenVertexArrays(1, &s_charVao);
+		glBindVertexArray(s_charVao);
+		glGenBuffers(1, &s_charVbo);
+		glBindBuffer(GL_ARRAY_BUFFER, s_charVbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(s_charVerts), NULL, GL_DYNAMIC_DRAW);
+		glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)(0));
+		glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, (void*)(5 * sizeof(float)));
+	}
+	glBindVertexArray(s_charVao);
+
+	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
+	gShaderScene.SetInt("texture1", 0);
+	gShaderScene.SetInt("uUseTexture", 1);
+
+	s_charCount = 0;
+	g_bCharCoreActive = true;
+
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		g_ErrorReport.Write("> [Shader] Core character pass active (character_core program %u, single bind)\r\n",
+			gShaderScene.GetProgram(eShaderS_CharacterCore));
+	}
+	return true;
+}
+
+// End the Core character pass: flush, unbind, restore the previous program.
+void CharacterCoreEnd()
+{
+	if (!g_bCharCoreActive)
+		return;
+	CharTrisFlush();
+	g_bCharCoreActive = false;
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+}
+#endif // SHADER_PIPELINE
 
 void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float BlendMeshLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, int MeshTexture)
 {
