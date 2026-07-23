@@ -193,18 +193,46 @@ GPU-skinning VBO path, which the FPS memory documents as flicker-prone on
 effect/blend meshes):
 
 - **15.1 (done):** authored `character_core.vs/.fs` (inert).
-- **15.2 (next):** add `eShaderS_CharacterCore` to `CShaderScene` (load + keep +
-  log, not bound) — mirror 14.3. Runtime check: log `Loaded 'character_core'`.
-- **15.3:** add a character emit-collector in `ZzzBMD.cpp` (pos3/tex2/color4,
-  `GL_TRIANGLES`, larger buffer than terrain) + `tChar*` emit helpers + a
-  `CharacterCoreBegin/End` that binds `character_core` once for the character pass
-  and a per-character `SetCharacterModelView()` that uploads `uModelView` from the
-  read-back matrix. Gate behind `-gl33char` (new marker `Client\gl33char.enable`).
-- **15.4:** route `RenderMesh`'s `glBegin(GL_TRIANGLES)` block through the emit
-  helpers; wire the character pass (where `CShaderScene.Use(eShaderS_Character)` is
-  called, `ZzzScene.cpp:2653`) to `CharacterCoreBegin/End`. Verify per model:
-  players, monsters, equipment, wings, blend/chrome meshes, alpha.
-- **15.5+:** effects/wings tex-env, then default once validated.
+- **15.2 (done, verified):** added `eShaderS_CharacterCore` to `CShaderScene`
+  (load + keep + log, not bound) — mirrors 14.3. Log confirmed on NVIDIA:
+  `Loaded 'character_core' (program 12)`, `Init OK`, scene identical.
+- **15.3 (done, superseded by 15.4):** added a Core character emit-collector in
+  `ZzzBMD.cpp`. NOTE: the plan's premise was wrong — the live character draw is
+  NOT immediate mode. `RenderMeshInternal` builds `RenderArrayVertices/TexCoords/
+  Colors` from the CPU-skinned transforms and submits them with `glVertexPointer`
+  + `glDrawArrays(GL_TRIANGLES)`. The `glBegin(GL_TRIANGLES)` block the plan
+  pointed at is in `RenderMeshTranslate`, whose only caller `RenderBodyTranslate`
+  has no callers anywhere — dead code. So the conversion is client-arrays -> VBO,
+  and the emit-collector had no producer; 15.4 replaced it with a direct array
+  upload.
+- **15.4 (done, verified):** `CharacterCoreDrawTriangles` uploads the three CPU
+  arrays into a VBO/VAO and draws via `character_core`; wired at the
+  `RenderCharactersClient` pass (`ZzzScene.cpp`). Gate `Client\gl33char.enable` /
+  `-gl33char`. Per-mesh `uModelView` and (no-color-array) `uConstColor` are read
+  back from `GL_MODELVIEW_MATRIX` / `GL_CURRENT_COLOR`.
+  **Crash + fix:** the first 15.4 bound `character_core` for the WHOLE pass, but
+  the pass also draws shadows (`RenderBodyShadow`/`AddMeshShadowTriangles`) and
+  part-effects that still use fixed-function client arrays — under the
+  explicit-attribute Core program those crashed the NVIDIA driver (minidump:
+  fault in `nvoglv32.dll` via `RenderBodyShadow`). Fix: `character_core` is bound
+  PER BODY MESH only (Use/Unuse around each `CharacterCoreDrawTriangles`), the
+  pass keeps the compatibility `eShaderS_Character` bound for shadows/effects.
+  Same per-mesh bind/restore discipline as `RenderMeshVBO`. Never mix core +
+  immediate-mode on one pass. Verified in-game (log `Core character path active
+  ... per-body bind`, no crash).
+- **15.5 (done, compiles — awaiting ON==OFF check):** made `character_core`
+  pixel-identical to the compatibility `character.fs` it replaces. There is NO
+  fog/tex-env to fold in — neither scene character shader has any. The only
+  divergence was texturing: `character.fs` (the OFF path, the verified reference)
+  samples `texture1` unconditionally (a bound fragment shader ignores
+  `DisableTexture()`), so the 15.3 `uUseTexture` skip for RENDER_BRIGHT/COLOR was
+  removed. `uUseVertexColor`/`uConstColor` stay (they reproduce `gl_Color`). The
+  two programs are now semantically identical, so the Core path is a byte-for-byte
+  substitute. **Verify: with `gl33char.enable` present vs absent the character
+  render must be identical** (players, monsters, equipment, wings, chrome/metal
+  set armor, alpha/transparent, bright/color meshes). Then make it default.
+- **15.6+ (future):** once ON==OFF validated across maps, make the Core character
+  path default (drop the gate).
 
 Do NOT convert per-mesh blend/chrome/effect logic blindly — those are the parts
 that historically flickered; verify each in the Release run.
