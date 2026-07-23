@@ -14,6 +14,12 @@ layout(location = 2) in vec4 aColor;
 uniform mat4 uProj;
 uniform mat4 uModelView;
 
+// Phase 15.4: the legacy draw enables GL_COLOR_ARRAY only for lit/chrome meshes;
+// otherwise every vertex takes the fixed-function current colour. A Core profile
+// has neither, so the draw path selects between the aColor stream and a constant.
+uniform int  uUseVertexColor;
+uniform vec4 uConstColor;
+
 out vec2 TexCoord;
 out vec4 to_light;
 
@@ -21,5 +27,5 @@ void main()
 {
     gl_Position = uProj * uModelView * vec4(aPos, 1.0);
     TexCoord = aTex;
-    to_light = aColor;
+    to_light = (uUseVertexColor != 0) ? aColor : uConstColor;
 }

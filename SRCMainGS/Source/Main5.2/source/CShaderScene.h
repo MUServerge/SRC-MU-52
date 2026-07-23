@@ -80,6 +80,7 @@ public:
 	void SetInt  (const char* name, int value) const;
 	void SetFloat(const char* name, float value) const;
 	void SetVec3 (const char* name, float x, float y, float z) const;
+	void SetVec4 (const char* name, float x, float y, float z, float w) const;
 	// Column-major matrices (GL_FALSE, matching RenderMatrix output). Phase 14.
 	void SetMat4 (const char* name, const float* m16) const;
 	void SetMat3 (const char* name, const float* m9) const;
