@@ -7439,6 +7439,39 @@ void RenderJoints(BYTE bRenderOneMore)
 					VectorCopy(o->Tails[j + 1][0], vertices[vertex_index]);
 					vertex_index++;
 
+					// BUGFIX (present since the 5.2 base): this branch built the
+					// three arrays and then drew NOTHING - the immediate-mode block
+					// below was commented out during the file-wide glBegin ->
+					// client-array conversion and no glDrawArrays was put in its
+					// place, so BITMAP_JOINT_FORCE SubType 0 (the Sword Force tail,
+					// created from ZzzEffect.cpp BITMAP_SWORD_FORCE SubType 0) has
+					// been invisible. The arrays already hold exactly the four
+					// vertices the commented quad emitted, in the same order, so the
+					// fix is to submit them - through the Phase 16.7 Core path first,
+					// with the legacy client-array draw as the fallback, matching the
+					// two RENDER_FACE quads below.
+					bool bCore = false;
+#ifdef SHADER_PIPELINE
+					bCore = EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)vertices,
+						(const float*)textCoords, (const float*)colors, vertex_index, 0, true, -1.f);
+#endif // SHADER_PIPELINE
+					if (!bCore)
+					{
+						glEnableClientState(GL_VERTEX_ARRAY);
+						glEnableClientState(GL_COLOR_ARRAY);
+						glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+						glVertexPointer(3, GL_FLOAT, 0, vertices);
+						glColorPointer(4, GL_FLOAT, 0, colors);
+						glTexCoordPointer(2, GL_FLOAT, 0, textCoords);
+
+						glDrawArrays(GL_QUADS, 0, vertex_index);
+
+						glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+						glDisableClientState(GL_COLOR_ARRAY);
+						glDisableClientState(GL_VERTEX_ARRAY);
+					}
+
 					//glColor3f(Luminosity, Luminosity, Luminosity);
 					//glBegin(GL_QUADS);
 					//glTexCoord2f(Light1, 0.f);
