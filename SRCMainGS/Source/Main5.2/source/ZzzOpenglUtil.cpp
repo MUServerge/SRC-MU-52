@@ -94,6 +94,10 @@ namespace
 	GLuint s_effectVao = 0;
 	GLuint s_effectVboPos = 0, s_effectVboTex = 0, s_effectVboCol = 0;
 
+	// Phase 16.9 note: see ZzzBMD.cpp - the capacity-orphan + glBufferSubData
+	// streaming variant measured SLOWER than exact-size glBufferData on this
+	// hardware, so both Core paths keep the simple form.
+
 	bool EffectCoreEnsureBuffers()
 	{
 		if (s_effectVao != 0)
@@ -1355,6 +1359,32 @@ void RenderSpriteUV(int Texture, vec3_t Position, float Width, float Height, flo
 	Vector(x + Width, y - Height, z, p[1]);
 	Vector(x + Width, y + Height, z, p[2]);
 	Vector(x - Width, y + Height, z, p[3]);
+
+#ifdef SHADER_PIPELINE
+	// Phase 16.8: route the per-corner-lit world billboard (the floating damage /
+	// experience numbers, via RenderNumber) through effect_core. Same 4 vertices
+	// in the same order, so GL_TRIANGLE_FAN triangulates identically to the
+	// GL_QUADS below (0,1,2 + 0,2,3) and is Core-legal.
+	{
+		float col[4 * 4];
+		for (int i = 0; i < 4; i++)
+		{
+			col[i * 4 + 0] = Light[i][0];
+			col[i * 4 + 1] = Light[i][1];
+			col[i * 4 + 2] = Light[i][2];
+			col[i * 4 + 3] = Alpha;
+		}
+		if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)p, (const float*)UV,
+			col, 4, g_EffectTexEnvMode, TextureEnable, -1.f))
+		{
+			// The legacy loop below leaves the fixed-function current colour at the
+			// last vertex colour, and later draws inherit it. The Core path sets no
+			// glColor, so reproduce that trailing state explicitly.
+			glColor4f(Light[3][0], Light[3][1], Light[3][2], Alpha);
+			return;
+		}
+	}
+#endif // SHADER_PIPELINE
 
 	glBegin(GL_QUADS);
 	for (int i = 0; i < 4; i++)

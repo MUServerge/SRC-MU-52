@@ -127,6 +127,15 @@ static  float   g_fFrustumRange = -40.f;
 extern float g_ProjectionMatrix[16];
 extern float g_ViewMatrix[16];
 
+// Phase 16.8: shared Core-profile effect draw + the tracked fixed-function
+// texture-env combine, both defined in ZzzOpenglUtil.cpp. Declared here (not in
+// the ISO-8859 ZzzOpenglUtil.h) to keep that header byte-untouched.
+// EffectCoreDrawArrays returns false when the Core effect path is off or
+// unavailable, so the caller runs its untouched legacy draw.
+bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	const float* col, int vertexCount, int texEnvMode, bool useTexture, float alphaRef);
+extern int g_EffectTexEnvMode;
+
 static bool GL33TerrainEnabled()
 {
 	static int cached = -1;
@@ -2393,6 +2402,62 @@ void RenderTerrainBitmapTile(float xf, float yf, float lodf, int lodi, vec3_t c[
 		VectorCopy(PrimaryTerrainLight[TerrainIndex3], Light[2]);
 		VectorCopy(PrimaryTerrainLight[TerrainIndex4], Light[3]);
 	}
+
+#ifdef SHADER_PIPELINE
+	// Phase 16.8: route the ground-decal tile (magic circles, AoE markers and the
+	// other RenderTerrainBitmap / RenderTerrainAlphaBitmap overlays) through
+	// effect_core. Same primitive, same 4 vertices, same order as the fan below.
+	// When LightEnable is false the legacy loop emits no glColor at all, so the
+	// tile takes the fixed-function current colour that the caller set once before
+	// its tile loop - read it back and put it in the vertex colours. Note
+	// glColor3fv sets alpha to 1, which is why the Alpha == 1 branch does too.
+	{
+		float col[4 * 4];
+		if (LightEnable)
+		{
+			for (int i = 0; i < 4; i++)
+			{
+				col[i * 4 + 0] = Light[i][0];
+				col[i * 4 + 1] = Light[i][1];
+				col[i * 4 + 2] = Light[i][2];
+				col[i * 4 + 3] = (Alpha == 1.f) ? 1.f : Alpha;
+			}
+		}
+		else
+		{
+			float cur[4] = { 1.f, 1.f, 1.f, 1.f };
+			glGetFloatv(GL_CURRENT_COLOR, cur);
+			for (int i = 0; i < 4; i++)
+			{
+				col[i * 4 + 0] = cur[0];
+				col[i * 4 + 1] = cur[1];
+				col[i * 4 + 2] = cur[2];
+				col[i * 4 + 3] = cur[3];
+			}
+		}
+		float tex[4 * 2];
+		for (int i = 0; i < 4; i++)
+		{
+			tex[i * 2 + 0] = c[i][0];
+			tex[i * 2 + 1] = c[i][1];
+		}
+		if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)TerrainVertex, tex,
+			col, 4, g_EffectTexEnvMode, TextureEnable, -1.f))
+		{
+			// The legacy loop leaves the fixed-function current colour at the last
+			// vertex colour when LightEnable is set, and later draws inherit it.
+			// The Core path sets no glColor, so reproduce that trailing state.
+			if (LightEnable)
+			{
+				if (Alpha == 1.f)
+					glColor3fv(Light[3]);
+				else
+					glColor4f(Light[3][0], Light[3][1], Light[3][2], Alpha);
+			}
+			return;
+		}
+	}
+#endif // SHADER_PIPELINE
 
 	glBegin(GL_TRIANGLE_FAN);
 	for (int i = 0; i < 4; i++)
