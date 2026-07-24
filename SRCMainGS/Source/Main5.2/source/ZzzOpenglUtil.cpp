@@ -174,6 +174,28 @@ bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
 }
 #endif // SHADER_PIPELINE
 
+// Phase 16.6: tracked mirror of the fixed-function texture-environment combine.
+// A Core profile has no glTexEnv, so effect_core reproduces the combine in the
+// fragment shader (uTexEnvMode 0=MODULATE / 1=ADD / 2=REPLACE). Every effect
+// glTexEnvi site goes through this setter, so a Core effect draw knows which
+// combine the legacy path would have used without a per-draw glGet readback
+// (particles issue hundreds of draws a frame). The fixed-function call is still
+// made here, so the legacy (Core-effect-off) path is byte-for-byte unchanged.
+int g_EffectTexEnvMode = 0;
+
+void SetEffectTexEnvMode(int mode)
+{
+	GLint glMode = GL_MODULATE;
+	if (mode == 1)
+		glMode = GL_ADD;
+	else if (mode == 2)
+		glMode = GL_REPLACE;
+	else
+		mode = 0;
+	g_EffectTexEnvMode = mode;
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, glMode);
+}
+
 bool    FogEnable = false;
 GLfloat FogDensity = 0.0004f;
 
@@ -1264,6 +1286,21 @@ void RenderSprite(int Texture, vec3_t Position, float Width, float Height, vec3_
 				colors[i][3] = Light[0];
 		}
 	}
+
+#ifdef SHADER_PIPELINE
+	// Phase 16.6: route the particle/sprite billboard through effect_core. This
+	// one function is the draw for the whole particle family (skills, aura, fire,
+	// sparks) plus the other sprite billboards. The legacy draw below is a
+	// client-array GL_QUADS over exactly these 4 vertices; GL_TRIANGLE_FAN over
+	// the same 4 in the same order triangulates identically (0,1,2 + 0,2,3), and
+	// is Core-legal. uTexEnvMode carries the tracked glTexEnvi combine (this is
+	// the first user of the GL_ADD additive path), uUseTexture mirrors the
+	// fixed-function GL_TEXTURE_2D enable, and the alpha test / blend mode stay
+	// fixed-function state owned by the caller.
+	if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)p, (const float*)c,
+		(const float*)colors, 4, g_EffectTexEnvMode, TextureEnable, -1.f))
+		return;
+#endif // SHADER_PIPELINE
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);

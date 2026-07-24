@@ -18,6 +18,14 @@
 #include "MapManager.h"
 #include "NewUISystem.h"
 
+#ifdef SHADER_PIPELINE
+// Phase 16.6: tracked texture-env setter, defined in ZzzOpenglUtil.cpp. Declared
+// here (not in the ISO-8859 ZzzOpenglUtil.h) to keep that header byte-untouched.
+// It still issues the fixed-function glTexEnvi, and additionally records the
+// combine so the Core effect draw (effect_core uTexEnvMode) can reproduce it.
+void SetEffectTexEnvMode(int mode);
+#endif // SHADER_PIPELINE
+
 
 vec3_t g_vParticleWind = { 0.0f, 0.0f, 0.0f };
 vec3_t g_vParticleWindVelo = { 0.0f, 0.0f, 0.0f };
@@ -9038,10 +9046,10 @@ void RenderParticles(BYTE byRenderOneMore)
 			case BITMAP_ADV_SMOKE + 1:
 				if (o->SubType == 2)
 				{
-					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_ADD);
+					SetEffectTexEnvMode(1); // GL_ADD: additive glow combine
 					EnableAlphaBlend3();
 					RenderSprite(o->TexType, o->Position, Width, Height, o->Light, o->Rotation);
-					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+					SetEffectTexEnvMode(0); // GL_MODULATE: restore the default combine
 				}
 				else
 				{
