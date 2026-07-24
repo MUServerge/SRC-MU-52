@@ -17,6 +17,14 @@
 #include "GMBattleCastle.h"
 #include "NewUISystem.h"
 
+#ifdef SHADER_PIPELINE
+// Phase 16.7: shared Core-profile effect draw, defined in ZzzOpenglUtil.cpp.
+// Declared here (not in the ISO-8859 ZzzOpenglUtil.h) to keep that header
+// byte-untouched. Returns false when the Core effect path is off/unavailable.
+bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	const float* col, int vertexCount, int texEnvMode, bool useTexture, float alphaRef);
+#endif // SHADER_PIPELINE
+
 
 extern float g_fBoneSave[10][3][4];
 
@@ -5000,7 +5008,7 @@ void MoveJoint(JOINT* o, int iIndex)
 				}
 				else
 				{
-					assert(!"µð¹ö±ë");
+					assert(!"ï¿½ï¿½ï¿½ï¿½ï¿½");
 				}
 			}
 			break;
@@ -5210,7 +5218,7 @@ void MoveJoint(JOINT* o, int iIndex)
 				o->Light[2] -= timefac(10.12f);
 			}
 		}
-		else if (o->SubType == 1 || o->SubType == 2 || o->SubType == 3 || o->SubType == 5 || o->SubType == 6 || o->SubType == 7) //  À§¿¡¼­ ¾Æ·¡·Î ³»·Á¿À´Â ¹ø°³.
+		else if (o->SubType == 1 || o->SubType == 2 || o->SubType == 3 || o->SubType == 5 || o->SubType == 6 || o->SubType == 7) //  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Æ·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
 
 		{
 			VectorCopy(o->StartPosition, o->Position);
@@ -5798,7 +5806,7 @@ void MoveJoint(JOINT* o, int iIndex)
 			else
 			{
 				if (fLife < 10.f)
-				{	// ³¡
+				{	// ï¿½ï¿½
 					fPos = fLife * 7.0f;
 				}
 				else
@@ -6042,7 +6050,7 @@ void MoveJoint(JOINT* o, int iIndex)
 		{
 			if (o->Target->Live)
 			{
-				o->LifeTime = 100.f; //¹«ÇÑ
+				o->LifeTime = 100.f; //ï¿½ï¿½ï¿½ï¿½
 				o->life_time_work = standlimit((int)o->LifeTime);
 
 				if (rand() % 3 == 0)
@@ -6508,8 +6516,8 @@ void MoveJoint(JOINT* o, int iIndex)
 							CreateParticleSync(BITMAP_FIRE, o->Position, o->Angle, o->Light, 0);
 						}
 
-						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 10 + 5.f, 5, 10); //  Àü±â 
-						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 8 + 4.f, 5, 10); //  Àü±â 
+						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 10 + 5.f, 5, 10); //  ï¿½ï¿½ï¿½ï¿½ 
+						CreateJointSync(BITMAP_JOINT_THUNDER, Light, o->Position, o->Angle, 3, NULL, rand() % 8 + 4.f, 5, 10); //  ï¿½ï¿½ï¿½ï¿½ 
 					}
 				}
 				if (o->SubType == 0)
@@ -7589,6 +7597,56 @@ void RenderJoints(BYTE bRenderOneMore)
 						glPushMatrix();
 						glTranslatef(t_bias[0], t_bias[1], t_bias[2]);
 
+#ifdef SHADER_PIPELINE
+						// Phase 16.7: the legacy glBegin(GL_QUADS) below emits EIGHT
+						// vertices, i.e. two independent quads (the two faces of the
+						// tail segment). Each becomes one GL_TRIANGLE_FAN over the same
+						// 4 corners in the same order - identical triangulation
+						// (0,1,2 + 0,2,3) and Core-legal. The immediate path has no
+						// per-vertex colour, so every vertex takes the current colour
+						// (fCurColor, read above). The glTranslatef is honoured because
+						// the helper reads GL_MODELVIEW_MATRIX back per draw. Blend mode
+						// and alpha test stay fixed-function, set by the caller.
+						{
+							const float col[4 * 4] = {
+								fCurColor[0],fCurColor[1],fCurColor[2],fCurColor[3],
+								fCurColor[0],fCurColor[1],fCurColor[2],fCurColor[3],
+								fCurColor[0],fCurColor[1],fCurColor[2],fCurColor[3],
+								fCurColor[0],fCurColor[1],fCurColor[2],fCurColor[3],
+							};
+							const float posA[4 * 3] = {
+								o->Tails[j][2][0],     o->Tails[j][2][1],     o->Tails[j][2][2],
+								o->Tails[j][3][0],     o->Tails[j][3][1],     o->Tails[j][3][2],
+								o->Tails[j + 1][3][0], o->Tails[j + 1][3][1], o->Tails[j + 1][3][2],
+								o->Tails[j + 1][2][0], o->Tails[j + 1][2][1], o->Tails[j + 1][2][2],
+							};
+							const float texA[4 * 2] = {
+								Light1, 1.f,
+								Light1, 0.f,
+								Light2, 0.f,
+								Light2, 1.f,
+							};
+							const float posB[4 * 3] = {
+								o->Tails[j][0][0],     o->Tails[j][0][1],     o->Tails[j][0][2],
+								o->Tails[j][1][0],     o->Tails[j][1][1],     o->Tails[j][1][2],
+								o->Tails[j + 1][1][0], o->Tails[j + 1][1][1], o->Tails[j + 1][1][2],
+								o->Tails[j + 1][0][0], o->Tails[j + 1][0][1], o->Tails[j + 1][0][2],
+							};
+							const float texB[4 * 2] = {
+								Light1, 0.f,
+								Light1, 1.f,
+								Light2, 1.f,
+								Light2, 0.f,
+							};
+							if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, posA, texA, col, 4, 0, true, -1.f))
+							{
+								EffectCoreDrawArrays(GL_TRIANGLE_FAN, posB, texB, col, 4, 0, true, -1.f);
+								glPopMatrix();
+								continue;
+							}
+						}
+#endif // SHADER_PIPELINE
+
 						glBegin(GL_QUADS);
 						glTexCoord2f(Light1, 1.f);
 						glVertex3fv(o->Tails[j][2]);
@@ -7659,19 +7717,30 @@ void RenderJoints(BYTE bRenderOneMore)
 						VectorCopy(o->Tails[j + 1][2], vertices[vertex_index]);
 						vertex_index++;
 
-						glEnableClientState(GL_VERTEX_ARRAY);
-						glEnableClientState(GL_COLOR_ARRAY);
-						glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+						// Phase 16.7: RENDER_FACE_ONE tail quad through effect_core.
+						// Same 4 vertices in the same order, GL_TRIANGLE_FAN == GL_QUADS
+						// here; blend mode / alpha test stay fixed-function.
+						bool bCore = false;
+#ifdef SHADER_PIPELINE
+						bCore = EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)vertices,
+							(const float*)textCoords, (const float*)colors, vertex_index, 0, true, -1.f);
+#endif // SHADER_PIPELINE
+						if (!bCore)
+						{
+							glEnableClientState(GL_VERTEX_ARRAY);
+							glEnableClientState(GL_COLOR_ARRAY);
+							glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
-						glVertexPointer(3, GL_FLOAT, 0, vertices);
-						glColorPointer(4, GL_FLOAT, 0, colors);
-						glTexCoordPointer(2, GL_FLOAT, 0, textCoords);
+							glVertexPointer(3, GL_FLOAT, 0, vertices);
+							glColorPointer(4, GL_FLOAT, 0, colors);
+							glTexCoordPointer(2, GL_FLOAT, 0, textCoords);
 
-						glDrawArrays(GL_QUADS, 0, vertex_index);
+							glDrawArrays(GL_QUADS, 0, vertex_index);
 
-						glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-						glDisableClientState(GL_COLOR_ARRAY);
-						glDisableClientState(GL_VERTEX_ARRAY);
+							glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+							glDisableClientState(GL_COLOR_ARRAY);
+							glDisableClientState(GL_VERTEX_ARRAY);
+						}
 
 						//glBegin(GL_QUADS);
 						//glTexCoord2f(L1, V2);
@@ -7716,19 +7785,29 @@ void RenderJoints(BYTE bRenderOneMore)
 						VectorCopy(o->Tails[j + 1][0], vertices[vertex_index]);
 						vertex_index++;
 
-						glEnableClientState(GL_VERTEX_ARRAY);
-						glEnableClientState(GL_COLOR_ARRAY);
-						glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+						// Phase 16.7: RENDER_FACE_TWO tail quad through effect_core
+						// (same substitution as the RENDER_FACE_ONE quad above).
+						bool bCore = false;
+#ifdef SHADER_PIPELINE
+						bCore = EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)vertices,
+							(const float*)textCoords, (const float*)colors, vertex_index, 0, true, -1.f);
+#endif // SHADER_PIPELINE
+						if (!bCore)
+						{
+							glEnableClientState(GL_VERTEX_ARRAY);
+							glEnableClientState(GL_COLOR_ARRAY);
+							glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
-						glVertexPointer(3, GL_FLOAT, 0, vertices);
-						glColorPointer(4, GL_FLOAT, 0, colors);
-						glTexCoordPointer(2, GL_FLOAT, 0, textCoords);
+							glVertexPointer(3, GL_FLOAT, 0, vertices);
+							glColorPointer(4, GL_FLOAT, 0, colors);
+							glTexCoordPointer(2, GL_FLOAT, 0, textCoords);
 
-						glDrawArrays(GL_QUADS, 0, vertex_index);
+							glDrawArrays(GL_QUADS, 0, vertex_index);
 
-						glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-						glDisableClientState(GL_COLOR_ARRAY);
-						glDisableClientState(GL_VERTEX_ARRAY);
+							glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+							glDisableClientState(GL_COLOR_ARRAY);
+							glDisableClientState(GL_VERTEX_ARRAY);
+						}
 
 						//glBegin(GL_QUADS);
 						//glTexCoord2f(L1, V1);
