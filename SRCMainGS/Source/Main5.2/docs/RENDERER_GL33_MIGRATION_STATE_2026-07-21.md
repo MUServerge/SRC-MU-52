@@ -308,7 +308,13 @@ behind an opt-in marker, verify, default):
   pos/tex/col arrays, call `EffectCoreDrawArrays` with the right `uTexEnvMode` per
   the glTexEnvi mode. Verify additive glows match exactly (this is the flicker-
   prone additive-blend area — go carefully, per family).
-- **16.7:** joints/trails `ZzzEffectJoint.cpp` — the MOST complex (4+ blend modes:
+- **16.6 (done, verified):** particles. `ZzzEffectParticle.cpp` has no draw call
+  of its own — every particle is emitted by the single `RenderSprite()` billboard
+  in `ZzzOpenglUtil.cpp`, so the whole family converts at that one point. Added
+  `SetEffectTexEnvMode()`, which still issues `glTexEnvi` (legacy path unchanged)
+  and records the combine so `uTexEnvMode` needs no per-draw `glGet`. First user
+  of the GL_ADD additive path.
+- **16.7 (done, verified):** joints/trails `ZzzEffectJoint.cpp` — the MOST complex (4+ blend modes:
   AlphaBlend/Test/Minus/Blend2, mixed immediate `glBegin(GL_QUADS)` at ~7592 and
   client-array `glDrawArrays(GL_QUADS)` at ~7670/7727). Do LAST in the family, one
   draw at a time.
@@ -316,6 +322,64 @@ behind an opt-in marker, verify, default):
   `CSWaterTerrain`, `ZzzObject`), then default on once every family validates. The
   character shadow (`RenderBodyShadow`, translucent+stencil, currently off) rides
   along here. `Sprite.cpp` 2D is Phase 17 (UI).
+
+### Phase 16.9 — cost of the Core paths (2026-07-24) — READ BEFORE RESUMING
+
+Phase 16 stalled on an FPS regression the user reported and then confirmed by
+A/B (`gl33effect.enable` present vs absent). Do not resume the 16.8 conversions
+until this is resolved.
+
+**The regression is structural, not a bug.** `EffectCoreDrawArrays` and
+`CharacterCoreDrawTriangles` are self-contained PER-DRAW binds: each costs
+~18 GL calls (2x `glUseProgram`, 2x `glBindVertexArray`, 4x `glBindBuffer`,
+2-3x `glBufferData`, 2x `glGetFloatv`, ~5 uniform uploads) to draw one quad or
+one mesh. The legacy client-array path was ~10 calls with no program switch.
+
+**Corrected principle:** a slice is done when it is pixel-identical AND not more
+expensive than the path it replaces. Phase 14 terrain is the model — its
+single-bind pass removed 1495 tile draws/frame outright (the `TerrainTileDraws`
+and `TerrainRender` counters are gone from the profile entirely).
+
+**Measured baseline** (crowded scene 5, ~780 Core character meshes/frame,
+`Client\RenderProfiler.log`):
+
+| | value |
+|---|---|
+| frame / FPS | 33-34 ms, ~30 |
+| `Render` | 32-33 ms (96% of frame, `Sleep` 0 -> fully render-bound) |
+| `BMD::RenderMeshLegacy` | **~18 ms, ~23.6 us per mesh** |
+| `BMD::RenderMeshVBO` | 1.3 ms, 2.6 us per mesh (8.6x cheaper) |
+| `ProgramSwitches` | ~2390 /frame |
+| `TextureBindChanges` | ~2460 /frame |
+| `DrawCalls` | ~5800 /frame |
+
+**What was tried in 16.9 and what it actually bought:**
+
+- Uniform value-cache in `CShaderScene` (skip `glUniform*` when unchanged):
+  removed ~2550 GL calls/frame, **no measurable FPS gain**. Kept (correct,
+  visually verified) but do not count it as a win.
+- Capacity-orphan + `glBufferSubData` instead of per-mesh `glBufferData`:
+  **measured much WORSE** (per-mesh 22.3 -> 46.1 us, Render 32 -> 51 ms,
+  FPS 30 -> 19) because orphaning re-specifies the largest mesh's storage every
+  draw. Reverted; comments in the code warn against redoing it blind.
+
+**Conclusion / next step.** ~23.6 us per mesh is far too much for ~10 GL calls,
+so the cost is NOT the call count alone. Do not guess again — the profiler now
+works (marker file `renderprofiler.enable`, plain-text `RenderProfiler.log`);
+bisect it by measuring one change at a time:
+
+1. The two per-mesh `glGetFloatv` readbacks (`GL_MODELVIEW_MATRIX`,
+   `GL_CURRENT_COLOR`) — cheap in theory, but with a program bound some drivers
+   flush. Test by feeding a cached value and measuring.
+2. The 2x `glUseProgram` per mesh (~2390 switches/frame). Program batching was
+   tried and reverted once before as fragile in the hybrid — retry only with a
+   measurement and per-slice verification.
+3. The CPU array-building inside `RenderMeshInternal` (it is inside the measured
+   section, and is NOT GL work at all).
+4. `TextureBindChanges` ~2460/frame — sort/batch draws by texture.
+
+Then batching (sprites/particles grouped by texture+blend+texEnvMode), then the
+remaining 16.8 conversions, then default-on.
 
 ## 5. RenderMatrix API quick reference
 
