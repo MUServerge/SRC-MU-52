@@ -79,6 +79,13 @@ public:
 	GLint GetUniformLocation(GLuint program, const char* name) const;
 	void ForgetProgram(GLuint program);
 
+	// Phase 16.9 value cache. Resolves the location of 'name' on the bound
+	// program and reports whether the cached value already equals 'values', so
+	// the setter can skip a redundant glUniform*. Returns false (and records the
+	// new value) when the upload must happen. Only valid for the bound program;
+	// callers must have checked m_CurrentProgram / m_BoundProgram first.
+	bool IsUniformValueCached(const char* name, const float* values, int valueCount, GLint& outLocation) const;
+
 	// Uniform setters operate on the currently bound program.
 	void SetInt  (const char* name, int value) const;
 	void SetFloat(const char* name, float value) const;
@@ -104,10 +111,18 @@ private:
 	static const int UNIFORMS_PER_PROGRAM = 16;
 	static const int UNIFORM_NAME_CAPACITY = 48;
 
+	// Phase 16.9: the entry also caches the last value uploaded to this uniform.
+	// Uniform state lives in the program object and survives unbinding, so an
+	// upload whose value is unchanged is pure overhead. The crowd profile showed
+	// ~5450 redundant uniform uploads per frame (uProj and texture1 re-sent for
+	// every one of ~755 character meshes), and GL-call count is the dominant
+	// cost in this client. ValueCount 0 means nothing cached yet.
 	struct UniformCacheEntry
 	{
 		char Name[UNIFORM_NAME_CAPACITY];
 		GLint Location;
+		int   ValueCount;
+		float Value[16];
 	};
 
 	struct ProgramUniformCache

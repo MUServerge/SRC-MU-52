@@ -312,6 +312,7 @@ void CShaderScene::ClearUniformCache()
 		{
 			m_UniformCache[i].Uniforms[j].Name[0] = '\0';
 			m_UniformCache[i].Uniforms[j].Location = -1;
+			m_UniformCache[i].Uniforms[j].ValueCount = 0;
 		}
 	}
 }
@@ -332,6 +333,7 @@ void CShaderScene::ForgetProgram(GLuint program)
 		{
 			m_UniformCache[i].Uniforms[j].Name[0] = '\0';
 			m_UniformCache[i].Uniforms[j].Location = -1;
+			m_UniformCache[i].Uniforms[j].ValueCount = 0;
 		}
 		return;
 	}
@@ -385,15 +387,56 @@ GLint CShaderScene::GetUniformLocation(GLuint program, const char* name) const
 		UniformCacheEntry& entry = programCache->Uniforms[programCache->Count++];
 		strcpy_s(entry.Name, UNIFORM_NAME_CAPACITY, name);
 		entry.Location = location;
+		entry.ValueCount = 0;
 	}
 
 	return location;
 }
 
+bool CShaderScene::IsUniformValueCached(const char* name, const float* values, int valueCount, GLint& outLocation) const
+{
+	// Resolving through GetUniformLocation also creates the cache entry, so the
+	// value slot below exists from the first upload onwards.
+	const GLuint program = m_Program[m_CurrentProgram];
+	outLocation = GetUniformLocation(program, name);
+	if (outLocation < 0)
+		return true; // uniform not present in this program: nothing to upload, ever
+	if (values == NULL || valueCount <= 0 || valueCount > 16)
+		return false;
+
+	for (int i = 0; i < PROGRAM_UNIFORM_CACHE_CAPACITY; ++i)
+	{
+		if (m_UniformCache[i].Program != program)
+			continue;
+
+		ProgramUniformCache& cache = m_UniformCache[i];
+		for (int j = 0; j < cache.Count; ++j)
+		{
+			if (strcmp(cache.Uniforms[j].Name, name) != 0)
+				continue;
+
+			UniformCacheEntry& entry = cache.Uniforms[j];
+			if (entry.ValueCount == valueCount &&
+				memcmp(entry.Value, values, valueCount * sizeof(float)) == 0)
+				return true;
+
+			entry.ValueCount = valueCount;
+			memcpy(entry.Value, values, valueCount * sizeof(float));
+			return false;
+		}
+		break;
+	}
+
+	return false; // uncacheable (cache full): always upload
+}
+
 void CShaderScene::SetInt(const char* name, int value) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
+	const float cachedValue[1] = { (float)value };
+	GLint loc = -1;
+	if (IsUniformValueCached(name, cachedValue, 1, loc))
+		return;
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -404,7 +447,10 @@ void CShaderScene::SetInt(const char* name, int value) const
 void CShaderScene::SetFloat(const char* name, float value) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
+	const float cachedValue[1] = { value };
+	GLint loc = -1;
+	if (IsUniformValueCached(name, cachedValue, 1, loc))
+		return;
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -415,7 +461,10 @@ void CShaderScene::SetFloat(const char* name, float value) const
 void CShaderScene::SetVec3(const char* name, float x, float y, float z) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
+	const float cachedValue[3] = { x, y, z };
+	GLint loc = -1;
+	if (IsUniformValueCached(name, cachedValue, 3, loc))
+		return;
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -426,7 +475,10 @@ void CShaderScene::SetVec3(const char* name, float x, float y, float z) const
 void CShaderScene::SetVec4(const char* name, float x, float y, float z, float w) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
+	const float cachedValue[4] = { x, y, z, w };
+	GLint loc = -1;
+	if (IsUniformValueCached(name, cachedValue, 4, loc))
+		return;
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
@@ -437,7 +489,9 @@ void CShaderScene::SetVec4(const char* name, float x, float y, float z, float w)
 void CShaderScene::SetMat4(const char* name, const float* m16) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
+	GLint loc = -1;
+	if (IsUniformValueCached(name, m16, 16, loc))
+		return;
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATRIX);
@@ -448,7 +502,9 @@ void CShaderScene::SetMat4(const char* name, const float* m16) const
 void CShaderScene::SetMat3(const char* name, const float* m9) const
 {
 	if (m_CurrentProgram < 0 || m_BoundProgram != m_Program[m_CurrentProgram]) return;
-	const GLint loc = GetUniformLocation(m_Program[m_CurrentProgram], name);
+	GLint loc = -1;
+	if (IsUniformValueCached(name, m9, 9, loc))
+		return;
 	if (loc >= 0)
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATRIX);

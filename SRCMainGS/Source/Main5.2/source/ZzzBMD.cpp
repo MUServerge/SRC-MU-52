@@ -1396,6 +1396,15 @@ static bool   g_bCharCoreActive = false;
 static GLuint s_charVao = 0;
 static GLuint s_charVboPos = 0, s_charVboTex = 0, s_charVboCol = 0;
 
+// Phase 16.9 note: a "keep the allocation and refill with glBufferSubData"
+// variant was tried here and MEASURED SLOWER (crowd profile: per-mesh cost
+// 22.3 -> 46.1 us, Render 32 -> 51 ms). Orphaning with the grown capacity
+// re-specifies the LARGEST mesh's storage on every draw, so small meshes paid
+// the biggest allocation plus a second call. Exact-size glBufferData is the
+// cheaper of the two here. Real streaming (ring buffer / persistent mapping)
+// is a separate, measured change - do not "optimize" this back without a
+// before/after RenderProfiler.log.
+
 bool CharacterCoreIsActive() { return g_bCharCoreActive; }
 
 // Arm the Core character path for the pass. Does NOT bind character_core or a
