@@ -44,6 +44,11 @@ float   g_ProjectionMatrix[16];
 // fixed-function MODELVIEW stays authoritative; zero behavior change today.
 float   g_ViewMatrix[16];
 
+// Phase 17.2: CPU copy of the UI's screen-space ortho projection, built in
+// BeginBitmap alongside gluOrtho2D. Separate from g_ProjectionMatrix on purpose:
+// that one is the perspective world camera, and the 2D UI never uses it.
+float   g_UIProjectionMatrix[16];
+
 // Phase 13.5: authoritative CPU mirror of the fixed-function MODELVIEW stack.
 // Each fixed-function modelview op (glPushMatrix/glPopMatrix/glLoadIdentity/
 // glRotatef/glTranslatef) is mirrored onto this stack at its call site so the
@@ -1496,6 +1501,15 @@ void BeginBitmap()
 
 	glLoadIdentity();
 	gluOrtho2D(0, WindowWidth, 0, WindowHeight);
+
+	// Phase 17.2: CPU mirror of the UI's ortho projection, built alongside the
+	// fixed-function gluOrtho2D exactly as g_ProjectionMatrix mirrors
+	// gluPerspective (Phase 13.2). The UI is screen-space, so a Core UI draw
+	// must feed uProj from THIS, never from g_ProjectionMatrix - that one holds
+	// the perspective camera and would place every widget off-screen. The
+	// fixed-function matrix stays authoritative; nothing consumes this yet.
+	RenderMatrix::Ortho(g_UIProjectionMatrix, 0.f, (float)WindowWidth,
+		0.f, (float)WindowHeight, -1.f, 1.f);
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
