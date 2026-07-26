@@ -238,8 +238,15 @@ namespace
 // Returns false when the Core UI path is off or unavailable, so the caller runs
 // its untouched legacy draw.
 bool UICoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
-	int vertexCount, bool useTexture, float alphaRef)
+	int vertexCount, float alphaRef)
 {
+	// Ask GL, do not mirror. TextureEnable has several independent writers -
+	// EnableAlphaTest/EnableAlphaBlend set it as a side effect too - so no single
+	// place can keep it honest, and two attempts to feed the Core UI draw from it
+	// painted the name/chat backplates black, then white. glIsEnabled is a
+	// readback, but it is correct BY CONSTRUCTION, and correctness comes before
+	// its cost. Phase 18 deletes GL_TEXTURE_2D entirely and this goes with it.
+	const bool useTexture = (glIsEnabled(GL_TEXTURE_2D) == GL_TRUE);
 	if (!GL33UIEnabled() || vertexCount <= 0 || pos == NULL)
 		return false;
 	if (useTexture && tex == NULL)
@@ -1853,11 +1860,7 @@ void RenderBitmap(int Texture, float x, float y, float Width, float Height, floa
 	// because the helper reads the fixed-function current colour into uColor.
 	// The client-array state enabled above is left as the legacy path left it
 	// and is disabled below either way, so the fallback stays byte-identical.
-	// useTexture mirrors the fixed-function GL_TEXTURE_2D enable, NOT a constant:
-	// callers reach here after DisableTexture() for untextured widgets (the name
-	// and chat backplates), where the legacy draw emits the flat current colour.
-	// Sampling the bound texture there painted them black.
-	if (!UICoreDrawArrays(GL_TRIANGLE_FAN, (const float*)p, (const float*)c, 4, TextureEnable, -1.f))
+	if (!UICoreDrawArrays(GL_TRIANGLE_FAN, (const float*)p, (const float*)c, 4, -1.f))
 #endif // SHADER_PIPELINE
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);  // 4 v�rtices en total
 
