@@ -1458,9 +1458,40 @@ bool CharacterCoreBegin()
 	return true;
 }
 
+// Phase 16.10a: character_core used to be bound and unbound around EVERY body
+// mesh. Measured cost of that (crowd profile, gl33char on vs off, same scene):
+// MeshSubmitGL 13.5 us/mesh vs 3.8 us/mesh on the legacy client-array path,
+// i.e. ~8 ms/frame and ~10 FPS. ProgramSwitches were 2390/frame vs 1071.
+//
+// A RenderBody call keeps the fixed-function matrices unchanged across its mesh
+// loop and issues no draws other than RenderMeshInternal, so the bind, the
+// GL_MODELVIEW_MATRIX readback and the constant uniforms (uProj, uModelView,
+// texture1) can be hoisted to ONCE PER BODY. The bind is lazy - taken by the
+// first Core mesh - and released by CharacterCoreEndBody, so a body that draws
+// nothing through the Core path never binds at all.
+//
+// Safety (this is the 15.4 driver-crash area): any path that falls back to a
+// fixed-function client-array draw calls CharacterCoreEndBody first, so legacy
+// geometry is never submitted under the explicit-attribute Core program. The
+// next Core mesh simply re-binds. RenderMeshVBO is safe as-is because it
+// restores the exact previous program (RestoreProgram(prevProgram)).
+static bool s_charBodyBound = false;
+
+void CharacterCoreEndBody()
+{
+	if (!s_charBodyBound)
+		return;
+
+	s_charBodyBound = false;
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+}
+
 // Disarm the Core character path at the end of the pass.
 void CharacterCoreEnd()
 {
+	CharacterCoreEndBody();
 	g_bCharCoreActive = false;
 }
 
@@ -1479,8 +1510,23 @@ bool CharacterCoreDrawTriangles(const float* pos, const float* tex, const float*
 	if (!g_bCharCoreActive || vertexCount <= 0 || pos == NULL || tex == NULL)
 		return false;
 
-	if (!gShaderScene.Use(eShaderS_CharacterCore))
-		return false; // leaves the previous program bound; caller uses legacy path
+	if (!s_charBodyBound)
+	{
+		if (!gShaderScene.Use(eShaderS_CharacterCore))
+			return false; // leaves the previous program bound; caller uses legacy path
+		s_charBodyBound = true;
+
+		// Per-body constants: the modelview is fixed for this RenderBody, uProj is
+		// fixed for the frame and texture1 never changes. Uploading these once per
+		// body instead of once per mesh is the whole point of the hoist (the value
+		// cache in CShaderScene would skip the redundant uploads anyway, but not
+		// the glGetFloatv or the location lookups).
+		float modelView[16];
+		glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
+		gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
+		gShaderScene.SetMat4("uModelView", modelView);
+		gShaderScene.SetInt("texture1", 0);
+	}
 
 	glBindVertexArray(s_charVao);
 
@@ -1505,21 +1551,11 @@ bool CharacterCoreDrawTriangles(const float* pos, const float* tex, const float*
 		gShaderScene.SetVec4("uConstColor", current[0], current[1], current[2], current[3]);
 	}
 
-	// uProj is per-pass but uniform state lives in the program object, so set it
-	// each draw (cheap, cached location); uModelView is per character.
-	float modelView[16];
-	glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
-	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
-	gShaderScene.SetMat4("uModelView", modelView);
-	gShaderScene.SetInt("texture1", 0);
-
 	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
 
-	// Restore the pass's previous program and the default VAO so the following
-	// shadow/effect client-array draws are safe.
-	glBindVertexArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	gShaderScene.Unuse();
+	// The program, the VAO and the per-body uniforms stay bound for the rest of
+	// this body's meshes; CharacterCoreEndBody releases them (and is also called
+	// before any fixed-function fallback draw).
 	return true;
 }
 #endif // SHADER_PIPELINE
@@ -1528,6 +1564,11 @@ void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float Bl
 {
 	RenderMeshInternal(i, RenderFlag, Alpha, BlendMesh, BlendMeshLight,
 		BlendMeshTexCoordU, BlendMeshTexCoordV, MeshTexture, NULL);
+#ifdef SHADER_PIPELINE
+	// Standalone single-mesh entry point: there is no RenderBody loop to close
+	// the per-body bind, so release it here.
+	CharacterCoreEndBody();
+#endif // SHADER_PIPELINE
 }
 
 void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, float BlendMeshLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, int MeshTexture, ShaderMatrixSnapshot* matrixSnapshot)
@@ -1987,6 +2028,13 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						|| renderFlags == RENDER_CHROME8
 						|| renderFlags == RENDER_OIL;
 
+					// Phase 16.9 bisect: this loop is pure CPU (no GL at all) and
+					// expands the whole skinned mesh into the shared arrays. Measured
+					// separately from the draw below so the profile says which of the
+					// two the ~23.6 us per mesh actually belongs to. The extra brace
+					// scopes the timer to the loop without reindenting its body.
+					{ CRenderProfilerScope buildScope(RP_BMD_MESH_BUILD);
+
 					for (int j = 0; j < m->NumTriangles; j++)
 					{
 						Triangle_t* triangle = &m->Triangles[j];
@@ -2071,8 +2119,11 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						}
 					}
 
+					} // end RP_BMD_MESH_BUILD
+
 					if (target_vertex_index != -1)
 					{
+						CRenderProfilerScope submitScope(RP_BMD_MESH_SUBMIT);
 #ifdef SHADER_PIPELINE
 						// Phase 15.4: Core-profile draw of the very same CPU arrays when
 						// the character pass armed character_core. 'enableColor' mirrors
@@ -2088,6 +2139,12 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 							g_RenderProfiler.AddCounter(RPC_LEGACY_BMD_MESH_DRAWS);
 							return;
 						}
+						// Phase 16.10a: this is a fixed-function client-array draw, so it
+						// must NOT run under the explicit-attribute Core program that a
+						// previous mesh of this body may still have bound (that mix is
+						// what crashed the NVIDIA driver in 15.4). Releasing here is
+						// safe: the next Core mesh re-binds lazily.
+						CharacterCoreEndBody();
 #endif // SHADER_PIPELINE
 						// Legacy immediate-mode fallback (also the only path when the
 						// GPU short-circuit above did not fire, or SHADER_VERSION_TEST off).
@@ -2182,6 +2239,11 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 					BlendMeshTexCoordU, BlendMeshTexCoordV, Texture, &matrixSnapshot);
 			}
 		}
+#ifdef SHADER_PIPELINE
+		// Close the per-body character_core bind (Phase 16.10a) before EndRender
+		// restores the pass state, so nothing after this body runs under it.
+		CharacterCoreEndBody();
+#endif // SHADER_PIPELINE
 		this->EndRender();
 	}
 }
