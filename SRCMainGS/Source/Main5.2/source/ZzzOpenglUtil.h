@@ -26,6 +26,7 @@ extern float  CameraMatrix[3][4];
 extern float  g_fCameraCustomDistance;
 extern bool   FogEnable;
 extern bool   TextureEnable;
+extern void SetTextureEnabled(bool enable);
 extern bool   DepthTestEnable;
 extern bool   CullFaceEnable;
 extern bool   DepthMaskEnable;

@@ -181,6 +181,108 @@ bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
 	}
 	return true;
 }
+
+// ===========================================================================
+// Phase 17: Core-profile 2D UI draw.
+//
+// Opt-IN for now ('-gl33ui' or a 'gl33ui.enable' marker file), like every other
+// phase, so the UI can be compared against the fixed-function original.
+// ===========================================================================
+bool GL33UIEnabled()
+{
+	static int cached = -1;
+	if (cached < 0)
+	{
+		const char* cmd = GetCommandLineA();
+		bool on = (cmd != NULL && strstr(cmd, "-gl33ui") != NULL);
+		if (!on && GetFileAttributesA("gl33ui.enable") != INVALID_FILE_ATTRIBUTES)
+			on = true;
+		cached = on ? 1 : 0;
+	}
+	return cached != 0;
+}
+
+namespace
+{
+	GLuint s_uiVao = 0;
+	GLuint s_uiVboPos = 0, s_uiVboTex = 0;
+
+	bool UICoreEnsureBuffers()
+	{
+		if (s_uiVao != 0)
+			return true;
+		if (glGenVertexArrays == NULL)
+			return false;
+		glGenVertexArrays(1, &s_uiVao);
+		glBindVertexArray(s_uiVao);
+		glGenBuffers(1, &s_uiVboPos);
+		glBindBuffer(GL_ARRAY_BUFFER, s_uiVboPos);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(0);
+		glGenBuffers(1, &s_uiVboTex);
+		glBindBuffer(GL_ARRAY_BUFFER, s_uiVboTex);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(1);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		return true;
+	}
+}
+
+// Draw one 2D UI primitive through ui_core. 'pos' is vec2 screen space, 'tex'
+// vec2 (may be NULL for untextured draws). The colour is NOT per-vertex: the UI
+// call sites set the fixed-function current colour once, so it is read back here
+// into uColor - which also means this must be called AFTER the caller's
+// glColor*. uProj comes from g_UIProjectionMatrix (the ortho mirror built in
+// BeginBitmap), never from g_ProjectionMatrix. Blending stays fixed-function.
+// Returns false when the Core UI path is off or unavailable, so the caller runs
+// its untouched legacy draw.
+bool UICoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	int vertexCount, bool useTexture, float alphaRef)
+{
+	if (!GL33UIEnabled() || vertexCount <= 0 || pos == NULL)
+		return false;
+	if (useTexture && tex == NULL)
+		return false;
+	if (gShaderScene.GetProgram(eShaderS_UICore) == 0)
+		return false;
+	if (!UICoreEnsureBuffers())
+		return false;
+	if (!gShaderScene.Use(eShaderS_UICore))
+		return false;
+
+	glBindVertexArray(s_uiVao);
+	glBindBuffer(GL_ARRAY_BUFFER, s_uiVboPos);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (int)sizeof(float), pos, GL_STREAM_DRAW);
+	if (tex != NULL)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, s_uiVboTex);
+		glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (int)sizeof(float), tex, GL_STREAM_DRAW);
+	}
+
+	float current[4] = { 1.f, 1.f, 1.f, 1.f };
+	glGetFloatv(GL_CURRENT_COLOR, current);
+	gShaderScene.SetMat4("uProj", g_UIProjectionMatrix);
+	gShaderScene.SetVec4("uColor", current[0], current[1], current[2], current[3]);
+	gShaderScene.SetInt("texture1", 0);
+	gShaderScene.SetInt("uUseTexture", useTexture ? 1 : 0);
+	gShaderScene.SetFloat("uAlphaRef", alphaRef);
+
+	glDrawArrays(mode, 0, vertexCount);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		g_ErrorReport.Write("> [Shader] Core UI path active (ui_core program %u, per-draw bind)\r\n",
+			gShaderScene.GetProgram(eShaderS_UICore));
+	}
+	return true;
+}
 #endif // SHADER_PIPELINE
 
 // Phase 16.6: tracked mirror of the fixed-function texture-environment combine.
@@ -583,6 +685,34 @@ void DisableCullFace()
 		CullFaceEnable = false;
 		glDisable(GL_CULL_FACE);
 	}
+}
+
+// Phase 17: authoritative toggle for GL_TEXTURE_2D.
+//
+// 'TextureEnable' is meant to mirror the fixed-function texture enable, but 21
+// call sites across the UI (UIControls, UIWindows, NewUIMessageBox, Sprite,
+// CameraMove, ZzzInterface) called glEnable/glDisable(GL_TEXTURE_2D) directly
+// and bypassed it, so the mirror could not be trusted. That is not a cosmetic
+// problem: the Core UI draw has to know whether the legacy draw would have
+// sampled a texture or emitted a flat colour, and a stale mirror turns name
+// and chat backplates black or white depending on which way it is wrong.
+//
+// Deliberately NOT DisableTexture(): that one also forces the depth mask on and
+// toggles the alpha test, so substituting it at these sites would change
+// behaviour. This does exactly what the raw call did and keeps the mirror in
+// step - the redundant-call skip is the only difference.
+//
+// Phase 18 removes GL_TEXTURE_2D entirely (it does not exist in Core), so
+// routing every site through one function is a prerequisite either way.
+void SetTextureEnabled(bool enable)
+{
+	if (TextureEnable == enable)
+		return;
+	TextureEnable = enable;
+	if (enable)
+		glEnable(GL_TEXTURE_2D);
+	else
+		glDisable(GL_TEXTURE_2D);
 }
 
 void DisableTexture(bool AlphaTest)
@@ -1717,6 +1847,18 @@ void RenderBitmap(int Texture, float x, float y, float Width, float Height, floa
 	}
 
 	// Dibujar los v�rtices como un cuadrado utilizando un tri�ngulo en abanico
+#ifdef SHADER_PIPELINE
+	// Phase 17.4: first Core UI consumer. Same primitive, same 4 vertices, same
+	// order - only the submission changes. Placed AFTER the glColor4f above,
+	// because the helper reads the fixed-function current colour into uColor.
+	// The client-array state enabled above is left as the legacy path left it
+	// and is disabled below either way, so the fallback stays byte-identical.
+	// useTexture mirrors the fixed-function GL_TEXTURE_2D enable, NOT a constant:
+	// callers reach here after DisableTexture() for untextured widgets (the name
+	// and chat backplates), where the legacy draw emits the flat current colour.
+	// Sampling the bound texture there painted them black.
+	if (!UICoreDrawArrays(GL_TRIANGLE_FAN, (const float*)p, (const float*)c, 4, TextureEnable, -1.f))
+#endif // SHADER_PIPELINE
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);  // 4 v�rtices en total
 
 	// Restaurar el color si fue cambiado

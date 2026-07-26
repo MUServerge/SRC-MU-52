@@ -354,7 +354,7 @@ void CCameraMove::RenderWayPoint()
 {
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_ALPHA_TEST);
-	glDisable(GL_TEXTURE_2D);
+	SetTextureEnabled(false);
 
 	glBegin(GL_QUADS);
 	glColor4f(1.0f, 0.0f, 0.0f, 0.8f);
@@ -380,7 +380,7 @@ void CCameraMove::RenderWayPoint()
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_ALPHA_TEST);
-	glEnable(GL_TEXTURE_2D);
+	SetTextureEnabled(true);
 }
 
 void CCameraMove::SetSelectedTile(int iTileIndex)
