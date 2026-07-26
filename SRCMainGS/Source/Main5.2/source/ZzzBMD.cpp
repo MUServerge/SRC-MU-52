@@ -86,6 +86,17 @@ static DeferredCpuTransformContext g_DeferredCpuTransform = {};
 
 static bool IsVboSceneEnabled()
 {
+	// 'vbo.disable' marker forces every model draw down the legacy CPU path.
+	// This exists to get a REFERENCE image: world objects always take the VBO
+	// path when eligible, so without it there is nothing to compare the shader
+	// output against, and questions like "is the 0.85 trim in Model.vs real or
+	// eyeballed" cannot be answered with evidence.
+	static int cached = -1;
+	if (cached < 0)
+		cached = (GetFileAttributesA("vbo.disable") != INVALID_FILE_ATTRIBUTES) ? 0 : 1;
+	if (cached == 0)
+		return false;
+
 	return SceneFlag == MAIN_SCENE;
 }
 

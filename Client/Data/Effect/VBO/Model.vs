@@ -129,7 +129,14 @@ vec3 ApplyBoneNormal(vec3 normal, uint boneIndex)
     vec3 r0 = u_Bones[boneIndex + 0u].xyz;
     vec3 r1 = u_Bones[boneIndex + 1u].xyz;
     vec3 r2 = u_Bones[boneIndex + 2u].xyz;
-    return normalize(vec3(dot(r0, normal), dot(r1, normal), dot(r2, normal)));
+    // Deliberately NOT normalized. The CPU path is a bare VectorRotate
+    // (ZzzBMD.cpp NormalTransform) with no renormalization, and the lighting
+    // term dot(N,L)*0.8+0.4 is therefore sensitive to the stored normal's
+    // length - BMD normals are not guaranteed unit length. Normalizing here
+    // lengthened them, raised the dot product and made every lit surface
+    // brighter than the legacy draw; that is what the old `* 0.85` trim at the
+    // end of main() was silently compensating for. Match the CPU instead.
+    return vec3(dot(r0, normal), dot(r1, normal), dot(r2, normal));
 }
 
 void main()
@@ -170,10 +177,18 @@ void main()
         if (intensity < 0.2) intensity = 0.2;
         color.rgb *= intensity;
     }
-    // Fixed-function clamps vertex colour before the texture modulate. Preserve
-    // the established 0.85 trim for the existing world-object VBO path, but use
-    // the untrimmed legacy colour for opt-in translated character/equipment draws.
-    color.rgb = clamp(color.rgb, 0.0, 1.0) * (u_translate != 0 ? 1.0 : 0.85);
+    // Fixed-function clamps the vertex colour before the texture modulate, so
+    // this clamp is real parity, not a tweak.
+    //
+    // A `* (u_translate != 0 ? 1.0 : 0.85)` trim used to sit here. It had NO
+    // counterpart anywhere in the CPU path - ZzzBMD.cpp computes exactly
+    // dot(N,L)*0.8 + 0.4 with a 0.2 floor and nothing else - so it was an
+    // eyeballed correction for a difference nobody had identified, and it made
+    // u_translate do two unrelated jobs at once (body transform AND brightness).
+    // Removed: u_translate is now purely geometric, and any remaining mismatch
+    // has to be found and fixed rather than averaged away. Compare against the
+    // legacy reference with the 'vbo.disable' marker.
+    color.rgb = clamp(color.rgb, 0.0, 1.0);
     vColor = color;
 
     gl_Position = uProj * uView * vec4(worldPos, 1.0);
