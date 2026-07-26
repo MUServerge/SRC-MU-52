@@ -76,6 +76,42 @@ Then the per-vertex application from the legacy build loop:
 - `RENDER_CHROME4` / `RENDER_CHROME8` -> texcoord = chrome + `BlendMeshTexCoord`
 - `RENDER_OIL` -> texcoord = `chrome * aTex + BlendMeshTexCoord`
 
+### Wiring facts established by reading `RenderMeshInternal` (do not re-derive)
+
+1. **The whole chrome family collapses `renderFlags` to exactly FOUR values**
+   (`ZzzBMD.cpp` ~1745): `RENDER_CHROME` is the default, then `RENDER_CHROME4`,
+   `RENDER_CHROME8`, `RENDER_OIL` override it. Nothing else. This matches the
+   build-loop switch one-for-one, so:
+
+   | `renderFlags` | apply mode |
+   |---|---|
+   | `RENDER_CHROME` | direct (`CHROME_APPLY_DIRECT`) |
+   | `RENDER_CHROME4`, `RENDER_CHROME8` | `+ BlendMeshTexCoord` (`CHROME_APPLY_OFFSET`) |
+   | `RENDER_OIL` | `* aTex + BlendMeshTexCoord` (`CHROME_APPLY_MODULATE`) |
+
+2. **The formula is chosen by the original `RenderFlag` bits**, not by
+   `renderFlags` — CHROME2/3/4/5/6/7/8/OIL/CHROME, else the metal default. That
+   is the `u_chromeMode` enum already in `Model.vs`, in the same if/else order.
+
+3. **CRITICAL — chrome uses FLAT `BodyLight`, never the per-vertex intensity.**
+   The legacy build loop writes `colors[] = BodyLight` and only the
+   `case RENDER_TEXTURE:` branch replaces it with `LightTransform` when
+   `EnableLight`. Chrome never reaches that branch. So a chrome draw routed to
+   the VBO path **must pass `EnableLight = 0`** to `RenderMeshVBO`, regardless of
+   the object's real `EnableLight`, or the shader will apply
+   `dot(N,L)*0.8+0.4` that the legacy path does not — a visible brightness
+   difference on every chrome/metal surface.
+
+4. `IsVboMaterialEligible` currently demands `renderFlags == RENDER_TEXTURE`;
+   extend it to also accept those four chrome values. Keep the `enableLight`
+   requirement conservative at first and relax it only with a measurement.
+
+5. **Known remaining waste (optimize later, after correctness):** the chrome
+   branch runs `EnsureCpuTransforms()` and the whole `g_chrome` per-normal loop
+   *before* the VBO gate is reached. Routing the draw to the VBO path skips
+   `MeshBuildCPU` and `MeshSubmitGL` but not that loop, so the first version
+   captures most - not all - of the available win.
+
 ### Implementation shape
 
 1. `Model.vs`: add `uniform int u_texCoordMode;` plus `u_wave`, `u_wave2`,
