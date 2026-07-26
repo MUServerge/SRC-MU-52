@@ -3036,6 +3036,19 @@ void RenderSkillInfo(int sx, int sy, int Type, int SkillNum, int iRenderPoint /*
 		sprintf(TextList[TextNum], GlobalText[360], iSkillMana);
 		TextListColor[TextNum] = TEXT_COLOR_WHITE; TextBold[TextNum] = false; TextNum++;
 	}
+
+	// Skill tooltip redesign: show the skill's required energy (real value from
+	// GetSkillInformation_Energy). Only rendered when the skill actually needs energy.
+	// NOTE: label kept inline for now - the client's localized strings live in the
+	// encrypted Data\Local\<lang>\Text.bmd, so move it to a GlobalText id when available.
+	int iRequiredEnergy = 0;
+	gSkillManager.GetSkillInformation_Energy(CharacterAttribute->Skill[Type], &iRequiredEnergy);
+	if (iRequiredEnergy > 0)
+	{
+		sprintf(TextList[TextNum], "Requer energia %d", iRequiredEnergy);
+		TextListColor[TextNum] = TEXT_COLOR_WHITE; TextBold[TextNum] = false; TextNum++;
+	}
+
 	if (gCharacterManager.GetBaseClass(Hero->Class) == CLASS_KNIGHT)
 	{
 		if (CharacterAttribute->Skill[Type] == Skill_Impale)
