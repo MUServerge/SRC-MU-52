@@ -194,7 +194,12 @@ static bool FillVboChromeParams(BMD::VboChromeParams& out, int renderFlags, int 
 
 	out.Scalars[0] = wave;
 	out.Scalars[1] = ((int)WorldTime % 5000) * 0.00024f - 0.4f;
-	out.Scalars[2] = (float)((int)WorldTime % 100000) * 0.00006f;
+	// Exactly the CPU expression (WorldTime * 0.00006f), NOT a wrapped one. An
+	// earlier version took WorldTime % 100000 first to protect float precision;
+	// that made the CHROME7 scroll jump every 100 s, a discontinuity the legacy
+	// path does not have. Matching the CPU matters more than the precision here,
+	// because the two must agree per frame.
+	out.Scalars[2] = (float)(WorldTime * 0.00006);
 	out.L[0] = (float)cos(WorldTime * 0.001f);
 	out.L[1] = (float)sin(WorldTime * 0.002f);
 	out.L[2] = 1.f;
@@ -210,6 +215,20 @@ static bool FillVboChromeParams(BMD::VboChromeParams& out, int renderFlags, int 
 // four chrome values are admitted now that Model.vs generates their texcoords.
 // Chrome draws take flat BodyLight (see the caller - they must pass
 // enableLight 0), so the enableLight requirement applies to RENDER_TEXTURE only.
+// Per-mesh path record for the current body. A chrome/metal pass paints over the
+// SAME geometry its base pass just drew, so the two must be skinned the same way
+// or their positions differ by float noise and z-fight - which is the weapon
+// shine jumping across the surface. The base pass runs first (see
+// runtime_render_level), so it records where it went and the overlay follows it.
+// This is the Phase 14 rule stated directly: one surface, one path.
+static bool s_meshWentVbo[MAX_MESH] = { false };
+
+static void ResetMeshPathRecord()
+{
+	for (int i = 0; i < MAX_MESH; ++i)
+		s_meshWentVbo[i] = false;
+}
+
 static bool IsVboChromeMaterial(int renderFlags)
 {
 	return renderFlags == RENDER_CHROME
@@ -2090,9 +2109,17 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					// GPU-skinned Model draw for plain lit textured meshes. All special
 					// chrome/metal/oil, wave, shadow and effect materials remain on their
 					// authoritative legacy path.
+					// One surface, one path: a chrome/metal overlay may only take the
+					// VBO route if this mesh's base pass did too. Otherwise the
+					// overlay is GPU-skinned over a CPU-skinned base and the two
+					// z-fight - the weapon shine jumping across the surface.
+					const bool chromeFollowsBase =
+						!IsVboChromeMaterial(renderFlags) || s_meshWentVbo[i];
+
 					if (IsVboSceneEnabled()
 						&& objectVboEligible
 						&& IsVboMaterialEligible(renderFlags, EnableLight, EnableWave)
+						&& chromeFollowsBase
 						&& m->VAO != 0 // non-zero only when CreateVertexBuffer ran (VBO path ready)
 						&& !HasVboExcludedRenderFlag(RenderFlag))
 					{
@@ -2120,6 +2147,10 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 							g_RenderProfiler.AddCounter(RPC_VBO_DRAW_SUCCEEDED);
 							if (translatedVboEligible)
 								g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_SUCCEEDED);
+							// Record the base pass's route so this mesh's chrome/metal
+							// overlays follow it (see chromeFollowsBase above).
+							if (renderFlags == RENDER_TEXTURE)
+								s_meshWentVbo[i] = true;
 							return;
 						}
 						g_RenderProfiler.AddCounter(RPC_VBO_DRAW_REJECTED);
@@ -2127,6 +2158,12 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 							g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_REJECTED);
 					}
 #endif // SHADER_VERSION_TEST
+
+					// Reaching here means this pass draws on the legacy CPU path. If it
+					// is the base pass, its chrome/metal overlays must follow it there
+					// rather than being GPU-skinned over it.
+					if (renderFlags == RENDER_TEXTURE)
+						s_meshWentVbo[i] = false;
 
 					// The legacy path and every special material consume the shared CPU
 					// vertex/normal arrays. Materialize them once, only when fallback is
@@ -2298,6 +2335,9 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 	if (NumMeshs)
 	{
 		int iBlendMesh = BlendMesh;
+
+		// Fresh per-mesh path record for this body (see s_meshWentVbo).
+		ResetMeshPathRecord();
 
 		this->BeginRender(Alpha);
 

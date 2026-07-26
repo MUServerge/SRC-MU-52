@@ -129,13 +129,10 @@ vec3 ApplyBoneNormal(vec3 normal, uint boneIndex)
     vec3 r0 = u_Bones[boneIndex + 0u].xyz;
     vec3 r1 = u_Bones[boneIndex + 1u].xyz;
     vec3 r2 = u_Bones[boneIndex + 2u].xyz;
-    // Deliberately NOT normalized. The CPU path is a bare VectorRotate
-    // (ZzzBMD.cpp NormalTransform) with no renormalization, and the lighting
-    // term dot(N,L)*0.8+0.4 is therefore sensitive to the stored normal's
-    // length - BMD normals are not guaranteed unit length. Normalizing here
-    // lengthened them, raised the dot product and made every lit surface
-    // brighter than the legacy draw; that is what the old `* 0.85` trim at the
-    // end of main() was silently compensating for. Match the CPU instead.
+    // Raw, exactly like the CPU path (ZzzBMD.cpp NormalTransform is a bare
+    // VectorRotate with no renormalization). See main(): the two consumers of
+    // this vector need different things, so the normalize happens per consumer
+    // instead of here.
     return vec3(dot(r0, normal), dot(r1, normal), dot(r2, normal));
 }
 
@@ -158,7 +155,12 @@ void main()
     }
     else
     {
-        vec2 chrome = ChromeTexCoord(normal);
+        // Chrome takes the UNIT normal. These formulas map the normal straight
+        // into texture space (N.z*0.5+0.2 and friends), so a normal whose length
+        // wobbles per vertex and per animation frame makes the highlight swim
+        // and flicker. Length is meaningless to a reflection direction - only
+        // orientation is - so normalizing here is correct, not a tweak.
+        vec2 chrome = ChromeTexCoord(normalize(normal));
         if (u_chromeApply == CHROME_APPLY_MODULATE)
             vTex = chrome * aTex + u_blendMeshTexCoord.xy;
         else if (u_chromeApply == CHROME_APPLY_OFFSET)
@@ -171,6 +173,10 @@ void main()
     // BMD::Transform): body colour modulated per-vertex by clamp(dot(N,L)*0.8+0.4, min 0.2)
     // when lit, otherwise flat body colour. No brightness floor (the old max(...,0.45)
     // washed out dark areas / over-brightened them).
+    // Lighting takes the RAW normal, matching the CPU term exactly. Normalizing
+    // it here lengthened short BMD normals, raised dot(N,L) and washed out
+    // characters/NPCs - that difference is what the removed `* 0.85` trim used
+    // to average back down.
     vec4 color = u_bodyLight;
     if (u_enableLight != 0) {
         float intensity = dot(normal, u_lightPosition.xyz) * 0.8 + 0.4;
