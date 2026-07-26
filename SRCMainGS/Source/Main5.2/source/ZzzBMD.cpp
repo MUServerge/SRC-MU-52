@@ -96,9 +96,29 @@ static bool IsVboMaterialEligible(int renderFlags, bool enableLight, bool enable
 
 static bool HasVboExcludedRenderFlag(int renderFlag)
 {
+	// RENDER_BRIGHT is deliberately NOT in this list. It has two unrelated
+	// meanings in RenderMeshInternal:
+	//
+	//   A) RENDER_TEXTURE | RENDER_BRIGHT -> resolves to renderFlags ==
+	//      RENDER_TEXTURE with the texture bound; the ONLY difference from a
+	//      normal textured draw is EnableAlphaBlend(), which is fixed-function
+	//      state and completely independent of the bound program.
+	//   B) RENDER_BRIGHT alone -> resolves to renderFlags == RENDER_BRIGHT with
+	//      DisableTexture(); a genuinely different, untextured material.
+	//
+	// Excluding the flag blocked BOTH. That forced case A - the set-armour /
+	// monster glow pass - onto the legacy CPU-skinned path while the base mesh
+	// it overlays was drawn GPU-skinned through the VBO path. Two coplanar draws
+	// with two different skinning implementations differ by floating-point noise,
+	// which z-fights, and z-fighting varies with depth precision - exactly the
+	// "glow flickers at certain camera zoom" report. Same class of bug as the
+	// Phase 14 base-only-Core terrain z-fight.
+	//
+	// Case B needs no entry here: IsVboMaterialEligible already requires
+	// renderFlags == RENDER_TEXTURE, so it can never reach the VBO draw.
 	const int kVboExcludeFlags =
 		RENDER_WAVE | RENDER_SHADOWMAP | RENDER_LIGHTMAP |
-		RENDER_BRIGHT | RENDER_DARK | RENDER_DOPPELGANGER | RENDER_EXTRA;
+		RENDER_DARK | RENDER_DOPPELGANGER | RENDER_EXTRA;
 
 	return (renderFlag & kVboExcludeFlags) != 0;
 }
