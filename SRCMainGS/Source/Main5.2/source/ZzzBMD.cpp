@@ -89,9 +89,26 @@ static bool IsVboSceneEnabled()
 	return SceneFlag == MAIN_SCENE;
 }
 
+static bool IsVboChromeMaterial(int renderFlags);
+
 static bool IsVboMaterialEligible(int renderFlags, bool enableLight, bool enableWave)
 {
-	return renderFlags == RENDER_TEXTURE && enableLight && !enableWave;
+	if (enableWave)
+		return false;
+	// The enableLight requirement stays. Dropping it was TRIED and REVERTED
+	// (2026-07-26): the reasoning - that an unlit textured draw takes flat
+	// BodyLight, which Model.vs reproduces with u_enableLight == 0 - is true for
+	// the colour VALUE, but not for where that value comes from. With
+	// enableColor false the legacy draw has no colour array and consumes the
+	// fixed-function CURRENT colour, which callers set independently of
+	// BodyLight; feeding u_bodyLight instead turned weapon metal black and lost
+	// the chrome look. Re-enabling this needs those glColor call sites audited
+	// first, not a gate flip.
+	if (renderFlags == RENDER_TEXTURE)
+		return enableLight;
+	// Chrome/metal/oil never use the per-vertex intensity either; Model.vs
+	// generates their texcoords.
+	return IsVboChromeMaterial(renderFlags);
 }
 
 static bool HasVboExcludedRenderFlag(int renderFlag)
@@ -123,12 +140,80 @@ static bool HasVboExcludedRenderFlag(int renderFlag)
 	return (renderFlag & kVboExcludeFlags) != 0;
 }
 
+// Scene light direction. Defined here rather than further down because the
+// chrome texcoord helper below needs it (RENDER_CHROME3 uses dot(N, LightVector)).
+static vec3_t LightVector = { 0.f, -0.1f, -0.8f };
+static vec3_t LightVector2 = { 0.f, -0.5f, -0.8f };
+
+// Chrome/metal/oil materials have no per-vertex UVs: the legacy path recomputes
+// the texcoord from the TRANSFORMED NORMAL every frame (g_chrome). That is what
+// kept every chrome overlay on the CPU-skinned path while the base mesh under it
+// was GPU-skinned - one surface, two skinnings, float noise, z-fight, and the
+// camera-distance-dependent glow flicker. Model.vs now generates the same
+// coordinates, so this only has to pick the mode.
+//
+// Two different flag sets drive it: the FORMULA comes from the caller's
+// RenderFlag bits, the APPLY step from the resolved renderFlags (which the
+// chrome branch collapses to exactly CHROME / CHROME4 / CHROME8 / OIL).
+// Keep this in the same if/else order as the g_chrome loop it mirrors.
+static bool FillVboChromeParams(BMD::VboChromeParams& out, int renderFlags, int renderFlag,
+	float wave, float blendTexCoordU, float blendTexCoordV)
+{
+	switch (renderFlags)
+	{
+	case RENDER_CHROME:  out.Apply = 0; break; // direct
+	case RENDER_CHROME4:
+	case RENDER_CHROME8: out.Apply = 1; break; // + blend-mesh offset
+	case RENDER_OIL:     out.Apply = 2; break; // * aTex + blend-mesh offset
+	default:
+		out.Mode = 0; // ordinary UVs - not a chrome draw
+		return false;
+	}
+
+	if (renderFlag & RENDER_CHROME2)      out.Mode = 3;
+	else if (renderFlag & RENDER_CHROME3) out.Mode = 4;
+	else if (renderFlag & RENDER_CHROME4) out.Mode = 5;
+	else if (renderFlag & RENDER_CHROME5) out.Mode = 6;
+	else if (renderFlag & RENDER_CHROME6) out.Mode = 7;
+	else if (renderFlag & RENDER_CHROME7) out.Mode = 8;
+	else if (renderFlag & RENDER_CHROME8) out.Mode = 9;
+	else if (renderFlag & RENDER_OIL)     out.Mode = 9;
+	else if (renderFlag & RENDER_CHROME)  out.Mode = 2;
+	else                                  out.Mode = 1; // metal / default branch
+
+	out.Scalars[0] = wave;
+	out.Scalars[1] = ((int)WorldTime % 5000) * 0.00024f - 0.4f;
+	out.Scalars[2] = (float)((int)WorldTime % 100000) * 0.00006f;
+	out.L[0] = (float)cos(WorldTime * 0.001f);
+	out.L[1] = (float)sin(WorldTime * 0.002f);
+	out.L[2] = 1.f;
+	out.LightVector[0] = LightVector[0];
+	out.LightVector[1] = LightVector[1];
+	out.LightVector[2] = LightVector[2];
+	out.BlendTexCoord[0] = blendTexCoordU;
+	out.BlendTexCoord[1] = blendTexCoordV;
+	return true;
+}
+
+// Materials the VBO path can draw. RENDER_TEXTURE is the plain lit case; the
+// four chrome values are admitted now that Model.vs generates their texcoords.
+// Chrome draws take flat BodyLight (see the caller - they must pass
+// enableLight 0), so the enableLight requirement applies to RENDER_TEXTURE only.
+static bool IsVboChromeMaterial(int renderFlags)
+{
+	return renderFlags == RENDER_CHROME
+		|| renderFlags == RENDER_CHROME4
+		|| renderFlags == RENDER_CHROME8
+		|| renderFlags == RENDER_OIL;
+}
+
 static RenderProfilerCounter ClassifyTranslatedVboMesh(int renderFlags,
 	bool enableLight, bool enableWave, GLuint vao, int renderFlag)
 {
-	if (renderFlags != RENDER_TEXTURE)
+	// Mirrors IsVboMaterialEligible - keep the two in step or the counters lie.
+	if (renderFlags != RENDER_TEXTURE && !IsVboChromeMaterial(renderFlags))
 		return RPC_VBO_TRANSLATE_MATERIAL_BLOCKED;
-	if (!enableLight)
+	if (!enableLight && renderFlags == RENDER_TEXTURE)
 		return RPC_VBO_TRANSLATE_UNLIT_BLOCKED;
 	if (enableWave)
 		return RPC_VBO_TRANSLATE_WAVE_BLOCKED;
@@ -162,8 +247,6 @@ float BoneScale = 1.f;
 bool  StopMotion = false;
 float ParentMatrix[3][4];
 
-static vec3_t LightVector = { 0.f, -0.1f, -0.8f };
-static vec3_t LightVector2 = { 0.f, -0.5f, -0.8f };
 
 void BMD::Animation(float(*BoneMatrix)[3][4], float AnimationFrame, float PriorFrame, unsigned short PriorAction, vec3_t Angle, vec3_t HeadAngle, bool Parent, bool Translate)
 {
@@ -2008,9 +2091,20 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						if (translatedVboEligible)
 							g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_ATTEMPTED);
 
-						if (this->RenderMeshVBO(m, Alpha, EnableLight ? 1 : 0,
+						// A chrome/metal/oil draw generates its texcoords in the shader
+						// AND takes flat BodyLight: the legacy build loop only swaps in
+						// the per-vertex LightTransform inside `case RENDER_TEXTURE:`,
+						// which chrome never reaches. Passing enableLight here would
+						// apply an intensity term the legacy path never applied and
+						// shift the brightness of every chrome surface.
+						BMD::VboChromeParams chromeParams;
+						const bool isChrome = FillVboChromeParams(chromeParams, renderFlags,
+							RenderFlag, Wave, BlendMeshTexCoordU, BlendMeshTexCoordV);
+
+						if (this->RenderMeshVBO(m, Alpha, (!isChrome && EnableLight) ? 1 : 0,
 								translatedVboEligible,
-								matrixSnapshot))
+								matrixSnapshot,
+								isChrome ? &chromeParams : NULL))
 						{
 							g_RenderProfiler.AddCounter(RPC_VBO_DRAW_SUCCEEDED);
 							if (translatedVboEligible)
@@ -4083,7 +4177,7 @@ void BMD::CreateVertexBuffer(Mesh_t& mesh)
 // texture is already bound by the caller. Returns false (drawing nothing) when
 // the required program is unavailable, so the caller falls back to legacy.
 bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
-	ShaderMatrixSnapshot* matrixSnapshot)
+	ShaderMatrixSnapshot* matrixSnapshot, const VboChromeParams* chrome)
 {
 #ifdef SHADER_VERSION_TEST
 	CRenderProfilerScope profilerScope(RP_BMD_RENDER_MESH_VBO);
@@ -4199,6 +4293,26 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 		if (matrixSnapshot != NULL)
 			matrixSnapshot->BodyTransformUploaded = true;
 	}
+	// Chrome/metal/oil texcoord generation. Always written, including the zeroing
+	// pass, because these uniforms live in the shared Model program and would
+	// otherwise leak a previous draw's chrome mode onto an ordinary textured mesh.
+	if (chrome != NULL && chrome->Mode != 0)
+	{
+		gShaderGL->vboSetInt("u_chromeMode", chrome->Mode);
+		gShaderGL->vboSetInt("u_chromeApply", chrome->Apply);
+		gShaderGL->vboSetVec4("u_chromeScalars",
+			chrome->Scalars[0], chrome->Scalars[1], chrome->Scalars[2], 0.f);
+		gShaderGL->vboSetVec4("u_chromeL", chrome->L[0], chrome->L[1], chrome->L[2], 0.f);
+		gShaderGL->vboSetVec4("u_chromeLightVector",
+			chrome->LightVector[0], chrome->LightVector[1], chrome->LightVector[2], 0.f);
+		gShaderGL->vboSetVec4("u_blendMeshTexCoord",
+			chrome->BlendTexCoord[0], chrome->BlendTexCoord[1], 0.f, 0.f);
+	}
+	else
+	{
+		gShaderGL->vboSetInt("u_chromeMode", 0);
+	}
+
 	gShaderGL->vboSetInt("uTexture", 0); // texture already bound by the caller
 
 	RenderProfilerBindVertexArray(m->VAO);

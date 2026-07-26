@@ -65,16 +65,16 @@ uniform int  u_chromeMode;
 uniform int  u_chromeApply;
 // x = Wave, y = Wave2, z = WorldTime * 0.00006 (precomputed on the CPU: passing
 // WorldTime itself would lose precision in a float uniform).
-uniform vec3 u_chromeScalars;
-uniform vec3 u_chromeL;
-uniform vec3 u_chromeLightVector;
-uniform vec2 u_blendMeshTexCoord;
+uniform vec4 u_chromeScalars;
+uniform vec4 u_chromeL;
+uniform vec4 u_chromeLightVector;
+uniform vec4 u_blendMeshTexCoord;
 
 vec2 ChromeTexCoord(vec3 N)
 {
     float wave  = u_chromeScalars.x;
     float wave2 = u_chromeScalars.y;
-    vec3  L     = u_chromeL;
+    vec3  L     = u_chromeL.xyz;
 
     if (u_chromeMode == CHROME_1)
         return vec2(N.z * 0.5 + wave, N.y * 0.5 + wave * 2.0);
@@ -82,7 +82,7 @@ vec2 ChromeTexCoord(vec3 N)
         return vec2((N.z + N.x) * 0.8 + wave2 * 2.0, (N.y + N.x) * 1.0 + wave2 * 3.0);
     if (u_chromeMode == CHROME_3)
     {
-        float d = dot(N, u_chromeLightVector);
+        float d = dot(N, u_chromeLightVector.xyz);
         return vec2(d, 1.0 - d);
     }
     if (u_chromeMode == CHROME_4)
@@ -153,9 +153,9 @@ void main()
     {
         vec2 chrome = ChromeTexCoord(normal);
         if (u_chromeApply == CHROME_APPLY_MODULATE)
-            vTex = chrome * aTex + u_blendMeshTexCoord;
+            vTex = chrome * aTex + u_blendMeshTexCoord.xy;
         else if (u_chromeApply == CHROME_APPLY_OFFSET)
-            vTex = chrome + u_blendMeshTexCoord;
+            vTex = chrome + u_blendMeshTexCoord.xy;
         else
             vTex = chrome;
     }

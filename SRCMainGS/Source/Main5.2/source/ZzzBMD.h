@@ -289,9 +289,32 @@ public:
 		}
 	};
 
+	// Chrome / metal / oil texcoord generation moved from the CPU (g_chrome) into
+	// Model.vs, so an overlay pass can be GPU-skinned like the base mesh it sits
+	// on. Mode selects the formula (from the caller's RenderFlag bits), Apply
+	// selects how the result is used (from the resolved renderFlags). Mode 0 =
+	// ordinary per-vertex UVs, which keeps every existing VBO draw unchanged.
+	struct VboChromeParams
+	{
+		int   Mode;
+		int   Apply;
+		float Scalars[3];    // Wave, Wave2, WorldTime * 0.00006
+		float L[3];
+		float LightVector[3];
+		float BlendTexCoord[2];
+
+		VboChromeParams() : Mode(0), Apply(0)
+		{
+			Scalars[0] = Scalars[1] = Scalars[2] = 0.f;
+			L[0] = L[1] = L[2] = 0.f;
+			LightVector[0] = LightVector[1] = LightVector[2] = 0.f;
+			BlendTexCoord[0] = BlendTexCoord[1] = 0.f;
+		}
+	};
+
 	void CreateVertexBuffer(Mesh_t& mesh);
 	bool RenderMeshVBO(Mesh_t* mesh, float alpha, int enableLight, bool translate,
-		ShaderMatrixSnapshot* matrixSnapshot);
+		ShaderMatrixSnapshot* matrixSnapshot, const VboChromeParams* chrome = NULL);
 
 	bool PlayAnimation(float* AnimationFrame, float* PriorAnimationFrame, unsigned short* PriorAction, float Speed, vec3_t Origin, vec3_t Angle);
 	void Animation(float(*BoneTransform)[3][4], float AnimationFrame, float PriorAnimationFrame, unsigned short PriorAction, vec3_t Angle, vec3_t HeadAngle, bool Parent = false, bool Translate = true);
