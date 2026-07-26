@@ -2,6 +2,7 @@
 #include "RenderProfiler.h"
 #include "_define.h"
 #include "Utilities/Log/ErrorReport.h"
+#include <share.h> // _fsopen / _SH_DENYWR for the shared plain-text profiler log
 
 namespace
 {
@@ -17,8 +18,10 @@ namespace
 		if (!s_opened)
 		{
 			s_opened = true;
-			if (fopen_s(&s_file, "RenderProfiler.log", "wt") != 0)
-				s_file = NULL;
+			// _fsopen with _SH_DENYWR, not fopen_s: fopen_s opens exclusively, so
+			// the log could not be read at all while the client was running - which
+			// defeats the point of a live 2-second report.
+			s_file = _fsopen("RenderProfiler.log", "wt", _SH_DENYWR);
 		}
 		return s_file;
 	}
@@ -56,6 +59,8 @@ namespace
 		case RP_BMD_RENDER_MESH: return "BMD::RenderMesh";
 		case RP_BMD_RENDER_MESH_VBO: return "BMD::RenderMeshVBO";
 		case RP_BMD_RENDER_MESH_LEGACY: return "BMD::RenderMeshLegacy";
+		case RP_BMD_MESH_BUILD: return "BMD::MeshBuildCPU";
+		case RP_BMD_MESH_SUBMIT: return "BMD::MeshSubmitGL";
 		default: return "Unknown";
 		}
 	}

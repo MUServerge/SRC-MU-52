@@ -13,6 +13,14 @@ enum RenderProfilerSection
 	RP_BMD_RENDER_MESH,
 	RP_BMD_RENDER_MESH_VBO,
 	RP_BMD_RENDER_MESH_LEGACY,
+	// Phase 16.9 bisect: RP_BMD_RENDER_MESH_LEGACY measures ~23.6 us per mesh,
+	// far too much for the ~10 GL calls it issues, so split it. BUILD is the
+	// pure-CPU loop that expands the skinned mesh into the shared
+	// vertex/colour/texcoord arrays (~1090 vertices per mesh, ~1.4M per frame);
+	// SUBMIT is the actual draw, Core or legacy client-array. These two must add
+	// up to LEGACY - whichever dominates is the real bottleneck.
+	RP_BMD_MESH_BUILD,
+	RP_BMD_MESH_SUBMIT,
 	RP_SECTION_COUNT
 };
 
