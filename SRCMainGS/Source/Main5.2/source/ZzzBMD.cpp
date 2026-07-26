@@ -231,6 +231,19 @@ static void ResetMeshPathRecord()
 
 static bool IsVboChromeMaterial(int renderFlags)
 {
+	// 'chromevbo.disable' keeps chrome/metal/oil on the legacy CPU path while
+	// everything else still uses the VBO path. This splits the outstanding
+	// "shine jumps/breaks" report in two without a rebuild:
+	//   marker ON  and shine clean -> the fault is in this Core chrome path
+	//                                 (the Model.vs formulas or the normal).
+	//   marker ON  and shine still broken -> the fault is in the BASE mesh on
+	//                                 the translated VBO path, not in chrome.
+	static int cached = -1;
+	if (cached < 0)
+		cached = (GetFileAttributesA("chromevbo.disable") != INVALID_FILE_ATTRIBUTES) ? 0 : 1;
+	if (cached == 0)
+		return false;
+
 	return renderFlags == RENDER_CHROME
 		|| renderFlags == RENDER_CHROME4
 		|| renderFlags == RENDER_CHROME8

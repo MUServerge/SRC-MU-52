@@ -20,12 +20,32 @@
 #include "MapManager.h"
 #include "NewUISystem.h"
 
+#ifdef SHADER_PIPELINE
+// Phase 16.8c: shared Core-profile effect draw + the tracked fixed-function
+// texture-env combine, both defined in ZzzOpenglUtil.cpp. Declared here (not in
+// the ISO-8859 ZzzOpenglUtil.h) to keep that header byte-untouched. Returns
+// false when the Core effect path is off/unavailable, so the caller runs its
+// untouched legacy draw.
+bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	const float* col, int vertexCount, int texEnvMode, bool useTexture, float alphaRef);
+extern int g_EffectTexEnvMode;
+#endif // SHADER_PIPELINE
+
 extern  float   WorldTime;
 extern  int     MoveSceneFrame;
 extern  float   TerrainMappingAlpha[TERRAIN_SIZE * TERRAIN_SIZE];
 extern  float   g_chrome[MAX_VERTICES][2];
 
 CheckerTime time_sine_wave(2.6f);
+
+#ifdef SHADER_PIPELINE
+// Scratch for the Core water passes (Phase 16.8c). m_iTriangleList is bounded by
+// the grid, so these are fixed-size and never reallocated.
+static const int MAX_WATER_VERTS = MAX_WATER_GRID * MAX_WATER_GRID * 6;
+static float s_waterPos[MAX_WATER_VERTS * 3];
+static float s_waterTex[MAX_WATER_VERTS * 2];
+static float s_waterCol[MAX_WATER_VERTS * 4];
+#endif // SHADER_PIPELINE
 
 void CSWaterTerrain::Init(void)
 {
@@ -72,30 +92,103 @@ void CSWaterTerrain::Render(void)
 
 	EnableAlphaTest();
 	BindTexture(BITMAP_MAPTILE);
-	glBegin(GL_TRIANGLES);
-	glColor3f(0.2f, 0.5f, 0.65f);
 
-	for (j = 0; j < m_iTriangleListNum; j++)
+#ifdef SHADER_PIPELINE
+	// Phase 16.8c: the two water passes are large single-primitive batches -
+	// m_iTriangleListNum vertices of GL_TRIANGLES each - so they convert to one
+	// Core draw apiece with no change in primitive or vertex order. Blend and
+	// alpha test stay fixed-function, set above by the caller. The scratch
+	// buffers are file-static: the list is rebuilt every frame anyway, and it is
+	// bounded by the grid, so there is nothing to grow or free.
+	bool coreDrawn = false;
 	{
-		offset = m_iTriangleList[j];
-		glTexCoord2f(g_chrome[offset][1], g_chrome[offset][0]);
-		glVertex3fv(m_Vertices[offset]);
+		int n = m_iTriangleListNum;
+		if (n > MAX_WATER_VERTS)
+			n = MAX_WATER_VERTS;
+		for (j = 0; j < n; j++)
+		{
+			offset = m_iTriangleList[j];
+			s_waterPos[j * 3 + 0] = m_Vertices[offset][0];
+			s_waterPos[j * 3 + 1] = m_Vertices[offset][1];
+			s_waterPos[j * 3 + 2] = m_Vertices[offset][2];
+			s_waterTex[j * 2 + 0] = g_chrome[offset][1];
+			s_waterTex[j * 2 + 1] = g_chrome[offset][0];
+			s_waterCol[j * 4 + 0] = 0.2f;
+			s_waterCol[j * 4 + 1] = 0.5f;
+			s_waterCol[j * 4 + 2] = 0.65f;
+			s_waterCol[j * 4 + 3] = 1.f;
+		}
+		if (EffectCoreDrawArrays(GL_TRIANGLES, s_waterPos, s_waterTex, s_waterCol,
+			n, g_EffectTexEnvMode, TextureEnable, -1.f))
+		{
+			// The legacy glBegin block leaves the fixed-function current colour
+			// at the colour it set; later draws inherit it.
+			glColor3f(0.2f, 0.5f, 0.65f);
+			coreDrawn = true;
+		}
 	}
-	glEnd();
+	if (!coreDrawn)
+#endif // SHADER_PIPELINE
+	{
+		glBegin(GL_TRIANGLES);
+		glColor3f(0.2f, 0.5f, 0.65f);
+
+		for (j = 0; j < m_iTriangleListNum; j++)
+		{
+			offset = m_iTriangleList[j];
+			glTexCoord2f(g_chrome[offset][1], g_chrome[offset][0]);
+			glVertex3fv(m_Vertices[offset]);
+		}
+		glEnd();
+	}
 
 	EnableAlphaBlend();
 	BindTexture(BITMAP_MAPTILE + 1);
-	glBegin(GL_TRIANGLES);
 
-	for (j = 0; j < m_iTriangleListNum; j++)
+#ifdef SHADER_PIPELINE
+	coreDrawn = false;
 	{
-		offset = m_iTriangleList[j];
-		alpha = 1.f - DotProduct(m_Normals[offset], m_vLightVector);
-		glColor3f(alpha, alpha * 2.5f, alpha * 3.f);
-		glTexCoord2f(g_chrome[offset][1], g_chrome[offset][0]);
-		glVertex3fv(m_Vertices[offset]);
+		int n = m_iTriangleListNum;
+		if (n > MAX_WATER_VERTS)
+			n = MAX_WATER_VERTS;
+		float lastAlpha = 0.f;
+		for (j = 0; j < n; j++)
+		{
+			offset = m_iTriangleList[j];
+			alpha = 1.f - DotProduct(m_Normals[offset], m_vLightVector);
+			lastAlpha = alpha;
+			s_waterPos[j * 3 + 0] = m_Vertices[offset][0];
+			s_waterPos[j * 3 + 1] = m_Vertices[offset][1];
+			s_waterPos[j * 3 + 2] = m_Vertices[offset][2];
+			s_waterTex[j * 2 + 0] = g_chrome[offset][1];
+			s_waterTex[j * 2 + 1] = g_chrome[offset][0];
+			s_waterCol[j * 4 + 0] = alpha;
+			s_waterCol[j * 4 + 1] = alpha * 2.5f;
+			s_waterCol[j * 4 + 2] = alpha * 3.f;
+			s_waterCol[j * 4 + 3] = 1.f;
+		}
+		if (EffectCoreDrawArrays(GL_TRIANGLES, s_waterPos, s_waterTex, s_waterCol,
+			n, g_EffectTexEnvMode, TextureEnable, -1.f))
+		{
+			glColor3f(lastAlpha, lastAlpha * 2.5f, lastAlpha * 3.f);
+			coreDrawn = true;
+		}
 	}
-	glEnd();
+	if (!coreDrawn)
+#endif // SHADER_PIPELINE
+	{
+		glBegin(GL_TRIANGLES);
+
+		for (j = 0; j < m_iTriangleListNum; j++)
+		{
+			offset = m_iTriangleList[j];
+			alpha = 1.f - DotProduct(m_Normals[offset], m_vLightVector);
+			glColor3f(alpha, alpha * 2.5f, alpha * 3.f);
+			glTexCoord2f(g_chrome[offset][1], g_chrome[offset][0]);
+			glVertex3fv(m_Vertices[offset]);
+		}
+		glEnd();
+	}
 }
 
 void CSWaterTerrain::CreateTerrain(int x, int y)
@@ -411,6 +504,58 @@ void CSWaterTerrain::RenderWaterBitmapTile(float xf, float yf, float lodf, int l
 		VectorCopy(PrimaryTerrainLight[TerrainIndex3], Light[2]);
 		VectorCopy(PrimaryTerrainLight[TerrainIndex4], Light[3]);
 	}
+
+#ifdef SHADER_PIPELINE
+	// Phase 16.8c: water decal tile, same shape as the ground decal in
+	// ZzzLodTerrain.cpp - 4 vertices, same order, same primitive. When
+	// LightEnable is false the legacy loop emits no glColor at all, so the tile
+	// takes the caller's current colour; read it back into the vertex colours.
+	// glColor3fv sets alpha to 1, which is why the Alpha == 1 branch does too.
+	{
+		float col[4 * 4];
+		if (LightEnable)
+		{
+			for (int i = 0; i < 4; i++)
+			{
+				col[i * 4 + 0] = Light[i][0];
+				col[i * 4 + 1] = Light[i][1];
+				col[i * 4 + 2] = Light[i][2];
+				col[i * 4 + 3] = (Alpha == 1.f) ? 1.f : Alpha;
+			}
+		}
+		else
+		{
+			float cur[4] = { 1.f, 1.f, 1.f, 1.f };
+			glGetFloatv(GL_CURRENT_COLOR, cur);
+			for (int i = 0; i < 4; i++)
+			{
+				col[i * 4 + 0] = cur[0];
+				col[i * 4 + 1] = cur[1];
+				col[i * 4 + 2] = cur[2];
+				col[i * 4 + 3] = cur[3];
+			}
+		}
+		float tex[4 * 2];
+		for (int i = 0; i < 4; i++)
+		{
+			tex[i * 2 + 0] = c[i][0];
+			tex[i * 2 + 1] = c[i][1];
+		}
+		if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)TerrainVertex, tex,
+			col, 4, g_EffectTexEnvMode, TextureEnable, -1.f))
+		{
+			// Reproduce the trailing current-colour state of the legacy loop.
+			if (LightEnable)
+			{
+				if (Alpha == 1.f)
+					glColor3fv(Light[3]);
+				else
+					glColor4f(Light[3][0], Light[3][1], Light[3][2], Alpha);
+			}
+			return;
+		}
+	}
+#endif // SHADER_PIPELINE
 
 	glBegin(GL_TRIANGLE_FAN);
 	for (int i = 0; i < 4; i++)
