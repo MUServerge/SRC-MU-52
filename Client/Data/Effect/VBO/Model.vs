@@ -26,6 +26,92 @@ uniform int u_enableLight;
 uniform vec4 u_bodyTransform;
 uniform int u_translate;
 
+// Chrome / metal / oil texture-coordinate generation.
+//
+// These materials do not have per-vertex UVs: the legacy path recomputes the
+// texcoord every frame on the CPU from the TRANSFORMED NORMAL (ZzzBMD.cpp
+// g_chrome, ~lines 1762-1819) and feeds it through the client-array draw. That
+// forced every chrome/metal overlay onto the CPU-skinned path while the base
+// mesh underneath it was GPU-skinned here - two skinnings of one surface, whose
+// float noise z-fights and produces the camera-distance-dependent glow flicker.
+//
+// The formulas are pure functions of the transformed normal (which this shader
+// already computes) plus a few per-draw scalars, so they belong here. Geometry
+// and skinning are untouched: positions stay bit-identical to the base pass,
+// which is what actually removes the z-fight.
+//
+// u_chromeMode 0 keeps aTex, so this whole block is inert until the C++ side
+// selects a mode (uninitialized uniforms read as 0).
+#define CHROME_NONE    0
+#define CHROME_METAL   1   // default branch: N.z*0.5+0.2 , N.y*0.5+0.5
+#define CHROME_1       2   // RENDER_CHROME
+#define CHROME_2       3   // RENDER_CHROME2
+#define CHROME_3       4   // RENDER_CHROME3
+#define CHROME_4       5   // RENDER_CHROME4
+#define CHROME_5       6   // RENDER_CHROME5
+#define CHROME_6       7   // RENDER_CHROME6
+#define CHROME_7       8   // RENDER_CHROME7
+#define CHROME_NORMALXY 9  // RENDER_CHROME8 and RENDER_OIL
+
+// How the generated coordinate is applied, mirroring the legacy build loop:
+//   0 = use it directly                    (RENDER_CHROME)
+//   1 = add u_blendMeshTexCoord            (RENDER_CHROME4, RENDER_CHROME8)
+//   2 = multiply by aTex, then add offset  (RENDER_OIL)
+#define CHROME_APPLY_DIRECT 0
+#define CHROME_APPLY_OFFSET 1
+#define CHROME_APPLY_MODULATE 2
+
+uniform int  u_chromeMode;
+uniform int  u_chromeApply;
+// x = Wave, y = Wave2, z = WorldTime * 0.00006 (precomputed on the CPU: passing
+// WorldTime itself would lose precision in a float uniform).
+uniform vec3 u_chromeScalars;
+uniform vec3 u_chromeL;
+uniform vec3 u_chromeLightVector;
+uniform vec2 u_blendMeshTexCoord;
+
+vec2 ChromeTexCoord(vec3 N)
+{
+    float wave  = u_chromeScalars.x;
+    float wave2 = u_chromeScalars.y;
+    vec3  L     = u_chromeL;
+
+    if (u_chromeMode == CHROME_1)
+        return vec2(N.z * 0.5 + wave, N.y * 0.5 + wave * 2.0);
+    if (u_chromeMode == CHROME_2)
+        return vec2((N.z + N.x) * 0.8 + wave2 * 2.0, (N.y + N.x) * 1.0 + wave2 * 3.0);
+    if (u_chromeMode == CHROME_3)
+    {
+        float d = dot(N, u_chromeLightVector);
+        return vec2(d, 1.0 - d);
+    }
+    if (u_chromeMode == CHROME_4)
+    {
+        float d = dot(N, L);
+        return vec2(d + (N.y * 0.5 + L.y * 3.0), (1.0 - d) - (N.z * 0.5 + wave * 3.0));
+    }
+    if (u_chromeMode == CHROME_5)
+    {
+        float d = dot(N, L);
+        return vec2(d + (N.y * 3.0 + L.y * 5.0), (1.0 - d) - (N.z * 2.5 + wave * 1.0));
+    }
+    if (u_chromeMode == CHROME_6)
+    {
+        float s = (N.z + N.x) * 0.8 + wave2 * 2.0;
+        return vec2(s, s);
+    }
+    if (u_chromeMode == CHROME_7)
+    {
+        float s = (N.z + N.x) * 0.8 + u_chromeScalars.z;
+        return vec2(s, s);
+    }
+    if (u_chromeMode == CHROME_NORMALXY)
+        return vec2(N.x, N.y);
+
+    // CHROME_METAL - the legacy 'else' branch
+    return vec2(N.z * 0.5 + 0.2, N.y * 0.5 + 0.5);
+}
+
 out vec2 vTex;
 out vec4 vColor;
 
@@ -59,7 +145,20 @@ void main()
         worldPos = worldPos * u_bodyTransform.w + u_bodyTransform.xyz;
     }
 
-    vTex = aTex;
+    if (u_chromeMode == CHROME_NONE)
+    {
+        vTex = aTex;
+    }
+    else
+    {
+        vec2 chrome = ChromeTexCoord(normal);
+        if (u_chromeApply == CHROME_APPLY_MODULATE)
+            vTex = chrome * aTex + u_blendMeshTexCoord;
+        else if (u_chromeApply == CHROME_APPLY_OFFSET)
+            vTex = chrome + u_blendMeshTexCoord;
+        else
+            vTex = chrome;
+    }
 
     // Match the legacy fixed-function lighting exactly (ZzzBMD.cpp RenderMesh /
     // BMD::Transform): body colour modulated per-vertex by clamp(dot(N,L)*0.8+0.4, min 0.2)
