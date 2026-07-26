@@ -381,6 +381,35 @@ bisect it by measuring one change at a time:
 Then batching (sprites/particles grouped by texture+blend+texEnvMode), then the
 remaining 16.8 conversions, then default-on.
 
+### Phase 16 status (2026-07-26) - the family is CONVERTED
+
+16.6 particles, 16.7 joints/trails, 16.8a damage numbers, 16.8b ground decals
+and 16.8c CSWaterTerrain are all done and verified in game together under
+`gl33effect.enable`.
+
+**16.8d turned out to be empty.** Its three named targets were checked and none
+is live code:
+
+- `RenderFog` / `RenderSky3` live in `ZzzEffectNoUse.cpp` and have NO callers -
+  only declarations in `ZzzEffect.h`. Dead, like the rest of that file.
+- `ZzzObject.cpp` glBegin is inside `RenderBoundingBox()`, a debug wireframe.
+- The remaining `ZzzLodTerrain.cpp` sites are `SHOW_PATH_INFO` / `_DEBUG` /
+  map-editor overlays, plus the legacy fallbacks the Core paths fall through to
+  on purpose.
+
+So there is nothing left to convert in a Release build for this family. What
+remains before effects can be DEFAULT ON is not conversion but COST: the effect
+helper is still a per-draw bind, the same structure that measured 13.5 us vs
+3.8 us per mesh on the character path. Batch by (texture, blend, texEnvMode)
+first, then flip the default.
+
+Also still deferred here: the character shadow (`RenderBodyShadow`,
+translucent+stencil, currently off).
+
+Next phase is 17 (UI / 3D previews). The ~12 remaining `glBegin` sites in
+`ZzzOpenglUtil.cpp` are all 2D UI (`RenderColor`, `RenderBitmap*` and the
+rotation variants) - that is Phase 17's scope, not Phase 16's.
+
 ## 5. RenderMatrix API quick reference
 
 `source/RenderMatrix.h`, namespace `RenderMatrix`, column-major `float[16]`
