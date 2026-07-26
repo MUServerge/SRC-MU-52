@@ -18,6 +18,7 @@ namespace
 		"terrain_core",  // eShaderS_TerrainCore
 		"character_core",// eShaderS_CharacterCore
 		"effect_core",   // eShaderS_EffectCore
+		"ui_core",       // eShaderS_UICore
 	};
 }
 
