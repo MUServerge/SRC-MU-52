@@ -6,6 +6,10 @@
 //
 //   Shaders/terrain.vs   + terrain.fs     (eShaderS_Terrain)
 //   Shaders/character.vs + character.fs   (eShaderS_Character)
+//   Shaders/terrain_core.*                (eShaderS_TerrainCore,   330 core)
+//   Shaders/character_core.*              (eShaderS_CharacterCore, 330 core)
+//   Shaders/effect_core.*                 (eShaderS_EffectCore,    330 core)
+//   Shaders/ui_core.*                     (eShaderS_UICore,        330 core)
 //
 // Each pair is loaded from "Shaders/<name>" first, then "Data/Shaders/<name>".
 //
@@ -30,6 +34,14 @@ enum eShaderSProgram
 {
 	eShaderS_Terrain = 0,
 	eShaderS_Character,
+	eShaderS_TerrainCore,   // Phase 14: Core-profile terrain (terrain_core.vs/.fs).
+	eShaderS_CharacterCore, // Phase 15: Core-profile character/BMD
+	                        // (character_core.vs/.fs).
+	eShaderS_EffectCore,    // Phase 16: Core-profile effects/sprites/hair
+	                        // (effect_core.vs/.fs), loaded but not bound yet.
+	eShaderS_UICore,        // Phase 17: Core-profile 2D UI (ui_core.vs/.fs).
+	                        // Screen-space ortho, no per-vertex colour; loaded
+	                        // but not bound yet.
 	eShaderS_MaxValue,
 };
 
@@ -71,10 +83,21 @@ public:
 	GLint GetUniformLocation(GLuint program, const char* name) const;
 	void ForgetProgram(GLuint program);
 
+	// Phase 16.9 value cache. Resolves the location of 'name' on the bound
+	// program and reports whether the cached value already equals 'values', so
+	// the setter can skip a redundant glUniform*. Returns false (and records the
+	// new value) when the upload must happen. Only valid for the bound program;
+	// callers must have checked m_CurrentProgram / m_BoundProgram first.
+	bool IsUniformValueCached(const char* name, const float* values, int valueCount, GLint& outLocation) const;
+
 	// Uniform setters operate on the currently bound program.
 	void SetInt  (const char* name, int value) const;
 	void SetFloat(const char* name, float value) const;
 	void SetVec3 (const char* name, float x, float y, float z) const;
+	void SetVec4 (const char* name, float x, float y, float z, float w) const;
+	// Column-major matrices (GL_FALSE, matching RenderMatrix output). Phase 14.
+	void SetMat4 (const char* name, const float* m16) const;
+	void SetMat3 (const char* name, const float* m9) const;
 
 	void Release();
 
@@ -92,10 +115,18 @@ private:
 	static const int UNIFORMS_PER_PROGRAM = 16;
 	static const int UNIFORM_NAME_CAPACITY = 48;
 
+	// Phase 16.9: the entry also caches the last value uploaded to this uniform.
+	// Uniform state lives in the program object and survives unbinding, so an
+	// upload whose value is unchanged is pure overhead. The crowd profile showed
+	// ~5450 redundant uniform uploads per frame (uProj and texture1 re-sent for
+	// every one of ~755 character meshes), and GL-call count is the dominant
+	// cost in this client. ValueCount 0 means nothing cached yet.
 	struct UniformCacheEntry
 	{
 		char Name[UNIFORM_NAME_CAPACITY];
 		GLint Location;
+		int   ValueCount;
+		float Value[16];
 	};
 
 	struct ProgramUniformCache

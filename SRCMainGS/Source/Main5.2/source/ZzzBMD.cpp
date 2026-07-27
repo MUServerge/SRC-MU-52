@@ -21,6 +21,8 @@
 #include "PhysicsManager.h"
 #include "MuCrypto/MuCrypto.h"
 #include "RenderProfiler.h"
+#include "CShaderScene.h"
+#include "./Utilities/Log/ErrorReport.h"
 // NOTE: CShaderGL.h (which pulls in glm and disables the Win32 min/max macros) is
 // included further down, right before the VBO/shader code that needs it, so it does
 // not affect bare max()/min() usage in the rest of this translation unit.
@@ -31,6 +33,10 @@ bool IsTranslatedVBOEnabled();
 extern float MouseX;
 extern float MouseY;
 extern bool MouseLButton;
+
+// Phase 13.4: CPU projection mirror built in ZzzOpenglUtil.cpp gluPerspective2.
+// Declared byte-safe here (ZzzOpenglUtil.h is ISO-8859; keep it untouched).
+extern float g_ProjectionMatrix[16];
 
 
 vec4_t BoneQuaternion[MAX_BONES];
@@ -80,29 +86,177 @@ static DeferredCpuTransformContext g_DeferredCpuTransform = {};
 
 static bool IsVboSceneEnabled()
 {
+	// 'vbo.disable' marker forces every model draw down the legacy CPU path.
+	// This exists to get a REFERENCE image: world objects always take the VBO
+	// path when eligible, so without it there is nothing to compare the shader
+	// output against, and questions like "is the 0.85 trim in Model.vs real or
+	// eyeballed" cannot be answered with evidence.
+	static int cached = -1;
+	if (cached < 0)
+		cached = (GetFileAttributesA("vbo.disable") != INVALID_FILE_ATTRIBUTES) ? 0 : 1;
+	if (cached == 0)
+		return false;
+
 	return SceneFlag == MAIN_SCENE;
 }
 
+static bool IsVboChromeMaterial(int renderFlags);
+
 static bool IsVboMaterialEligible(int renderFlags, bool enableLight, bool enableWave)
 {
-	return renderFlags == RENDER_TEXTURE && enableLight && !enableWave;
+	if (enableWave)
+		return false;
+	// The enableLight requirement stays. Dropping it was TRIED and REVERTED
+	// (2026-07-26): the reasoning - that an unlit textured draw takes flat
+	// BodyLight, which Model.vs reproduces with u_enableLight == 0 - is true for
+	// the colour VALUE, but not for where that value comes from. With
+	// enableColor false the legacy draw has no colour array and consumes the
+	// fixed-function CURRENT colour, which callers set independently of
+	// BodyLight; feeding u_bodyLight instead turned weapon metal black and lost
+	// the chrome look. Re-enabling this needs those glColor call sites audited
+	// first, not a gate flip.
+	if (renderFlags == RENDER_TEXTURE)
+		return enableLight;
+	// Chrome/metal/oil never use the per-vertex intensity either; Model.vs
+	// generates their texcoords.
+	return IsVboChromeMaterial(renderFlags);
 }
 
 static bool HasVboExcludedRenderFlag(int renderFlag)
 {
+	// RENDER_BRIGHT is deliberately NOT in this list. It has two unrelated
+	// meanings in RenderMeshInternal:
+	//
+	//   A) RENDER_TEXTURE | RENDER_BRIGHT -> resolves to renderFlags ==
+	//      RENDER_TEXTURE with the texture bound; the ONLY difference from a
+	//      normal textured draw is EnableAlphaBlend(), which is fixed-function
+	//      state and completely independent of the bound program.
+	//   B) RENDER_BRIGHT alone -> resolves to renderFlags == RENDER_BRIGHT with
+	//      DisableTexture(); a genuinely different, untextured material.
+	//
+	// Excluding the flag blocked BOTH. That forced case A - the set-armour /
+	// monster glow pass - onto the legacy CPU-skinned path while the base mesh
+	// it overlays was drawn GPU-skinned through the VBO path. Two coplanar draws
+	// with two different skinning implementations differ by floating-point noise,
+	// which z-fights, and z-fighting varies with depth precision - exactly the
+	// "glow flickers at certain camera zoom" report. Same class of bug as the
+	// Phase 14 base-only-Core terrain z-fight.
+	//
+	// Case B needs no entry here: IsVboMaterialEligible already requires
+	// renderFlags == RENDER_TEXTURE, so it can never reach the VBO draw.
 	const int kVboExcludeFlags =
 		RENDER_WAVE | RENDER_SHADOWMAP | RENDER_LIGHTMAP |
-		RENDER_BRIGHT | RENDER_DARK | RENDER_DOPPELGANGER | RENDER_EXTRA;
+		RENDER_DARK | RENDER_DOPPELGANGER | RENDER_EXTRA;
 
 	return (renderFlag & kVboExcludeFlags) != 0;
+}
+
+// Scene light direction. Defined here rather than further down because the
+// chrome texcoord helper below needs it (RENDER_CHROME3 uses dot(N, LightVector)).
+static vec3_t LightVector = { 0.f, -0.1f, -0.8f };
+static vec3_t LightVector2 = { 0.f, -0.5f, -0.8f };
+
+// Chrome/metal/oil materials have no per-vertex UVs: the legacy path recomputes
+// the texcoord from the TRANSFORMED NORMAL every frame (g_chrome). That is what
+// kept every chrome overlay on the CPU-skinned path while the base mesh under it
+// was GPU-skinned - one surface, two skinnings, float noise, z-fight, and the
+// camera-distance-dependent glow flicker. Model.vs now generates the same
+// coordinates, so this only has to pick the mode.
+//
+// Two different flag sets drive it: the FORMULA comes from the caller's
+// RenderFlag bits, the APPLY step from the resolved renderFlags (which the
+// chrome branch collapses to exactly CHROME / CHROME4 / CHROME8 / OIL).
+// Keep this in the same if/else order as the g_chrome loop it mirrors.
+static bool FillVboChromeParams(BMD::VboChromeParams& out, int renderFlags, int renderFlag,
+	float wave, float blendTexCoordU, float blendTexCoordV)
+{
+	switch (renderFlags)
+	{
+	case RENDER_CHROME:  out.Apply = 0; break; // direct
+	case RENDER_CHROME4:
+	case RENDER_CHROME8: out.Apply = 1; break; // + blend-mesh offset
+	case RENDER_OIL:     out.Apply = 2; break; // * aTex + blend-mesh offset
+	default:
+		out.Mode = 0; // ordinary UVs - not a chrome draw
+		return false;
+	}
+
+	if (renderFlag & RENDER_CHROME2)      out.Mode = 3;
+	else if (renderFlag & RENDER_CHROME3) out.Mode = 4;
+	else if (renderFlag & RENDER_CHROME4) out.Mode = 5;
+	else if (renderFlag & RENDER_CHROME5) out.Mode = 6;
+	else if (renderFlag & RENDER_CHROME6) out.Mode = 7;
+	else if (renderFlag & RENDER_CHROME7) out.Mode = 8;
+	else if (renderFlag & RENDER_CHROME8) out.Mode = 9;
+	else if (renderFlag & RENDER_OIL)     out.Mode = 9;
+	else if (renderFlag & RENDER_CHROME)  out.Mode = 2;
+	else                                  out.Mode = 1; // metal / default branch
+
+	out.Scalars[0] = wave;
+	out.Scalars[1] = ((int)WorldTime % 5000) * 0.00024f - 0.4f;
+	// Exactly the CPU expression (WorldTime * 0.00006f), NOT a wrapped one. An
+	// earlier version took WorldTime % 100000 first to protect float precision;
+	// that made the CHROME7 scroll jump every 100 s, a discontinuity the legacy
+	// path does not have. Matching the CPU matters more than the precision here,
+	// because the two must agree per frame.
+	out.Scalars[2] = (float)(WorldTime * 0.00006);
+	out.L[0] = (float)cos(WorldTime * 0.001f);
+	out.L[1] = (float)sin(WorldTime * 0.002f);
+	out.L[2] = 1.f;
+	out.LightVector[0] = LightVector[0];
+	out.LightVector[1] = LightVector[1];
+	out.LightVector[2] = LightVector[2];
+	out.BlendTexCoord[0] = blendTexCoordU;
+	out.BlendTexCoord[1] = blendTexCoordV;
+	return true;
+}
+
+// Materials the VBO path can draw. RENDER_TEXTURE is the plain lit case; the
+// four chrome values are admitted now that Model.vs generates their texcoords.
+// Chrome draws take flat BodyLight (see the caller - they must pass
+// enableLight 0), so the enableLight requirement applies to RENDER_TEXTURE only.
+// Per-mesh path record for the current body. A chrome/metal pass paints over the
+// SAME geometry its base pass just drew, so the two must be skinned the same way
+// or their positions differ by float noise and z-fight - which is the weapon
+// shine jumping across the surface. The base pass runs first (see
+// runtime_render_level), so it records where it went and the overlay follows it.
+// This is the Phase 14 rule stated directly: one surface, one path.
+static bool s_meshWentVbo[MAX_MESH] = { false };
+
+static void ResetMeshPathRecord()
+{
+	for (int i = 0; i < MAX_MESH; ++i)
+		s_meshWentVbo[i] = false;
+}
+
+static bool IsVboChromeMaterial(int renderFlags)
+{
+	// 'chromevbo.disable' keeps chrome/metal/oil on the legacy CPU path while
+	// everything else still uses the VBO path. This splits the outstanding
+	// "shine jumps/breaks" report in two without a rebuild:
+	//   marker ON  and shine clean -> the fault is in this Core chrome path
+	//                                 (the Model.vs formulas or the normal).
+	//   marker ON  and shine still broken -> the fault is in the BASE mesh on
+	//                                 the translated VBO path, not in chrome.
+	static int cached = -1;
+	if (cached < 0)
+		cached = (GetFileAttributesA("chromevbo.disable") != INVALID_FILE_ATTRIBUTES) ? 0 : 1;
+	if (cached == 0)
+		return false;
+
+	return renderFlags == RENDER_CHROME
+		|| renderFlags == RENDER_CHROME4
+		|| renderFlags == RENDER_CHROME8
+		|| renderFlags == RENDER_OIL;
 }
 
 static RenderProfilerCounter ClassifyTranslatedVboMesh(int renderFlags,
 	bool enableLight, bool enableWave, GLuint vao, int renderFlag)
 {
-	if (renderFlags != RENDER_TEXTURE)
+	// Mirrors IsVboMaterialEligible - keep the two in step or the counters lie.
+	if (renderFlags != RENDER_TEXTURE && !IsVboChromeMaterial(renderFlags))
 		return RPC_VBO_TRANSLATE_MATERIAL_BLOCKED;
-	if (!enableLight)
+	if (!enableLight && renderFlags == RENDER_TEXTURE)
 		return RPC_VBO_TRANSLATE_UNLIT_BLOCKED;
 	if (enableWave)
 		return RPC_VBO_TRANSLATE_WAVE_BLOCKED;
@@ -136,8 +290,6 @@ float BoneScale = 1.f;
 bool  StopMotion = false;
 float ParentMatrix[3][4];
 
-static vec3_t LightVector = { 0.f, -0.1f, -0.8f };
-static vec3_t LightVector2 = { 0.f, -0.5f, -0.8f };
 
 void BMD::Animation(float(*BoneMatrix)[3][4], float AnimationFrame, float PriorFrame, unsigned short PriorAction, vec3_t Angle, vec3_t HeadAngle, bool Parent, bool Translate)
 {
@@ -1320,10 +1472,249 @@ void BMD::RenderMeshEffect(int i, int iType, int iSubType, vec3_t Angle, VOID* o
 	}
 }
 
+#ifdef SHADER_PIPELINE
+// ===========================================================================
+// Phase 15.4: Core-profile character/BMD draw path.
+//
+// What the live character draw actually is: RenderMeshInternal builds the CPU
+// arrays RenderArrayVertices / RenderArrayTexCoords / RenderArrayColors from the
+// CPU-skinned VertexTransform / LightTransform and submits them with
+// glVertexPointer + glDrawArrays(GL_TRIANGLES). It is NOT immediate mode - the
+// glBegin(GL_TRIANGLES) block in RenderMeshTranslate is dead code
+// (RenderBodyTranslate, its only caller, has no callers anywhere in the tree).
+// So the Core conversion here is client-arrays -> VBO + explicit attributes,
+// and the emit-collector authored in 15.3 has no producer; it is replaced by the
+// array upload below, which needs no per-vertex repacking at all.
+//
+// character_core is bound ONCE for the whole character pass
+// (CharacterCoreBegin, from the RenderCharactersClient pass in ZzzScene.cpp),
+// and every mesh streams its three arrays into the pass VAO. One program for the
+// whole pass -> no per-mesh program switch, and no fixed-function overlay mixed
+// into the same depth range (the Phase 14 z-fight lesson).
+//
+// Two things are per-mesh rather than per-pass, and both are read back from the
+// fixed-function state rather than chased through every call site:
+//   - uModelView: the modelview is per character (each object pushes its own
+//     translate/rotate), so GL_MODELVIEW_MATRIX is read per draw. This is the
+//     same contract the CShaderGL RenderMeshVBO path already uses.
+//   - uConstColor: when the legacy draw does not enable GL_COLOR_ARRAY it relies
+//     on the fixed-function *current colour*, which callers set with glColor*
+//     from many places (RenderBody, the blend-mesh branch, the shadow-mesh
+//     passes). GL_CURRENT_COLOR is read back instead, which is exact by
+//     construction. Both readbacks disappear in Phase 18 when the matrix stack
+//     and glColor are gone.
+//
+// CPU skinning stays authoritative (VertexTransform / LightTransform); this
+// path replaces only the geometry submission. The GPU-skinning VBO path is
+// deliberately not used - it short-circuits earlier in RenderMeshInternal and is
+// unaffected by this slice.
+//
+// Default ON (Phase 15.6); opt out with '-nogl33char' or a 'gl33char.disable'
+// marker file, in which case every call site below falls through to the
+// untouched legacy path.
+// ===========================================================================
+
+// Phase 15.6: the Core character path is now the DEFAULT (validated in-game
+// across maps: parity with the compatibility character program, no crash). A
+// legacy fallback is kept as an opt-OUT safety valve: '-nogl33char' on the
+// command line, or an empty marker file 'gl33char.disable' in the client working
+// directory (some launchers do not forward command-line flags, so the file is
+// the reliable override). If a future map/material regresses, drop the file to
+// restore the fixed-function/compatibility path without a rebuild.
+bool GL33CharEnabled()
+{
+	static int cached = -1;
+	if (cached < 0)
+	{
+		const char* cmd = GetCommandLineA();
+		bool off = (cmd != NULL && strstr(cmd, "-nogl33char") != NULL);
+		if (!off && GetFileAttributesA("gl33char.disable") != INVALID_FILE_ATTRIBUTES)
+			off = true;
+		cached = off ? 0 : 1;
+	}
+	return cached != 0;
+}
+
+// One VAO with three streams, matching character_core.vs (aPos/aTex/aColor).
+// Separate buffers, not interleaved: the source arrays are already separate and
+// contiguous, so each mesh uploads with three glBufferData calls and no repack.
+static bool   g_bCharCoreActive = false;
+static GLuint s_charVao = 0;
+static GLuint s_charVboPos = 0, s_charVboTex = 0, s_charVboCol = 0;
+
+// Phase 16.9 note: a "keep the allocation and refill with glBufferSubData"
+// variant was tried here and MEASURED SLOWER (crowd profile: per-mesh cost
+// 22.3 -> 46.1 us, Render 32 -> 51 ms). Orphaning with the grown capacity
+// re-specifies the LARGEST mesh's storage on every draw, so small meshes paid
+// the biggest allocation plus a second call. Exact-size glBufferData is the
+// cheaper of the two here. Real streaming (ring buffer / persistent mapping)
+// is a separate, measured change - do not "optimize" this back without a
+// before/after RenderProfiler.log.
+
+bool CharacterCoreIsActive() { return g_bCharCoreActive; }
+
+// Arm the Core character path for the pass. Does NOT bind character_core or a
+// VAO globally: the RenderCharactersClient pass also draws shadows and
+// part-effects that still submit fixed-function client arrays, and those would
+// crash under an explicit-attribute Core program. Instead each body mesh binds
+// character_core just for its own draw (CharacterCoreDrawTriangles) and restores
+// the previously bound program, so the surrounding legacy draws are untouched.
+bool CharacterCoreBegin()
+{
+	if (!GL33CharEnabled() || gShaderScene.GetProgram(eShaderS_CharacterCore) == 0)
+		return false;
+
+	if (s_charVao == 0)
+	{
+		glGenVertexArrays(1, &s_charVao);
+		glBindVertexArray(s_charVao);
+
+		glGenBuffers(1, &s_charVboPos);
+		glBindBuffer(GL_ARRAY_BUFFER, s_charVboPos);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(0);
+
+		glGenBuffers(1, &s_charVboTex);
+		glBindBuffer(GL_ARRAY_BUFFER, s_charVboTex);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(1);
+
+		glGenBuffers(1, &s_charVboCol);
+		glBindBuffer(GL_ARRAY_BUFFER, s_charVboCol);
+		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		// Enabled per draw only when the legacy path would have enabled
+		// GL_COLOR_ARRAY, so a stale/short colour buffer is never read.
+		glDisableVertexAttribArray(2);
+
+		// Leave the default VAO bound so the pass's fixed-function client-array
+		// draws (shadows, effects) are unaffected until a body mesh draws.
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+
+	g_bCharCoreActive = true;
+
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		g_ErrorReport.Write("> [Shader] Core character path active (character_core program %u, per-body bind)\r\n",
+			gShaderScene.GetProgram(eShaderS_CharacterCore));
+	}
+	return true;
+}
+
+// Phase 16.10a: character_core used to be bound and unbound around EVERY body
+// mesh. Measured cost of that (crowd profile, gl33char on vs off, same scene):
+// MeshSubmitGL 13.5 us/mesh vs 3.8 us/mesh on the legacy client-array path,
+// i.e. ~8 ms/frame and ~10 FPS. ProgramSwitches were 2390/frame vs 1071.
+//
+// A RenderBody call keeps the fixed-function matrices unchanged across its mesh
+// loop and issues no draws other than RenderMeshInternal, so the bind, the
+// GL_MODELVIEW_MATRIX readback and the constant uniforms (uProj, uModelView,
+// texture1) can be hoisted to ONCE PER BODY. The bind is lazy - taken by the
+// first Core mesh - and released by CharacterCoreEndBody, so a body that draws
+// nothing through the Core path never binds at all.
+//
+// Safety (this is the 15.4 driver-crash area): any path that falls back to a
+// fixed-function client-array draw calls CharacterCoreEndBody first, so legacy
+// geometry is never submitted under the explicit-attribute Core program. The
+// next Core mesh simply re-binds. RenderMeshVBO is safe as-is because it
+// restores the exact previous program (RestoreProgram(prevProgram)).
+static bool s_charBodyBound = false;
+
+void CharacterCoreEndBody()
+{
+	if (!s_charBodyBound)
+		return;
+
+	s_charBodyBound = false;
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+}
+
+// Disarm the Core character path at the end of the pass.
+void CharacterCoreEnd()
+{
+	CharacterCoreEndBody();
+	g_bCharCoreActive = false;
+}
+
+// Draw one mesh's triangle list through character_core. Returns false when the
+// Core path is not armed, so the caller runs the legacy client-array draw.
+// 'pos' is vec3 per vertex, 'tex' vec2, 'col' vec4; 'useVertexColor' mirrors the
+// legacy GL_COLOR_ARRAY decision (gl_Color in the compatibility character.vs).
+//
+// Self-contained: binds character_core + the Core VAO for this draw only, then
+// restores the previously bound program (the pass's compatibility character
+// program) and the default VAO, so the surrounding shadow/effect fixed-function
+// draws never execute under the explicit-attribute Core program.
+bool CharacterCoreDrawTriangles(const float* pos, const float* tex, const float* col,
+	int vertexCount, bool useVertexColor)
+{
+	if (!g_bCharCoreActive || vertexCount <= 0 || pos == NULL || tex == NULL)
+		return false;
+
+	if (!s_charBodyBound)
+	{
+		if (!gShaderScene.Use(eShaderS_CharacterCore))
+			return false; // leaves the previous program bound; caller uses legacy path
+		s_charBodyBound = true;
+
+		// Per-body constants: the modelview is fixed for this RenderBody, uProj is
+		// fixed for the frame and texture1 never changes. Uploading these once per
+		// body instead of once per mesh is the whole point of the hoist (the value
+		// cache in CShaderScene would skip the redundant uploads anyway, but not
+		// the glGetFloatv or the location lookups).
+		float modelView[16];
+		glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
+		gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
+		gShaderScene.SetMat4("uModelView", modelView);
+		gShaderScene.SetInt("texture1", 0);
+	}
+
+	glBindVertexArray(s_charVao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, s_charVboPos);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (int)sizeof(float), pos, GL_STREAM_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, s_charVboTex);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (int)sizeof(float), tex, GL_STREAM_DRAW);
+
+	if (useVertexColor && col != NULL)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, s_charVboCol);
+		glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (int)sizeof(float), col, GL_STREAM_DRAW);
+		glEnableVertexAttribArray(2);
+		gShaderScene.SetInt("uUseVertexColor", 1);
+	}
+	else
+	{
+		glDisableVertexAttribArray(2);
+		float current[4] = { 1.f, 1.f, 1.f, 1.f };
+		glGetFloatv(GL_CURRENT_COLOR, current);
+		gShaderScene.SetInt("uUseVertexColor", 0);
+		gShaderScene.SetVec4("uConstColor", current[0], current[1], current[2], current[3]);
+	}
+
+	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+
+	// The program, the VAO and the per-body uniforms stay bound for the rest of
+	// this body's meshes; CharacterCoreEndBody releases them (and is also called
+	// before any fixed-function fallback draw).
+	return true;
+}
+#endif // SHADER_PIPELINE
+
 void BMD::RenderMesh(int i, int RenderFlag, float Alpha, int BlendMesh, float BlendMeshLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, int MeshTexture)
 {
 	RenderMeshInternal(i, RenderFlag, Alpha, BlendMesh, BlendMeshLight,
 		BlendMeshTexCoordU, BlendMeshTexCoordV, MeshTexture, NULL);
+#ifdef SHADER_PIPELINE
+	// Standalone single-mesh entry point: there is no RenderBody loop to close
+	// the per-body bind, so release it here.
+	CharacterCoreEndBody();
+#endif // SHADER_PIPELINE
 }
 
 void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, float BlendMeshLight, float BlendMeshTexCoordU, float BlendMeshTexCoordV, int MeshTexture, ShaderMatrixSnapshot* matrixSnapshot)
@@ -1731,9 +2122,17 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					// GPU-skinned Model draw for plain lit textured meshes. All special
 					// chrome/metal/oil, wave, shadow and effect materials remain on their
 					// authoritative legacy path.
+					// One surface, one path: a chrome/metal overlay may only take the
+					// VBO route if this mesh's base pass did too. Otherwise the
+					// overlay is GPU-skinned over a CPU-skinned base and the two
+					// z-fight - the weapon shine jumping across the surface.
+					const bool chromeFollowsBase =
+						!IsVboChromeMaterial(renderFlags) || s_meshWentVbo[i];
+
 					if (IsVboSceneEnabled()
 						&& objectVboEligible
 						&& IsVboMaterialEligible(renderFlags, EnableLight, EnableWave)
+						&& chromeFollowsBase
 						&& m->VAO != 0 // non-zero only when CreateVertexBuffer ran (VBO path ready)
 						&& !HasVboExcludedRenderFlag(RenderFlag))
 					{
@@ -1743,13 +2142,28 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						if (translatedVboEligible)
 							g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_ATTEMPTED);
 
-						if (this->RenderMeshVBO(m, Alpha, EnableLight ? 1 : 0,
+						// A chrome/metal/oil draw generates its texcoords in the shader
+						// AND takes flat BodyLight: the legacy build loop only swaps in
+						// the per-vertex LightTransform inside `case RENDER_TEXTURE:`,
+						// which chrome never reaches. Passing enableLight here would
+						// apply an intensity term the legacy path never applied and
+						// shift the brightness of every chrome surface.
+						BMD::VboChromeParams chromeParams;
+						const bool isChrome = FillVboChromeParams(chromeParams, renderFlags,
+							RenderFlag, Wave, BlendMeshTexCoordU, BlendMeshTexCoordV);
+
+						if (this->RenderMeshVBO(m, Alpha, (!isChrome && EnableLight) ? 1 : 0,
 								translatedVboEligible,
-								matrixSnapshot))
+								matrixSnapshot,
+								isChrome ? &chromeParams : NULL))
 						{
 							g_RenderProfiler.AddCounter(RPC_VBO_DRAW_SUCCEEDED);
 							if (translatedVboEligible)
 								g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_SUCCEEDED);
+							// Record the base pass's route so this mesh's chrome/metal
+							// overlays follow it (see chromeFollowsBase above).
+							if (renderFlags == RENDER_TEXTURE)
+								s_meshWentVbo[i] = true;
 							return;
 						}
 						g_RenderProfiler.AddCounter(RPC_VBO_DRAW_REJECTED);
@@ -1757,6 +2171,12 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 							g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_REJECTED);
 					}
 #endif // SHADER_VERSION_TEST
+
+					// Reaching here means this pass draws on the legacy CPU path. If it
+					// is the base pass, its chrome/metal overlays must follow it there
+					// rather than being GPU-skinned over it.
+					if (renderFlags == RENDER_TEXTURE)
+						s_meshWentVbo[i] = false;
 
 					// The legacy path and every special material consume the shared CPU
 					// vertex/normal arrays. Materialize them once, only when fallback is
@@ -1782,6 +2202,13 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						|| renderFlags == RENDER_CHROME4
 						|| renderFlags == RENDER_CHROME8
 						|| renderFlags == RENDER_OIL;
+
+					// Phase 16.9 bisect: this loop is pure CPU (no GL at all) and
+					// expands the whole skinned mesh into the shared arrays. Measured
+					// separately from the draw below so the profile says which of the
+					// two the ~23.6 us per mesh actually belongs to. The extra brace
+					// scopes the timer to the loop without reindenting its body.
+					{ CRenderProfilerScope buildScope(RP_BMD_MESH_BUILD);
 
 					for (int j = 0; j < m->NumTriangles; j++)
 					{
@@ -1867,8 +2294,33 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						}
 					}
 
+					} // end RP_BMD_MESH_BUILD
+
 					if (target_vertex_index != -1)
 					{
+						CRenderProfilerScope submitScope(RP_BMD_MESH_SUBMIT);
+#ifdef SHADER_PIPELINE
+						// Phase 15.4: Core-profile draw of the very same CPU arrays when
+						// the character pass armed character_core. 'enableColor' mirrors
+						// the legacy GL_COLOR_ARRAY decision (gl_Color); the texture is
+						// always sampled, exactly like the compatibility character.fs.
+						if (CharacterCoreDrawTriangles(
+								(const float*)vertices,
+								(const float*)textCoords,
+								(const float*)colors,
+								target_vertex_index + 1,
+								enableColor))
+						{
+							g_RenderProfiler.AddCounter(RPC_LEGACY_BMD_MESH_DRAWS);
+							return;
+						}
+						// Phase 16.10a: this is a fixed-function client-array draw, so it
+						// must NOT run under the explicit-attribute Core program that a
+						// previous mesh of this body may still have bound (that mix is
+						// what crashed the NVIDIA driver in 15.4). Releasing here is
+						// safe: the next Core mesh re-binds lazily.
+						CharacterCoreEndBody();
+#endif // SHADER_PIPELINE
 						// Legacy immediate-mode fallback (also the only path when the
 						// GPU short-circuit above did not fire, or SHADER_VERSION_TEST off).
 						glEnableClientState(GL_VERTEX_ARRAY);
@@ -1896,6 +2348,9 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 	if (NumMeshs)
 	{
 		int iBlendMesh = BlendMesh;
+
+		// Fresh per-mesh path record for this body (see s_meshWentVbo).
+		ResetMeshPathRecord();
 
 		this->BeginRender(Alpha);
 
@@ -1962,6 +2417,11 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 					BlendMeshTexCoordU, BlendMeshTexCoordV, Texture, &matrixSnapshot);
 			}
 		}
+#ifdef SHADER_PIPELINE
+		// Close the per-body character_core bind (Phase 16.10a) before EndRender
+		// restores the pass state, so nothing after this body runs under it.
+		CharacterCoreEndBody();
+#endif // SHADER_PIPELINE
 		this->EndRender();
 	}
 }
@@ -2360,11 +2820,19 @@ void BMD::RenderBodyShadow(int BlendMesh, int HiddenMesh, int StartMeshNumber, i
 
 	DisableTexture();
 	DisableDepthMask();
-	// The shadow is the model's mesh flattened onto the ground, so its triangle winding is
-	// unreliable (silhouette tris are near-degenerate). With back-face culling on, their facing
-	// flips frame to frame as the model moves/animates, dropping triangles in and out - that is
-	// the shimmer. Draw the shadow double-sided; restore the scene default afterwards.
+	// Keep the double-sided draw (culling off) so the flattened shadow always renders
+	// regardless of its unreliable triangle winding -- removing this culled every
+	// shadow triangle and the shadow vanished. The shimmer fix is the TRANSLUCENT
+	// blend below (borrowed from the reference 5.2 client SRC ThangCuoi): an opaque
+	// black shadow showed every coverage flip of the near-degenerate silhouette
+	// triangles as hard black on/off; a soft blended shadow hides it. Alpha 0.2 per
+	// pass ~= the reference's single 0.35 since a double-sided flat sheet draws each
+	// pixel twice. Self-contained state (overrides the caller's opaque colour +
+	// DisableAlphaBlend), restored after.
 	DisableCullFace();
+	EnableAlphaTest(false);
+	EnableAlphaBlend();
+	glColor4f(0.0f, 0.0f, 0.0f, 0.2f);
 	BeginRender(1.f);
 
 	int startMesh = 0;
@@ -3773,7 +4241,7 @@ void BMD::CreateVertexBuffer(Mesh_t& mesh)
 // texture is already bound by the caller. Returns false (drawing nothing) when
 // the required program is unavailable, so the caller falls back to legacy.
 bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
-	ShaderMatrixSnapshot* matrixSnapshot)
+	ShaderMatrixSnapshot* matrixSnapshot, const VboChromeParams* chrome)
 {
 #ifdef SHADER_VERSION_TEST
 	CRenderProfilerScope profilerScope(RP_BMD_RENDER_MESH_VBO);
@@ -3826,6 +4294,13 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 		glGetFloatv(GL_MODELVIEW_MATRIX, localModelView);
 		glGetFloatv(GL_PROJECTION_MATRIX, localProjection);
 	}
+
+	// Phase 13.4: first real consumer of the CPU matrix backbone. Feed uProj from
+	// g_ProjectionMatrix (built 1:1 alongside gluPerspective in gluPerspective2)
+	// instead of the fixed-function readback. Projection is always global (never
+	// per-object), so this is the safe first swap; uView still reads the driver's
+	// MODELVIEW (see Phase 13.5). Identical rendering proves the CPU build matches.
+	projection = g_ProjectionMatrix;
 
 	// Uniform values persist per linked program. Within this snapshot lifetime,
 	// upload the identical camera matrices only on the first use of each VBO
@@ -3882,6 +4357,26 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 		if (matrixSnapshot != NULL)
 			matrixSnapshot->BodyTransformUploaded = true;
 	}
+	// Chrome/metal/oil texcoord generation. Always written, including the zeroing
+	// pass, because these uniforms live in the shared Model program and would
+	// otherwise leak a previous draw's chrome mode onto an ordinary textured mesh.
+	if (chrome != NULL && chrome->Mode != 0)
+	{
+		gShaderGL->vboSetInt("u_chromeMode", chrome->Mode);
+		gShaderGL->vboSetInt("u_chromeApply", chrome->Apply);
+		gShaderGL->vboSetVec4("u_chromeScalars",
+			chrome->Scalars[0], chrome->Scalars[1], chrome->Scalars[2], 0.f);
+		gShaderGL->vboSetVec4("u_chromeL", chrome->L[0], chrome->L[1], chrome->L[2], 0.f);
+		gShaderGL->vboSetVec4("u_chromeLightVector",
+			chrome->LightVector[0], chrome->LightVector[1], chrome->LightVector[2], 0.f);
+		gShaderGL->vboSetVec4("u_blendMeshTexCoord",
+			chrome->BlendTexCoord[0], chrome->BlendTexCoord[1], 0.f, 0.f);
+	}
+	else
+	{
+		gShaderGL->vboSetInt("u_chromeMode", 0);
+	}
+
 	gShaderGL->vboSetInt("uTexture", 0); // texture already bound by the caller
 
 	RenderProfilerBindVertexArray(m->VAO);

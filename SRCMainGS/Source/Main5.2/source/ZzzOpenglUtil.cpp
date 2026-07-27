@@ -11,7 +11,9 @@
 #include "Zzzinfomation.h"
 #include "NewUISystem.h"
 #include "CShaderGL.h"
+#include "CShaderScene.h"
 #include "CameraProjection.h"
+#include "RenderMatrix.h"
 
 
 float Distance;
@@ -29,7 +31,289 @@ vec3_t  CameraAngle;
 float   CameraMatrix[3][4];
 vec3_t  MousePosition;
 vec3_t  MouseTarget;
+
+// Phase 13.2: CPU copy of the current perspective projection, built alongside
+// the fixed-function gluPerspective in gluPerspective2 (RenderMatrix backbone).
+// The fixed-function matrix stays authoritative; this is a column-major float[16]
+// mirror for future shader-fed (uProj) draws. Zero behavior change today.
+float   g_ProjectionMatrix[16];
+
+// Phase 13.3: CPU copy of the current camera view (modelview) matrix, built in
+// BeginOpengl alongside the fixed-function glRotatef/glTranslatef camera setup.
+// Column-major float[16] mirror for future shader-fed (uView) draws. The
+// fixed-function MODELVIEW stays authoritative; zero behavior change today.
+float   g_ViewMatrix[16];
+
+// Phase 17.2: CPU copy of the UI's screen-space ortho projection, built in
+// BeginBitmap alongside gluOrtho2D. Separate from g_ProjectionMatrix on purpose:
+// that one is the perspective world camera, and the 2D UI never uses it.
+float   g_UIProjectionMatrix[16];
+
+// Phase 13.5: authoritative CPU mirror of the fixed-function MODELVIEW stack.
+// Each fixed-function modelview op (glPushMatrix/glPopMatrix/glLoadIdentity/
+// glRotatef/glTranslatef) is mirrored onto this stack at its call site so the
+// current CPU modelview is available in a Core profile (no GL_MODELVIEW_MATRIX
+// readback). Sites are migrated incrementally; the fixed-function stack stays
+// authoritative until every site is covered and a consumer swaps to Top().
+// g_ViewMatrix is kept as a derived snapshot of the world-camera Top().
+RenderMatrix::Stack g_ModelViewStack;
 float   g_fCameraCustomDistance = 0.f;
+
+#ifdef SHADER_PIPELINE
+// ===========================================================================
+// Phase 16.3: shared Core-profile effect draw helper. Effects (ZzzEffect*,
+// SideHair, ...) are pure fixed-function today and are scattered across many
+// small draws interleaved with other fixed-function work, so - like the Phase
+// 15 character path, and unlike the homogeneous terrain pass - each effect draw
+// binds effect_core JUST for itself and restores the previous program, never a
+// pass-level bind (that would put the following fixed-function draws under an
+// explicit-attribute Core program and crash the driver, as the 15.4 shadow
+// crash showed).
+//
+// Alpha BLEND stays fixed-function (glBlendFunc is program-independent), set by
+// the caller as today; this helper only moves the geometry emission, the
+// texture-env combine (uTexEnvMode) and the alpha-test discard (uAlphaRef) into
+// the shader. CPU-side vertex data is uploaded unchanged.
+//
+// Opt-IN for now ('-gl33effect' or a 'gl33effect.enable' marker file): effects
+// are the flicker-prone surface, so this phase stays behind a flag and is
+// converted one effect family at a time until each is validated in the Release
+// run, before it becomes default.
+// ===========================================================================
+bool GL33EffectEnabled()
+{
+	static int cached = -1;
+	if (cached < 0)
+	{
+		const char* cmd = GetCommandLineA();
+		bool on = (cmd != NULL && strstr(cmd, "-gl33effect") != NULL);
+		if (!on && GetFileAttributesA("gl33effect.enable") != INVALID_FILE_ATTRIBUTES)
+			on = true;
+		cached = on ? 1 : 0;
+	}
+	return cached != 0;
+}
+
+namespace
+{
+	GLuint s_effectVao = 0;
+	GLuint s_effectVboPos = 0, s_effectVboTex = 0, s_effectVboCol = 0;
+
+	// Phase 16.9 note: see ZzzBMD.cpp - the capacity-orphan + glBufferSubData
+	// streaming variant measured SLOWER than exact-size glBufferData on this
+	// hardware, so both Core paths keep the simple form.
+
+	bool EffectCoreEnsureBuffers()
+	{
+		if (s_effectVao != 0)
+			return true;
+		if (glGenVertexArrays == NULL)
+			return false;
+		glGenVertexArrays(1, &s_effectVao);
+		glBindVertexArray(s_effectVao);
+		glGenBuffers(1, &s_effectVboPos);
+		glBindBuffer(GL_ARRAY_BUFFER, s_effectVboPos);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(0);
+		glGenBuffers(1, &s_effectVboTex);
+		glBindBuffer(GL_ARRAY_BUFFER, s_effectVboTex);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(1);
+		glGenBuffers(1, &s_effectVboCol);
+		glBindBuffer(GL_ARRAY_BUFFER, s_effectVboCol);
+		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(2);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		return true;
+	}
+}
+
+// Draw one effect primitive through effect_core. 'mode' is a GL primitive
+// (GL_TRIANGLE_FAN, GL_TRIANGLES, ...); 'pos' is vec3/vertex, 'tex' vec2, 'col'
+// vec4 (always provided - the caller fills it from the fixed-function current
+// colour when the legacy draw had no per-vertex colour). texEnvMode is 0
+// MODULATE / 1 ADD / 2 REPLACE; alphaRef < 0 disables the discard. uModelView is
+// read back from GL_MODELVIEW_MATRIX so the caller's push/translate/rotate is
+// honoured. Returns false when the Core effect path is off or unavailable, so
+// the caller runs its untouched legacy immediate-mode draw.
+bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	const float* col, int vertexCount, int texEnvMode, bool useTexture, float alphaRef)
+{
+	if (!GL33EffectEnabled() || vertexCount <= 0 || pos == NULL || tex == NULL || col == NULL)
+		return false;
+	if (gShaderScene.GetProgram(eShaderS_EffectCore) == 0)
+		return false;
+	if (!EffectCoreEnsureBuffers())
+		return false;
+	if (!gShaderScene.Use(eShaderS_EffectCore))
+		return false;
+
+	glBindVertexArray(s_effectVao);
+	glBindBuffer(GL_ARRAY_BUFFER, s_effectVboPos);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (int)sizeof(float), pos, GL_STREAM_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, s_effectVboTex);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (int)sizeof(float), tex, GL_STREAM_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, s_effectVboCol);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (int)sizeof(float), col, GL_STREAM_DRAW);
+
+	float modelView[16];
+	glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
+	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
+	gShaderScene.SetMat4("uModelView", modelView);
+	gShaderScene.SetInt("texture1", 0);
+	gShaderScene.SetInt("uTexEnvMode", texEnvMode);
+	gShaderScene.SetInt("uUseTexture", useTexture ? 1 : 0);
+	gShaderScene.SetFloat("uAlphaRef", alphaRef);
+
+	glDrawArrays(mode, 0, vertexCount);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		g_ErrorReport.Write("> [Shader] Core effect path active (effect_core program %u, per-draw bind)\r\n",
+			gShaderScene.GetProgram(eShaderS_EffectCore));
+	}
+	return true;
+}
+
+// ===========================================================================
+// Phase 17: Core-profile 2D UI draw.
+//
+// Opt-IN for now ('-gl33ui' or a 'gl33ui.enable' marker file), like every other
+// phase, so the UI can be compared against the fixed-function original.
+// ===========================================================================
+bool GL33UIEnabled()
+{
+	static int cached = -1;
+	if (cached < 0)
+	{
+		const char* cmd = GetCommandLineA();
+		bool on = (cmd != NULL && strstr(cmd, "-gl33ui") != NULL);
+		if (!on && GetFileAttributesA("gl33ui.enable") != INVALID_FILE_ATTRIBUTES)
+			on = true;
+		cached = on ? 1 : 0;
+	}
+	return cached != 0;
+}
+
+namespace
+{
+	GLuint s_uiVao = 0;
+	GLuint s_uiVboPos = 0, s_uiVboTex = 0;
+
+	bool UICoreEnsureBuffers()
+	{
+		if (s_uiVao != 0)
+			return true;
+		if (glGenVertexArrays == NULL)
+			return false;
+		glGenVertexArrays(1, &s_uiVao);
+		glBindVertexArray(s_uiVao);
+		glGenBuffers(1, &s_uiVboPos);
+		glBindBuffer(GL_ARRAY_BUFFER, s_uiVboPos);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(0);
+		glGenBuffers(1, &s_uiVboTex);
+		glBindBuffer(GL_ARRAY_BUFFER, s_uiVboTex);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glEnableVertexAttribArray(1);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		return true;
+	}
+}
+
+// Draw one 2D UI primitive through ui_core. 'pos' is vec2 screen space, 'tex'
+// vec2 (may be NULL for untextured draws). The colour is NOT per-vertex: the UI
+// call sites set the fixed-function current colour once, so it is read back here
+// into uColor - which also means this must be called AFTER the caller's
+// glColor*. uProj comes from g_UIProjectionMatrix (the ortho mirror built in
+// BeginBitmap), never from g_ProjectionMatrix. Blending stays fixed-function.
+// Returns false when the Core UI path is off or unavailable, so the caller runs
+// its untouched legacy draw.
+bool UICoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	int vertexCount, float alphaRef)
+{
+	// Ask GL, do not mirror. TextureEnable has several independent writers -
+	// EnableAlphaTest/EnableAlphaBlend set it as a side effect too - so no single
+	// place can keep it honest, and two attempts to feed the Core UI draw from it
+	// painted the name/chat backplates black, then white. glIsEnabled is a
+	// readback, but it is correct BY CONSTRUCTION, and correctness comes before
+	// its cost. Phase 18 deletes GL_TEXTURE_2D entirely and this goes with it.
+	const bool useTexture = (glIsEnabled(GL_TEXTURE_2D) == GL_TRUE);
+	if (!GL33UIEnabled() || vertexCount <= 0 || pos == NULL)
+		return false;
+	if (useTexture && tex == NULL)
+		return false;
+	if (gShaderScene.GetProgram(eShaderS_UICore) == 0)
+		return false;
+	if (!UICoreEnsureBuffers())
+		return false;
+	if (!gShaderScene.Use(eShaderS_UICore))
+		return false;
+
+	glBindVertexArray(s_uiVao);
+	glBindBuffer(GL_ARRAY_BUFFER, s_uiVboPos);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (int)sizeof(float), pos, GL_STREAM_DRAW);
+	if (tex != NULL)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, s_uiVboTex);
+		glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (int)sizeof(float), tex, GL_STREAM_DRAW);
+	}
+
+	float current[4] = { 1.f, 1.f, 1.f, 1.f };
+	glGetFloatv(GL_CURRENT_COLOR, current);
+	gShaderScene.SetMat4("uProj", g_UIProjectionMatrix);
+	gShaderScene.SetVec4("uColor", current[0], current[1], current[2], current[3]);
+	gShaderScene.SetInt("texture1", 0);
+	gShaderScene.SetInt("uUseTexture", useTexture ? 1 : 0);
+	gShaderScene.SetFloat("uAlphaRef", alphaRef);
+
+	glDrawArrays(mode, 0, vertexCount);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		g_ErrorReport.Write("> [Shader] Core UI path active (ui_core program %u, per-draw bind)\r\n",
+			gShaderScene.GetProgram(eShaderS_UICore));
+	}
+	return true;
+}
+#endif // SHADER_PIPELINE
+
+// Phase 16.6: tracked mirror of the fixed-function texture-environment combine.
+// A Core profile has no glTexEnv, so effect_core reproduces the combine in the
+// fragment shader (uTexEnvMode 0=MODULATE / 1=ADD / 2=REPLACE). Every effect
+// glTexEnvi site goes through this setter, so a Core effect draw knows which
+// combine the legacy path would have used without a per-draw glGet readback
+// (particles issue hundreds of draws a frame). The fixed-function call is still
+// made here, so the legacy (Core-effect-off) path is byte-for-byte unchanged.
+int g_EffectTexEnvMode = 0;
+
+void SetEffectTexEnvMode(int mode)
+{
+	GLint glMode = GL_MODULATE;
+	if (mode == 1)
+		glMode = GL_ADD;
+	else if (mode == 2)
+		glMode = GL_REPLACE;
+	else
+		mode = 0;
+	g_EffectTexEnvMode = mode;
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, glMode);
+}
+
 bool    FogEnable = false;
 GLfloat FogDensity = 0.0004f;
 
@@ -204,6 +488,12 @@ void GetOpenGLMatrix(float Matrix[3][4])
 void gluPerspective2(float Fov, float Aspect, float ZNear, float ZFar)
 {
 	gluPerspective(Fov, Aspect, ZNear, ZFar);
+
+	// Phase 13.2: build a CPU copy of the same projection into g_ProjectionMatrix.
+	// The fixed-function gluPerspective call above stays authoritative; this is an
+	// additive mirror (column-major float[16]) for future shader-fed draws. No
+	// existing behavior changes.
+	RenderMatrix::Perspective(g_ProjectionMatrix, Fov, Aspect, ZNear, ZFar);
 
 	ScreenCenterX = OpenglWindowX + OpenglWindowWidth / 2;
 	ScreenCenterY = OpenglWindowY + OpenglWindowHeight / 2;
@@ -402,6 +692,34 @@ void DisableCullFace()
 		CullFaceEnable = false;
 		glDisable(GL_CULL_FACE);
 	}
+}
+
+// Phase 17: authoritative toggle for GL_TEXTURE_2D.
+//
+// 'TextureEnable' is meant to mirror the fixed-function texture enable, but 21
+// call sites across the UI (UIControls, UIWindows, NewUIMessageBox, Sprite,
+// CameraMove, ZzzInterface) called glEnable/glDisable(GL_TEXTURE_2D) directly
+// and bypassed it, so the mirror could not be trusted. That is not a cosmetic
+// problem: the Core UI draw has to know whether the legacy draw would have
+// sampled a texture or emitted a flat colour, and a stale mirror turns name
+// and chat backplates black or white depending on which way it is wrong.
+//
+// Deliberately NOT DisableTexture(): that one also forces the depth mask on and
+// toggles the alpha test, so substituting it at these sites would change
+// behaviour. This does exactly what the raw call did and keeps the mirror in
+// step - the redundant-call skip is the only difference.
+//
+// Phase 18 removes GL_TEXTURE_2D entirely (it does not exist in Core), so
+// routing every site through one function is a prerequisite either way.
+void SetTextureEnabled(bool enable)
+{
+	if (TextureEnable == enable)
+		return;
+	TextureEnable = enable;
+	if (enable)
+		glEnable(GL_TEXTURE_2D);
+	else
+		glDisable(GL_TEXTURE_2D);
 }
 
 void DisableTexture(bool AlphaTest)
@@ -687,6 +1005,21 @@ void BeginOpengl(int x, int y, int Width, int Height, bool Screen)
 	glRotatef(CameraAngle[2], 0.f, 0.f, 1.f);
 	glTranslatef(-CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
 
+	// Phase 13.5: mirror the same MODELVIEW ops onto the CPU stack, 1:1 with the
+	// fixed-function calls above (glPushMatrix -> Push, glLoadIdentity -> Load-
+	// Identity, glRotatef/glTranslatef -> Rotate/Translate, GL post-multiply
+	// semantics). EndOpengl mirrors the matching glPopMatrix. g_ViewMatrix is kept
+	// as a derived snapshot of the resulting world-camera view. The fixed-function
+	// stack stays authoritative; additive, no behavior change (no consumer yet).
+	g_ModelViewStack.Push();
+	g_ModelViewStack.LoadIdentity();
+	g_ModelViewStack.Rotate(CameraAngle[1], 0.f, 1.f, 0.f);
+	if (CameraTopViewEnable == false)
+		g_ModelViewStack.Rotate(CameraAngle[0], 1.f, 0.f, 0.f);
+	g_ModelViewStack.Rotate(CameraAngle[2], 0.f, 0.f, 1.f);
+	g_ModelViewStack.Translate(-CameraPosition[0], -CameraPosition[1], -CameraPosition[2]);
+	RenderMatrix::Copy(g_ViewMatrix, g_ModelViewStack.Top());
+
 	glDisable(GL_ALPHA_TEST);
 	glEnable(GL_TEXTURE_2D);
 	glEnable(GL_DEPTH_TEST);
@@ -726,6 +1059,10 @@ void EndOpengl()
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
+
+	// Phase 13.5: mirror the MODELVIEW glPopMatrix above onto the CPU stack so it
+	// stays balanced with the BeginOpengl Push (projection is not CPU-mirrored).
+	g_ModelViewStack.Pop();
 }
 
 void UpdateMousePositionn()
@@ -1096,6 +1433,21 @@ void RenderSprite(int Texture, vec3_t Position, float Width, float Height, vec3_
 		}
 	}
 
+#ifdef SHADER_PIPELINE
+	// Phase 16.6: route the particle/sprite billboard through effect_core. This
+	// one function is the draw for the whole particle family (skills, aura, fire,
+	// sparks) plus the other sprite billboards. The legacy draw below is a
+	// client-array GL_QUADS over exactly these 4 vertices; GL_TRIANGLE_FAN over
+	// the same 4 in the same order triangulates identically (0,1,2 + 0,2,3), and
+	// is Core-legal. uTexEnvMode carries the tracked glTexEnvi combine (this is
+	// the first user of the GL_ADD additive path), uUseTexture mirrors the
+	// fixed-function GL_TEXTURE_2D enable, and the alpha test / blend mode stay
+	// fixed-function state owned by the caller.
+	if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)p, (const float*)c,
+		(const float*)colors, 4, g_EffectTexEnvMode, TextureEnable, -1.f))
+		return;
+#endif // SHADER_PIPELINE
+
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -1149,6 +1501,32 @@ void RenderSpriteUV(int Texture, vec3_t Position, float Width, float Height, flo
 	Vector(x + Width, y - Height, z, p[1]);
 	Vector(x + Width, y + Height, z, p[2]);
 	Vector(x - Width, y + Height, z, p[3]);
+
+#ifdef SHADER_PIPELINE
+	// Phase 16.8: route the per-corner-lit world billboard (the floating damage /
+	// experience numbers, via RenderNumber) through effect_core. Same 4 vertices
+	// in the same order, so GL_TRIANGLE_FAN triangulates identically to the
+	// GL_QUADS below (0,1,2 + 0,2,3) and is Core-legal.
+	{
+		float col[4 * 4];
+		for (int i = 0; i < 4; i++)
+		{
+			col[i * 4 + 0] = Light[i][0];
+			col[i * 4 + 1] = Light[i][1];
+			col[i * 4 + 2] = Light[i][2];
+			col[i * 4 + 3] = Alpha;
+		}
+		if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)p, (const float*)UV,
+			col, 4, g_EffectTexEnvMode, TextureEnable, -1.f))
+		{
+			// The legacy loop below leaves the fixed-function current colour at the
+			// last vertex colour, and later draws inherit it. The Core path sets no
+			// glColor, so reproduce that trailing state explicitly.
+			glColor4f(Light[3][0], Light[3][1], Light[3][2], Alpha);
+			return;
+		}
+	}
+#endif // SHADER_PIPELINE
 
 	glBegin(GL_QUADS);
 	for (int i = 0; i < 4; i++)
@@ -1260,6 +1638,15 @@ void BeginBitmap()
 
 	glLoadIdentity();
 	gluOrtho2D(0, WindowWidth, 0, WindowHeight);
+
+	// Phase 17.2: CPU mirror of the UI's ortho projection, built alongside the
+	// fixed-function gluOrtho2D exactly as g_ProjectionMatrix mirrors
+	// gluPerspective (Phase 13.2). The UI is screen-space, so a Core UI draw
+	// must feed uProj from THIS, never from g_ProjectionMatrix - that one holds
+	// the perspective camera and would place every widget off-screen. The
+	// fixed-function matrix stays authoritative; nothing consumes this yet.
+	RenderMatrix::Ortho(g_UIProjectionMatrix, 0.f, (float)WindowWidth,
+		0.f, (float)WindowHeight, -1.f, 1.f);
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
@@ -1467,6 +1854,14 @@ void RenderBitmap(int Texture, float x, float y, float Width, float Height, floa
 	}
 
 	// Dibujar los v�rtices como un cuadrado utilizando un tri�ngulo en abanico
+#ifdef SHADER_PIPELINE
+	// Phase 17.4: first Core UI consumer. Same primitive, same 4 vertices, same
+	// order - only the submission changes. Placed AFTER the glColor4f above,
+	// because the helper reads the fixed-function current colour into uColor.
+	// The client-array state enabled above is left as the legacy path left it
+	// and is disabled below either way, so the fallback stays byte-identical.
+	if (!UICoreDrawArrays(GL_TRIANGLE_FAN, (const float*)p, (const float*)c, 4, -1.f))
+#endif // SHADER_PIPELINE
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);  // 4 v�rtices en total
 
 	// Restaurar el color si fue cambiado

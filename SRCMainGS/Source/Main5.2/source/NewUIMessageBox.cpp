@@ -135,7 +135,7 @@ void SEASON3B::CNewUIMessageBoxBase::RenderMsgBackColor(bool _bRender)
 		glColor4f(m_vColor[0], m_vColor[1], m_vColor[2], m_fOpacityAlpha);
 
 		RenderColor(_fPosX, _fPosY, _fWidth, _fHeight);
-		glEnable(GL_TEXTURE_2D);
+		SetTextureEnabled(true);
 		
 		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 		DisableAlphaBlend();

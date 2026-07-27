@@ -2,9 +2,48 @@
 #include "RenderProfiler.h"
 #include "_define.h"
 #include "Utilities/Log/ErrorReport.h"
+#include <share.h> // _fsopen / _SH_DENYWR for the shared plain-text profiler log
 
 namespace
 {
+	// Plain-text profiler sink. The reports also go to g_ErrorReport, but
+	// MuError.log is XOR-encrypted AND is recreated once it passes 32 KB
+	// (ErrorReport.cpp), so a profiling run overruns it and loses the data.
+	// Mirror every report line into Client\RenderProfiler.log, truncated once
+	// per launch so the file always holds exactly the current session.
+	FILE* ProfilerTextFile()
+	{
+		static FILE* s_file = NULL;
+		static bool s_opened = false;
+		if (!s_opened)
+		{
+			s_opened = true;
+			// _fsopen with _SH_DENYWR, not fopen_s: fopen_s opens exclusively, so
+			// the log could not be read at all while the client was running - which
+			// defeats the point of a live 2-second report.
+			s_file = _fsopen("RenderProfiler.log", "wt", _SH_DENYWR);
+		}
+		return s_file;
+	}
+
+	void ProfilerEmit(const char* format, ...)
+	{
+		char line[1024];
+		va_list args;
+		va_start(args, format);
+		_vsnprintf_s(line, sizeof(line), _TRUNCATE, format, args);
+		va_end(args);
+
+		g_ErrorReport.Write("%s", line);
+
+		FILE* file = ProfilerTextFile();
+		if (file != NULL)
+		{
+			fputs(line, file);
+			fflush(file);
+		}
+	}
+
 	const char* GetSectionName(RenderProfilerSection section)
 	{
 		switch (section)
@@ -20,6 +59,8 @@ namespace
 		case RP_BMD_RENDER_MESH: return "BMD::RenderMesh";
 		case RP_BMD_RENDER_MESH_VBO: return "BMD::RenderMeshVBO";
 		case RP_BMD_RENDER_MESH_LEGACY: return "BMD::RenderMeshLegacy";
+		case RP_BMD_MESH_BUILD: return "BMD::MeshBuildCPU";
+		case RP_BMD_MESH_SUBMIT: return "BMD::MeshSubmitGL";
 		default: return "Unknown";
 		}
 	}
@@ -140,7 +181,14 @@ CRenderProfiler::CRenderProfiler()
 	const DWORD enabledLength = GetEnvironmentVariableA("MU_RENDER_PROFILER", enabledValue, sizeof(enabledValue));
 	const char* commandLine = GetCommandLineA();
 	const bool commandLineEnabled = commandLine != NULL && strstr(commandLine, "-renderprofiler") != NULL;
-	m_enabled = (enabledLength > 0 && enabledLength < sizeof(enabledValue) && atoi(enabledValue) != 0) || commandLineEnabled;
+	// Marker-file enable, same pattern as the gl33* gates: launchers and
+	// protection wrappers re-spawn Main.exe and drop both the environment
+	// variable and the command line, so neither of the two switches above is
+	// reliable in practice. An empty 'renderprofiler.enable' file in the client
+	// working directory always works.
+	const bool markerEnabled = GetFileAttributesA("renderprofiler.enable") != INVALID_FILE_ATTRIBUTES;
+	m_enabled = (enabledLength > 0 && enabledLength < sizeof(enabledValue) && atoi(enabledValue) != 0)
+		|| commandLineEnabled || markerEnabled;
 	m_started = false;
 	m_loadingFrame = false;
 	m_sceneFlag = -1;
@@ -342,7 +390,7 @@ void CRenderProfiler::ReportFrameSamples(const char* name, const double* samples
 	const int p50Index = (sampleCount - 1) * 50 / 100;
 	const int p95Index = (sampleCount - 1) * 95 / 100;
 	const int p99Index = (sampleCount - 1) * 99 / 100;
-	g_ErrorReport.Write("  %-22s samples %d, min %.3f, median %.3f, p95 %.3f, p99 %.3f, max %.3f, mean %.3f ms\r\n",
+	ProfilerEmit("  %-22s samples %d, min %.3f, median %.3f, p95 %.3f, p99 %.3f, max %.3f, mean %.3f ms\r\n",
 		name, sampleCount, sorted[0], sorted[p50Index], sorted[p95Index], sorted[p99Index],
 		sorted[sampleCount - 1], total / (double)sampleCount);
 }
@@ -352,7 +400,7 @@ void CRenderProfiler::ReportAndReset()
 	if (!m_enabled || m_frameCount <= 0)
 		return;
 
-	g_ErrorReport.Write("[RenderProfiler] scene %d, FPS %.0f, frames %d\r\n", m_sceneFlag, m_currentFps, m_frameCount);
+	ProfilerEmit("[RenderProfiler] scene %d, FPS %.0f, frames %d\r\n", m_sceneFlag, m_currentFps, m_frameCount);
 	ReportFrameSamples("FrameTimeStable", m_stableFrameSamples, m_stableFrameSampleCount);
 	ReportFrameSamples("FrameTimeLoading", m_loadingFrameSamples, m_loadingFrameSampleCount);
 
@@ -363,7 +411,7 @@ void CRenderProfiler::ReportAndReset()
 
 		const double avgFrameMs = m_sectionMs[i] / (double)m_frameCount;
 		const double avgCallMs = m_sectionMs[i] / (double)m_sectionCalls[i];
-		g_ErrorReport.Write("  %-22s frame %.3f ms, call %.4f ms, calls/frame %.1f\r\n",
+		ProfilerEmit("  %-22s frame %.3f ms, call %.4f ms, calls/frame %.1f\r\n",
 			GetSectionName((RenderProfilerSection)i), avgFrameMs, avgCallMs,
 			(double)m_sectionCalls[i] / (double)m_frameCount);
 	}
@@ -373,13 +421,13 @@ void CRenderProfiler::ReportAndReset()
 		if (m_counters[i] == 0)
 			continue;
 
-		g_ErrorReport.Write("  %-22s count %llu, per frame %.1f\r\n",
+		ProfilerEmit("  %-22s count %llu, per frame %.1f\r\n",
 			GetCounterName((RenderProfilerCounter)i), m_counters[i],
 			(double)m_counters[i] / (double)m_frameCount);
 	}
 
 	for (int i = 0; i < RPR_RESOURCE_COUNT; ++i)
-		g_ErrorReport.Write("  %-22s live %lld\r\n", GetResourceName((RenderProfilerResource)i), m_liveResources[i]);
+		ProfilerEmit("  %-22s live %lld\r\n", GetResourceName((RenderProfilerResource)i), m_liveResources[i]);
 
 	ResetWindow();
 }

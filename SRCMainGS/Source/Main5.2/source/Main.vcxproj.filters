@@ -1237,6 +1237,9 @@
     <ClCompile Include="RenderProfiler.cpp">
       <Filter>MU\Client\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RenderMatrix.cpp">
+      <Filter>MU\Client\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="supportingfeature.cpp">
       <Filter>MU\Client\Source Files</Filter>
     </ClCompile>
@@ -1258,7 +1261,7 @@
     <ClCompile Include="..\dependencies\ImGui\imgui_widgets.cpp">
       <Filter>MU\Client\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\dependencies\ImGui\backends\imgui_impl_opengl2.cpp">
+    <ClCompile Include="..\dependencies\ImGui\backends\imgui_impl_opengl3.cpp">
       <Filter>MU\Client\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\dependencies\ImGui\backends\imgui_impl_win32.cpp">
@@ -2560,6 +2563,9 @@
       <Filter>MU\Client\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RenderProfiler.h">
+      <Filter>MU\Client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderMatrix.h">
       <Filter>MU\Client\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="supportingfeature.h">

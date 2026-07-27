@@ -328,7 +328,7 @@ void CSprite::Render()
 		if (!TextureEnable) 
 		{
 			TextureEnable = true;
-			::glEnable(GL_TEXTURE_2D);
+			SetTextureEnabled(true);
 		}
 
 		BindTexture(m_nTexID);
@@ -350,7 +350,7 @@ void CSprite::Render()
 		if (TextureEnable) 
 		{
 			TextureEnable = false;
-			::glDisable(GL_TEXTURE_2D);
+			SetTextureEnabled(false);
 		}
 
 		::glBegin(GL_TRIANGLE_FAN);

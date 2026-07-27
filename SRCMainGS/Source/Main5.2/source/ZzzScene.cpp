@@ -11,6 +11,12 @@
 #include "ZzzCharacter.h"
 #include "ZzzLodTerrain.h"
 #include "CShaderScene.h"
+#ifdef SHADER_PIPELINE
+// Phase 15.4 Core character pass, defined in ZzzBMD.cpp. Declared here rather
+// than in ZzzBMD.h so the ISO-8859 header stays byte-untouched.
+bool CharacterCoreBegin();
+void CharacterCoreEnd();
+#endif // SHADER_PIPELINE
 #include "ZzzInterface.h"
 #include "ZzzInventory.h"
 #include "ZzzTexture.h"
@@ -2651,11 +2657,20 @@ bool RenderMainScene()
 		// untouched. Use() binds nothing and returns false if the program is
 		// missing, keeping the fixed-function fallback.
 		bool bCharShader = gShaderScene.Use(eShaderS_Character);
+		// Phase 15.6: arm the Core body-draw path (default ON; opt out with
+		// '-nogl33char' / gl33char.disable). It does NOT rebind the pass program:
+		// the compatibility character program above stays bound for the pass's
+		// shadow and part-effect draws, and each body mesh binds character_core
+		// only for its own draw and restores this program afterwards. Opted out /
+		// program missing -> the pass is byte-for-byte the legacy compat path.
+		bool bCharCore = CharacterCoreBegin();
 #endif // SHADER_PIPELINE
 
 		RenderCharactersClient();
 
 #ifdef SHADER_PIPELINE
+		if (bCharCore)
+			CharacterCoreEnd();
 		if (bCharShader)
 			gShaderScene.Unuse();
 #endif // SHADER_PIPELINE

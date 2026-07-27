@@ -105,8 +105,13 @@ void CShaderGL::Release()
 void CShaderGL::Init()
 {
 	const char* commandLine = GetCommandLineA();
+	// Marker-file gate as well as the flag: the protection wrapper re-spawns
+	// Main.exe and drops the command line, so '-vbotranslate' alone can never be
+	// observed in a normal launch (the same reason the gl33* paths and the render
+	// profiler use marker files).
 	m_TranslatedVboEnabled =
-		commandLine != NULL && strstr(commandLine, "-vbotranslate") != NULL;
+		(commandLine != NULL && strstr(commandLine, "-vbotranslate") != NULL)
+		|| GetFileAttributesA("vbotranslate.on") != INVALID_FILE_ATTRIBUTES;
 
 	InitVBOShaders();
 

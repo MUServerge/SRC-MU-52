@@ -5,7 +5,7 @@
 #include "MonkSystem.h"
 
 #include "imgui_impl_win32.h"
-#include "imgui_impl_opengl2.h"
+#include "imgui_impl_opengl3.h"
 
 #ifdef EFFECT_MNG_HANDLE
 
@@ -134,7 +134,7 @@ void SEASON3B::CGFxEffectHandle::SetButtonInfo()
 void SEASON3B::CGFxEffectHandle::RenderFrame()
 {
 	// Iniciar frame de ImGui
-	ImGui_ImplOpenGL2_NewFrame();
+	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	// Iniciar frame de ImGui
 	ImGui::NewFrame();
@@ -172,7 +172,7 @@ void SEASON3B::CGFxEffectHandle::RenderFrame()
 
 	ImGui::Render();
 
-	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 	//------------------
 	if (selectedItem != -1)

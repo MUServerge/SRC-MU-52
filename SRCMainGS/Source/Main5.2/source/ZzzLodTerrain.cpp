@@ -115,6 +115,181 @@ extern  float CameraDistance;
 static  float   g_fFrustumRange = -40.f;
 
 
+#ifdef SHADER_PIPELINE
+// Phase 14: Core-profile terrain pass (grass + ground base/alpha/blend) via a
+// VBO/VAO + the terrain_core program (explicit attributes/uniforms) instead of
+// the fixed-function GL_QUADS / immediate-mode client-array path. Default ON
+// since it is in-game verified (see GL33TerrainEnabled); the legacy path stays
+// as an opt-OUT fallback. If terrain_core is unavailable on a GPU, the emit
+// helpers fall through to fixed-function, so behavior is safe. The terrain
+// camera, so uModelView = g_ViewMatrix and uProj = g_ProjectionMatrix (both built
+// in ZzzOpenglUtil.cpp); terrain.fs ignores normals so uNormalMatrix is identity.
+extern float g_ProjectionMatrix[16];
+extern float g_ViewMatrix[16];
+
+// Phase 16.8: shared Core-profile effect draw + the tracked fixed-function
+// texture-env combine, both defined in ZzzOpenglUtil.cpp. Declared here (not in
+// the ISO-8859 ZzzOpenglUtil.h) to keep that header byte-untouched.
+// EffectCoreDrawArrays returns false when the Core effect path is off or
+// unavailable, so the caller runs its untouched legacy draw.
+bool EffectCoreDrawArrays(unsigned int mode, const float* pos, const float* tex,
+	const float* col, int vertexCount, int texEnvMode, bool useTexture, float alphaRef);
+extern int g_EffectTexEnvMode;
+
+static bool GL33TerrainEnabled()
+{
+	static int cached = -1;
+	if (cached < 0)
+	{
+		// Phase 14 is done and in-game verified (no z-fight, identical to legacy),
+		// so the Core terrain pass is now the DEFAULT, matching the Core character
+		// path (Phase 15.6). A legacy fallback is kept as an opt-OUT safety valve:
+		// '-nogl33terrain' on the command line, or an empty 'gl33terrain.disable'
+		// marker file in the client working directory (some launchers do not
+		// forward command-line flags, so the file is the reliable override). If a
+		// map regresses, drop the file to restore the fixed-function terrain path
+		// without a rebuild.
+		const char* cmd = GetCommandLineA();
+		bool off = (cmd != NULL && strstr(cmd, "-nogl33terrain") != NULL);
+		if (!off && GetFileAttributesA("gl33terrain.disable") != INVALID_FILE_ATTRIBUTES)
+			off = true;
+		cached = off ? 0 : 1;
+	}
+	return cached != 0;
+}
+
+// ===========================================================================
+// Phase 14.5 (full terrain Core pass). terrain_core is bound ONCE for the whole
+// terrain render (TerrainCoreBegin, from RenderTerrain); every tile fan is then
+// collected through the emit helpers below (tTexCoord/tColor/tVertex, which the
+// Vertex* functions call) and drawn as a GL_TRIANGLE_FAN. All terrain stays on
+// one program -> no fixed-function coplanar overlay -> no z-fight, and no per-quad
+// program switch. Active only under -gl33terrain; otherwise the emit helpers fall
+// through to fixed-function immediate mode (g_bTerrainCoreActive == false).
+// ===========================================================================
+enum { TERRAIN_FAN_MAX = 24 };
+static bool   g_bTerrainCoreActive = false;
+static float  s_fanVerts[TERRAIN_FAN_MAX * 12];   // interleaved pos3/nrm3/tex2/col4
+static int    s_fanCount = 0;
+static float  s_curTex[2] = { 0.f, 0.f };
+static float  s_curCol[4] = { 1.f, 1.f, 1.f, 1.f };
+static GLuint s_fanVao = 0, s_fanVbo = 0;
+
+// Immediate-mode-style emit helpers. In Core mode they accumulate the current
+// vertex into the active fan; otherwise they call fixed-function GL unchanged.
+static inline void tTexCoord(float u, float v)
+{
+	if (g_bTerrainCoreActive) { s_curTex[0] = u; s_curTex[1] = v; return; }
+	glTexCoord2f(u, v);
+}
+static inline void tColor4(float r, float g, float b, float a)
+{
+	if (g_bTerrainCoreActive) { s_curCol[0]=r; s_curCol[1]=g; s_curCol[2]=b; s_curCol[3]=a; return; }
+	glColor4f(r, g, b, a);
+}
+static inline void tColor3fv(const float* c)
+{
+	if (g_bTerrainCoreActive) { s_curCol[0]=c[0]; s_curCol[1]=c[1]; s_curCol[2]=c[2]; s_curCol[3]=1.f; return; }
+	glColor3fv(c);
+}
+static inline void tVertex(const float* p)
+{
+	if (g_bTerrainCoreActive)
+	{
+		if (s_fanCount < TERRAIN_FAN_MAX)
+		{
+			float* d = s_fanVerts + s_fanCount * 12;
+			d[0]=p[0]; d[1]=p[1]; d[2]=p[2];
+			d[3]=0.f; d[4]=0.f; d[5]=1.f;
+			d[6]=s_curTex[0]; d[7]=s_curTex[1];
+			d[8]=s_curCol[0]; d[9]=s_curCol[1]; d[10]=s_curCol[2]; d[11]=s_curCol[3];
+			++s_fanCount;
+		}
+		return;
+	}
+	glVertex3fv(p);
+}
+
+// Fan begin/end used at each terrain draw site (replace glBegin(GL_TRIANGLE_FAN)
+// / glEnd). Legacy immediate mode when the Core path is inactive.
+static inline void TerrainFanBegin()
+{
+	if (g_bTerrainCoreActive) { s_fanCount = 0; return; }
+	glBegin(GL_TRIANGLE_FAN);
+}
+static void TerrainFanEnd()
+{
+	if (g_bTerrainCoreActive)
+	{
+		if (s_fanCount >= 3)
+		{
+			glBindBuffer(GL_ARRAY_BUFFER, s_fanVbo);
+			glBufferSubData(GL_ARRAY_BUFFER, 0, s_fanCount * 12 * (int)sizeof(float), s_fanVerts);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, s_fanCount);
+		}
+		return;
+	}
+	glEnd();
+}
+
+// Bind terrain_core once for the terrain pass and set the shared uniforms; sets
+// g_bTerrainCoreActive so the emit helpers route to the Core fan collector.
+static bool TerrainCoreBegin()
+{
+	if (!GL33TerrainEnabled() || gShaderScene.GetProgram(eShaderS_TerrainCore) == 0)
+		return false;
+	if (!gShaderScene.Use(eShaderS_TerrainCore))
+		return false;
+
+	if (s_fanVao == 0)
+	{
+		const GLsizei stride = 12 * sizeof(float);
+		glGenVertexArrays(1, &s_fanVao);
+		glBindVertexArray(s_fanVao);
+		glGenBuffers(1, &s_fanVbo);
+		glBindBuffer(GL_ARRAY_BUFFER, s_fanVbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(s_fanVerts), NULL, GL_DYNAMIC_DRAW);
+		glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)(0));
+		glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2); glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+		glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
+	}
+	glBindVertexArray(s_fanVao);
+
+	static const float kIdentity3[9] = { 1.f,0.f,0.f, 0.f,1.f,0.f, 0.f,0.f,1.f };
+	gShaderScene.SetMat4("uProj", g_ProjectionMatrix);
+	gShaderScene.SetMat4("uModelView", g_ViewMatrix);
+	gShaderScene.SetMat3("uNormalMatrix", kIdentity3);
+	gShaderScene.SetInt("texture1", 0);
+	gShaderScene.SetFloat("brightness", 1.f);
+	gShaderScene.SetFloat("contrast", 1.f);
+
+	g_bTerrainCoreActive = true;
+
+	static bool s_logged = false;
+	if (!s_logged)
+	{
+		s_logged = true;
+		g_ErrorReport.Write("> [Shader] Core terrain pass active (terrain_core program %u, single bind)\r\n",
+			gShaderScene.GetProgram(eShaderS_TerrainCore));
+	}
+	return true;
+}
+
+// End the Core terrain pass: unbind and restore the previously bound program.
+static void TerrainCoreEnd()
+{
+	if (!g_bTerrainCoreActive)
+		return;
+	g_bTerrainCoreActive = false;
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	gShaderScene.Unuse();
+}
+
+#endif // SHADER_PIPELINE
+
+
 inline int TERRAIN_INDEX(int x, int y)
 {
 	return (y)*TERRAIN_SIZE + (x);
@@ -1425,202 +1600,202 @@ inline void Interpolation(int mx, int my)
 
 inline void Vertex0()
 {
-	glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
-	glColor3fv(PrimaryTerrainLight[TerrainIndex1]);
-	glVertex3fv(TerrainVertex[0]);
+	tTexCoord(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
+	tColor3fv(PrimaryTerrainLight[TerrainIndex1]);
+	tVertex(TerrainVertex[0]);
 }
 
 inline void Vertex1()
 {
-	glTexCoord2f(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
-	glColor3fv(PrimaryTerrainLight[TerrainIndex2]);
-	glVertex3fv(TerrainVertex[1]);
+	tTexCoord(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
+	tColor3fv(PrimaryTerrainLight[TerrainIndex2]);
+	tVertex(TerrainVertex[1]);
 }
 
 inline void Vertex2()
 {
-	glTexCoord2f(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
-	glColor3fv(PrimaryTerrainLight[TerrainIndex3]);
-	glVertex3fv(TerrainVertex[2]);
+	tTexCoord(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
+	tColor3fv(PrimaryTerrainLight[TerrainIndex3]);
+	tVertex(TerrainVertex[2]);
 }
 
 inline void Vertex3()
 {
-	glTexCoord2f(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
-	glColor3fv(PrimaryTerrainLight[TerrainIndex4]);
-	glVertex3fv(TerrainVertex[3]);
+	tTexCoord(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
+	tColor3fv(PrimaryTerrainLight[TerrainIndex4]);
+	tVertex(TerrainVertex[3]);
 }
 
 inline void Vertex01()
 {
-	glTexCoord2f(TerrainTextureCoord01[0], TerrainTextureCoord01[1]);
-	glColor3fv(PrimaryTerrainLight[Index01]);
-	glVertex3fv(TerrainVertex01);
+	tTexCoord(TerrainTextureCoord01[0], TerrainTextureCoord01[1]);
+	tColor3fv(PrimaryTerrainLight[Index01]);
+	tVertex(TerrainVertex01);
 }
 
 inline void Vertex12()
 {
-	glTexCoord2f(TerrainTextureCoord12[0], TerrainTextureCoord12[1]);
-	glColor3fv(PrimaryTerrainLight[Index12]);
-	glVertex3fv(TerrainVertex12);
+	tTexCoord(TerrainTextureCoord12[0], TerrainTextureCoord12[1]);
+	tColor3fv(PrimaryTerrainLight[Index12]);
+	tVertex(TerrainVertex12);
 }
 
 inline void Vertex23()
 {
-	glTexCoord2f(TerrainTextureCoord23[0], TerrainTextureCoord23[1]);
-	glColor3fv(PrimaryTerrainLight[Index23]);
-	glVertex3fv(TerrainVertex23);
+	tTexCoord(TerrainTextureCoord23[0], TerrainTextureCoord23[1]);
+	tColor3fv(PrimaryTerrainLight[Index23]);
+	tVertex(TerrainVertex23);
 }
 
 inline void Vertex30()
 {
-	glTexCoord2f(TerrainTextureCoord30[0], TerrainTextureCoord30[1]);
-	glColor3fv(PrimaryTerrainLight[Index30]);
-	glVertex3fv(TerrainVertex30);
+	tTexCoord(TerrainTextureCoord30[0], TerrainTextureCoord30[1]);
+	tColor3fv(PrimaryTerrainLight[Index30]);
+	tVertex(TerrainVertex30);
 }
 
 inline void Vertex02()
 {
-	glTexCoord2f(TerrainTextureCoord02[0], TerrainTextureCoord02[1]);
-	glColor3fv(PrimaryTerrainLight[Index02]);
-	glVertex3fv(TerrainVertex02);
+	tTexCoord(TerrainTextureCoord02[0], TerrainTextureCoord02[1]);
+	tColor3fv(PrimaryTerrainLight[Index02]);
+	tVertex(TerrainVertex02);
 }
 
 inline void VertexAlpha0()
 {
-	glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
+	tTexCoord(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
 	float* Light = &PrimaryTerrainLight[TerrainIndex1][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex1]);
-	glVertex3fv(TerrainVertex[0]);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex1]);
+	tVertex(TerrainVertex[0]);
 }
 
 inline void VertexAlpha1()
 {
-	glTexCoord2f(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
+	tTexCoord(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
 	float* Light = &PrimaryTerrainLight[TerrainIndex2][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex2]);
-	glVertex3fv(TerrainVertex[1]);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex2]);
+	tVertex(TerrainVertex[1]);
 }
 
 inline void VertexAlpha2()
 {
-	glTexCoord2f(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
+	tTexCoord(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
 	float* Light = &PrimaryTerrainLight[TerrainIndex3][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex3]);
-	glVertex3fv(TerrainVertex[2]);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex3]);
+	tVertex(TerrainVertex[2]);
 }
 
 inline void VertexAlpha3()
 {
-	glTexCoord2f(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
+	tTexCoord(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
 	float* Light = &PrimaryTerrainLight[TerrainIndex4][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex4]);
-	glVertex3fv(TerrainVertex[3]);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha[TerrainIndex4]);
+	tVertex(TerrainVertex[3]);
 }
 
 inline void VertexAlpha01()
 {
-	glTexCoord2f(TerrainTextureCoord01[0], TerrainTextureCoord01[1]);
+	tTexCoord(TerrainTextureCoord01[0], TerrainTextureCoord01[1]);
 	float* Light = &PrimaryTerrainLight[Index01][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha01);
-	glVertex3fv(TerrainVertex01);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha01);
+	tVertex(TerrainVertex01);
 }
 
 inline void VertexAlpha12()
 {
-	glTexCoord2f(TerrainTextureCoord12[0], TerrainTextureCoord12[1]);
+	tTexCoord(TerrainTextureCoord12[0], TerrainTextureCoord12[1]);
 	float* Light = &PrimaryTerrainLight[Index12][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha12);
-	glVertex3fv(TerrainVertex12);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha12);
+	tVertex(TerrainVertex12);
 }
 
 inline void VertexAlpha23()
 {
-	glTexCoord2f(TerrainTextureCoord23[0], TerrainTextureCoord23[1]);
+	tTexCoord(TerrainTextureCoord23[0], TerrainTextureCoord23[1]);
 	float* Light = &PrimaryTerrainLight[Index23][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha23);
-	glVertex3fv(TerrainVertex23);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha23);
+	tVertex(TerrainVertex23);
 }
 
 inline void VertexAlpha30()
 {
-	glTexCoord2f(TerrainTextureCoord30[0], TerrainTextureCoord30[1]);
+	tTexCoord(TerrainTextureCoord30[0], TerrainTextureCoord30[1]);
 	float* Light = &PrimaryTerrainLight[Index30][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha30);
-	glVertex3fv(TerrainVertex30);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha30);
+	tVertex(TerrainVertex30);
 }
 
 inline void VertexAlpha02()
 {
-	glTexCoord2f(TerrainTextureCoord02[0], TerrainTextureCoord02[1]);
+	tTexCoord(TerrainTextureCoord02[0], TerrainTextureCoord02[1]);
 	float* Light = &PrimaryTerrainLight[Index02][0];
-	glColor4f(Light[0], Light[1], Light[2], TerrainMappingAlpha02);
-	glVertex3fv(TerrainVertex02);
+	tColor4(Light[0], Light[1], Light[2], TerrainMappingAlpha02);
+	tVertex(TerrainVertex02);
 }
 
 inline void VertexBlend0()
 {
-	glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
+	tTexCoord(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
 	float Light = TerrainMappingAlpha[TerrainIndex1];
-	glColor3f(Light, Light, Light);
-	glVertex3fv(TerrainVertex[0]);
+	tColor4(Light, Light, Light, 1.f);
+	tVertex(TerrainVertex[0]);
 }
 
 inline void VertexBlend1()
 {
-	glTexCoord2f(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
+	tTexCoord(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
 	float Light = TerrainMappingAlpha[TerrainIndex2];
-	glColor3f(Light, Light, Light);
-	glVertex3fv(TerrainVertex[1]);
+	tColor4(Light, Light, Light, 1.f);
+	tVertex(TerrainVertex[1]);
 }
 
 inline void VertexBlend2()
 {
-	glTexCoord2f(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
+	tTexCoord(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
 	float Light = TerrainMappingAlpha[TerrainIndex3];
-	glColor3f(Light, Light, Light);
-	glVertex3fv(TerrainVertex[2]);
+	tColor4(Light, Light, Light, 1.f);
+	tVertex(TerrainVertex[2]);
 }
 
 inline void VertexBlend3()
 {
-	glTexCoord2f(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
+	tTexCoord(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
 	float Light = TerrainMappingAlpha[TerrainIndex4];
-	glColor3f(Light, Light, Light);
-	glVertex3fv(TerrainVertex[3]);
+	tColor4(Light, Light, Light, 1.f);
+	tVertex(TerrainVertex[3]);
 }
 
 void Vertex__alpha0(float Alpha, bool Normal)
 {
-	glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
-	glColor4f(PrimaryTerrainLight[TerrainIndex1][0], PrimaryTerrainLight[TerrainIndex1][1], PrimaryTerrainLight[TerrainIndex1][2], Alpha);
-	glVertex3fv(TerrainVertex[0]);
-	if (Normal) glNormal3fv(TerrainNormal[TerrainIndex1]);
+	tTexCoord(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
+	tColor4(PrimaryTerrainLight[TerrainIndex1][0], PrimaryTerrainLight[TerrainIndex1][1], PrimaryTerrainLight[TerrainIndex1][2], Alpha);
+	tVertex(TerrainVertex[0]);
+	if (Normal && !g_bTerrainCoreActive) glNormal3fv(TerrainNormal[TerrainIndex1]);
 }
 
 void Vertex__alpha1(float Alpha, bool Normal)
 {
-	glTexCoord2f(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
-	glColor4f(PrimaryTerrainLight[TerrainIndex2][0], PrimaryTerrainLight[TerrainIndex2][1], PrimaryTerrainLight[TerrainIndex2][2], Alpha);
-	glVertex3fv(TerrainVertex[1]);
-	if (Normal) glNormal3fv(TerrainNormal[TerrainIndex2]);
+	tTexCoord(TerrainTextureCoord[1][0], TerrainTextureCoord[1][1]);
+	tColor4(PrimaryTerrainLight[TerrainIndex2][0], PrimaryTerrainLight[TerrainIndex2][1], PrimaryTerrainLight[TerrainIndex2][2], Alpha);
+	tVertex(TerrainVertex[1]);
+	if (Normal && !g_bTerrainCoreActive) glNormal3fv(TerrainNormal[TerrainIndex2]);
 }
 
 void Vertex__alpha2(float Alpha, bool Normal)
 {
-	glTexCoord2f(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
-	glColor4f(PrimaryTerrainLight[TerrainIndex3][0], PrimaryTerrainLight[TerrainIndex3][1], PrimaryTerrainLight[TerrainIndex3][2], Alpha);
-	glVertex3fv(TerrainVertex[2]);
-	if (Normal) glNormal3fv(TerrainNormal[TerrainIndex3]);
+	tTexCoord(TerrainTextureCoord[2][0], TerrainTextureCoord[2][1]);
+	tColor4(PrimaryTerrainLight[TerrainIndex3][0], PrimaryTerrainLight[TerrainIndex3][1], PrimaryTerrainLight[TerrainIndex3][2], Alpha);
+	tVertex(TerrainVertex[2]);
+	if (Normal && !g_bTerrainCoreActive) glNormal3fv(TerrainNormal[TerrainIndex3]);
 }
 
 void Vertex__alpha3(float Alpha, bool Normal)
 {
-	glTexCoord2f(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
-	glColor4f(PrimaryTerrainLight[TerrainIndex4][0], PrimaryTerrainLight[TerrainIndex4][1], PrimaryTerrainLight[TerrainIndex4][2], Alpha);
-	glVertex3fv(TerrainVertex[3]);
+	tTexCoord(TerrainTextureCoord[3][0], TerrainTextureCoord[3][1]);
+	tColor4(PrimaryTerrainLight[TerrainIndex4][0], PrimaryTerrainLight[TerrainIndex4][1], PrimaryTerrainLight[TerrainIndex4][2], Alpha);
+	tVertex(TerrainVertex[3]);
 
-	if (Normal) glNormal3fv(TerrainNormal[TerrainIndex4]);
+	if (Normal && !g_bTerrainCoreActive) glNormal3fv(TerrainNormal[TerrainIndex4]);
 }
 
 void RenderFace(int Texture, int mx, int my)
@@ -1686,21 +1861,21 @@ void RenderFace(int Texture, int mx, int my)
 		if ((TerrainWall[TerrainIndex1] & TW_ATT5) != 0)
 		{
 			BindTexture(BITMAP_map_texture08);
-			glBegin(GL_TRIANGLE_FAN);
+			TerrainFanBegin();
 			Vertex__alpha0(0.4000000, true);
 			Vertex__alpha1(0.4000000, true);
 			Vertex__alpha2(0.4000000, true);
 			Vertex__alpha3(0.4000000, true);
-			glEnd();
+			TerrainFanEnd();
 
 			EnableAlphaTest(true);
 			BindTexture(BITMAP_MAPTILE + Texture);
-			glBegin(GL_TRIANGLE_FAN);
+			TerrainFanBegin();
 			Vertex__alpha0((1.000000 - 0.4000000), false);
 			Vertex__alpha1((1.000000 - 0.4000000), false);
 			Vertex__alpha2((1.000000 - 0.4000000), false);
 			Vertex__alpha3((1.000000 - 0.4000000), false);
-			glEnd();
+			TerrainFanEnd();
 			return;
 		}
 	}
@@ -1713,12 +1888,12 @@ void RenderFace(int Texture, int mx, int my)
 	}
 
 	BindTexture(BITMAP_MAPTILE + Texture);
-	glBegin(GL_TRIANGLE_FAN);
+	TerrainFanBegin();
 	Vertex0();
 	Vertex1();
 	Vertex2();
 	Vertex3();
-	glEnd();
+	TerrainFanEnd();
 }
 
 void RenderFace_After(int Texture, int mx, int my)
@@ -1734,12 +1909,12 @@ void RenderFace_After(int Texture, int mx, int my)
 
 			BindTexture(BITMAP_MAPTILE + Texture);
 
-			glBegin(GL_TRIANGLE_FAN);
+			TerrainFanBegin();
 			Vertex0();
 			Vertex1();
 			Vertex2();
 			Vertex3();
-			glEnd();
+			TerrainFanEnd();
 		}
 	}
 }
@@ -1751,12 +1926,12 @@ void RenderFaceAlpha(int Texture, int mx, int my)
 		EnableAlphaTest();
 		BindTexture(BITMAP_MAPTILE + Texture);
 
-		glBegin(GL_TRIANGLE_FAN);
+		TerrainFanBegin();
 		VertexAlpha0();
 		VertexAlpha1();
 		VertexAlpha2();
 		VertexAlpha3();
-		glEnd();
+		TerrainFanEnd();
 	}
 
 }
@@ -1768,12 +1943,12 @@ void RenderFaceBlend(int Texture, int mx, int my)
 		EnableAlphaBlend();
 		BindTexture(BITMAP_MAPTILE + Texture);
 
-		glBegin(GL_TRIANGLE_FAN);
+		TerrainFanBegin();
 		VertexBlend0();
 		VertexBlend1();
 		VertexBlend2();
 		VertexBlend3();
-		glEnd();
+		TerrainFanEnd();
 	}
 }
 
@@ -1958,6 +2133,23 @@ void RenderTerrainFace(float xf, float yf, int xi, int yi, float lodf)
 					colors[i][2] = PrimaryTerrainLight[terrain_index[i]][2];
 				}
 
+#ifdef SHADER_PIPELINE
+				if (g_bTerrainCoreActive)
+				{
+					// Grass quad through the single-bind Core terrain pass. GL_QUADS
+					// order 0,1,2,3 == a 4-vertex GL_TRIANGLE_FAN (same two triangles).
+					TerrainFanBegin();
+					for (int gi = 0; gi < 4; ++gi)
+					{
+						tTexCoord(TerrainTextureCoord[gi][0], TerrainTextureCoord[gi][1]);
+						tColor4(colors[gi][0], colors[gi][1], colors[gi][2], colors[gi][3]);
+						tVertex(TerrainVertex[gi]);
+					}
+					TerrainFanEnd();
+				}
+				else
+#endif
+				{
 				glEnableClientState(GL_VERTEX_ARRAY);
 				glEnableClientState(GL_COLOR_ARRAY);
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -1971,6 +2163,7 @@ void RenderTerrainFace(float xf, float yf, int xi, int yi, float lodf)
 				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 				glDisableClientState(GL_COLOR_ARRAY);
 				glDisableClientState(GL_VERTEX_ARRAY);
+				}
 
 				//glBegin(GL_QUADS);
 				//glTexCoord2f(TerrainTextureCoord[0][0], TerrainTextureCoord[0][1]);
@@ -2209,6 +2402,62 @@ void RenderTerrainBitmapTile(float xf, float yf, float lodf, int lodi, vec3_t c[
 		VectorCopy(PrimaryTerrainLight[TerrainIndex3], Light[2]);
 		VectorCopy(PrimaryTerrainLight[TerrainIndex4], Light[3]);
 	}
+
+#ifdef SHADER_PIPELINE
+	// Phase 16.8: route the ground-decal tile (magic circles, AoE markers and the
+	// other RenderTerrainBitmap / RenderTerrainAlphaBitmap overlays) through
+	// effect_core. Same primitive, same 4 vertices, same order as the fan below.
+	// When LightEnable is false the legacy loop emits no glColor at all, so the
+	// tile takes the fixed-function current colour that the caller set once before
+	// its tile loop - read it back and put it in the vertex colours. Note
+	// glColor3fv sets alpha to 1, which is why the Alpha == 1 branch does too.
+	{
+		float col[4 * 4];
+		if (LightEnable)
+		{
+			for (int i = 0; i < 4; i++)
+			{
+				col[i * 4 + 0] = Light[i][0];
+				col[i * 4 + 1] = Light[i][1];
+				col[i * 4 + 2] = Light[i][2];
+				col[i * 4 + 3] = (Alpha == 1.f) ? 1.f : Alpha;
+			}
+		}
+		else
+		{
+			float cur[4] = { 1.f, 1.f, 1.f, 1.f };
+			glGetFloatv(GL_CURRENT_COLOR, cur);
+			for (int i = 0; i < 4; i++)
+			{
+				col[i * 4 + 0] = cur[0];
+				col[i * 4 + 1] = cur[1];
+				col[i * 4 + 2] = cur[2];
+				col[i * 4 + 3] = cur[3];
+			}
+		}
+		float tex[4 * 2];
+		for (int i = 0; i < 4; i++)
+		{
+			tex[i * 2 + 0] = c[i][0];
+			tex[i * 2 + 1] = c[i][1];
+		}
+		if (EffectCoreDrawArrays(GL_TRIANGLE_FAN, (const float*)TerrainVertex, tex,
+			col, 4, g_EffectTexEnvMode, TextureEnable, -1.f))
+		{
+			// The legacy loop leaves the fixed-function current colour at the last
+			// vertex colour when LightEnable is set, and later draws inherit it.
+			// The Core path sets no glColor, so reproduce that trailing state.
+			if (LightEnable)
+			{
+				if (Alpha == 1.f)
+					glColor3fv(Light[3]);
+				else
+					glColor4f(Light[3][0], Light[3][1], Light[3][2], Alpha);
+			}
+			return;
+		}
+	}
+#endif // SHADER_PIPELINE
 
 	glBegin(GL_TRIANGLE_FAN);
 	for (int i = 0; i < 4; i++)
@@ -3104,7 +3353,12 @@ void RenderTerrain(bool EditFlag)
 	// which are drawn inside RenderTerrainFace). Game render only - the map
 	// editor path keeps the plain fixed-function look. Use() binds nothing and
 	// returns false if the terrain program failed to load, so we fall back safely.
-	bool bTerrainShader = (!EditFlag) && gShaderScene.Use(eShaderS_Terrain);
+	// Phase 14.5: prefer the single-bind Core terrain pass (every tile through
+	// terrain_core, so no fixed-function coplanar overlay -> no z-fight). Falls back
+	// to the compat terrain program, then fixed-function, so the default run
+	// (no -gl33terrain) is unchanged.
+	bool bTerrainCore = (!EditFlag) && TerrainCoreBegin();
+	bool bTerrainShader = (!bTerrainCore) && (!EditFlag) && gShaderScene.Use(eShaderS_Terrain);
 #endif // SHADER_PIPELINE
 
 	TerrainFlag = TERRAIN_MAP_NORMAL;
@@ -3124,7 +3378,9 @@ void RenderTerrain(bool EditFlag)
 		}
 #ifdef SHADER_PIPELINE
 		// Stop shading before the 3D pointers/markers below.
-		if (bTerrainShader)
+		if (bTerrainCore)
+			TerrainCoreEnd();
+		else if (bTerrainShader)
 			gShaderScene.Unuse();
 #endif // SHADER_PIPELINE
 		DisableDepthTest();

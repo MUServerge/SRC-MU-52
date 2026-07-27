@@ -1869,7 +1869,7 @@ void CUIPhotoViewer::RenderPhotoCharacter()
 	Vector(0.0f, 0.0f, m_fCurrentAngle, o->Angle);
 
 	glDisable(GL_ALPHA_TEST);
-	glEnable(GL_TEXTURE_2D);
+	SetTextureEnabled(true);
 	EnableDepthTest();
 	EnableCullFace();
 	EnableDepthMask();

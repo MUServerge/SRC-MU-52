@@ -1631,10 +1631,11 @@ void CMapManager::OpenFileTile(const char* WorldName)
 	sprintf(FileName, "%s\\TileRock07.jpg", WorldName);
 	LoadBitmap(FileName, BITMAP_MAPTILE + 13, GL_NEAREST_MIPMAP_NEAREST, GL_REPEAT, false);
 
-
-	sprintf_s(FileName, "%s\\AlphaTile01.Tga", WorldName);
-	LoadBitmap(FileName, BITMAP_MAPTILE + 14, GL_NEAREST_MIPMAP_NEAREST, GL_REPEAT, false, false);
-
+	// Tile slots +14..+48 are ExtTile01..ExtTile35. The loop below (index 13+i,
+	// i from 1) already loads ExtTile01 into +14; a prior AlphaTile01 load into
+	// the same slot was dead (overwritten where ExtTile01 exists, force-unloaded
+	// into an empty slot where it does not -> the World95/World75 "AlphaTile01
+	// (30270)->ExtTile01" log lines). Removed to match the reference terrain load.
 	for (int i = 1; i <= 35; i++)
 	{
 		sprintf_s(FileName, "%s\\ExtTile%02d.jpg", WorldName, i);
