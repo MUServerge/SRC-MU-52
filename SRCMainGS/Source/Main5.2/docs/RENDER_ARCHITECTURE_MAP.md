@@ -148,6 +148,56 @@ available answer.
 
 ---
 
+## 4b. The multi-pass glow is a fixed-function artefact, not a design
+
+This is the finding that reframes everything above.
+
+A glowing item draws the SAME geometry three times:
+
+| pass | texture | texcoord source |
+|---|---|---|
+| base | the item's own texture | the mesh's UVs |
+| `RENDER_CHROME` | `BITMAP_CHROME` | generated from the transformed normal (a fake reflection) |
+| `RENDER_METAL` | `BITMAP_SHINY` | generated from the transformed normal |
+
+The two overlays are additively blended layers over the base. That is a
+**fixed-function multi-pass technique**: with a single texture-combine stage,
+the only way to layer was to re-draw the geometry. A shader has no such limit -
+it can sample all three textures in one pass and combine them itself.
+
+So the three passes are not a requirement of the effect. They are a workaround
+for hardware constraints that no longer apply, and every problem in this
+document follows from them:
+
+- **Cost.** Glowing items multiply the mesh-draw count, which section 2 shows is
+  the entire frame budget. Collapsing to one pass removes two thirds of the
+  draws for exactly the objects that are most expensive.
+- **The path split.** With no overlay pass there is no second draw to disagree
+  with the base, so the z-fight that breaks the glow becomes impossible by
+  construction rather than something to be prevented.
+- **The VBO gate.** Every mesh can then take the same path; the material no
+  longer decides.
+
+Attempts to reconcile the three-pass structure with the VBO path -
+`chromeFollowsBase`, a per-mesh path record, a multi-pass registry - were all
+treating the symptom. They tried to make two paths agree instead of removing the
+second one. None of them are in the tree.
+
+### Shape of the correct version
+
+One draw per mesh. `Model.vs` already computes the transformed normal, so the
+chrome and shiny coordinates are available there for free. `Model.fs` samples
+the base texture plus whichever overlay layers the material asks for and adds
+them, with the per-layer brightness the current passes carry in `BodyLight`.
+The material description (which layers, which textures, what factors) is
+uniform data per draw instead of a sequence of `RenderBody` / `RenderMesh`
+calls in `RenderPartObjectEffect`.
+
+The work is real - a fragment shader with multi-texture layering plus material
+plumbing - but it replaces a structure rather than patching one, and it is the
+same change the community means by "shader rewriting" when they report stable
+60 FPS on old hardware.
+
 ## 5. State ownership (the recurring trap)
 
 The renderer is ordered global state with **several independent writers**.
