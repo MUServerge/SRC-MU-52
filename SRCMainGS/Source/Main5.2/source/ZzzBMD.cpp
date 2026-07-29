@@ -78,6 +78,69 @@ struct DeferredCpuTransformContext
 
 static DeferredCpuTransformContext g_DeferredCpuTransform = {};
 
+// Single-pass item glow: the material a mesh is drawn WITH, instead of a
+// sequence of extra passes drawn OVER it. See
+// docs/RENDER_ARCHITECTURE_MAP.md section 4b.
+//
+// The old shape was: draw the mesh, then draw it again with BITMAP_CHROME and
+// additive blending, then again with BITMAP_SHINY. Three draws of one surface,
+// because fixed-function had a single texture-combine stage. Model.fs samples
+// all three layers itself, so the extra draws become two colours and two
+// texture ids on the one draw that was always going to happen.
+//
+// Zeroed by default, which is what every current call site produces, so this is
+// inert until the RenderPartObjectEffect sequence is collapsed onto it.
+struct VboGlowMaterial
+{
+	float Chrome[3];   // strength of the BITMAP_CHROME layer, 0 = layer off
+	float Shiny[3];    // strength of the BITMAP_SHINY layer, 0 = layer off
+	int   ChromeTexture;
+	int   ShinyTexture;
+};
+
+static VboGlowMaterial g_VboGlowMaterial = {};
+
+// Set for the next mesh draw and cleared after it, so a material can never leak
+// onto an unrelated mesh - the failure mode that made the effect path paint one
+// draw's state onto another.
+void SetVboGlowMaterial(const float* chrome, const float* shiny,
+	int chromeTexture, int shinyTexture)
+{
+	for (int i = 0; i < 3; ++i)
+	{
+		g_VboGlowMaterial.Chrome[i] = chrome ? chrome[i] : 0.f;
+		g_VboGlowMaterial.Shiny[i] = shiny ? shiny[i] : 0.f;
+	}
+	g_VboGlowMaterial.ChromeTexture = chromeTexture;
+	g_VboGlowMaterial.ShinyTexture = shinyTexture;
+}
+
+void ClearVboGlowMaterial()
+{
+	VboGlowMaterial empty = {};
+	g_VboGlowMaterial = empty;
+}
+
+namespace
+{
+	bool GlowLayerActive(const float* c)
+	{
+		return c[0] != 0.f || c[1] != 0.f || c[2] != 0.f;
+	}
+
+	// Bind a layer texture to its own unit. Unit 0 stays the base texture the
+	// caller already bound, and the active unit is restored to 0 afterwards so
+	// nothing downstream sees a changed selector.
+	void BindGlowLayer(int textureUnit, int tex)
+	{
+		if (tex < 0)
+			return;
+		glActiveTexture(GL_TEXTURE0 + textureUnit);
+		glBindTexture(GL_TEXTURE_2D, Bitmaps[tex].TextureNumber);
+		glActiveTexture(GL_TEXTURE0);
+	}
+}
+
 static bool IsVboSceneEnabled()
 {
 	return SceneFlag == MAIN_SCENE;
@@ -3902,6 +3965,28 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 			matrixSnapshot->BodyTransformUploaded = true;
 	}
 	gShaderGL->vboSetInt("uTexture", 0); // texture already bound by the caller
+
+	// Glow layers. Written on EVERY draw including the zeroed case: these live in
+	// the shared Model program, so skipping the clear would leak one mesh's glow
+	// onto the next.
+	const bool chromeOn = GlowLayerActive(g_VboGlowMaterial.Chrome);
+	const bool shinyOn = GlowLayerActive(g_VboGlowMaterial.Shiny);
+
+	gShaderGL->vboSetVec4("uChromeColor", g_VboGlowMaterial.Chrome[0],
+		g_VboGlowMaterial.Chrome[1], g_VboGlowMaterial.Chrome[2], 0.f);
+	gShaderGL->vboSetVec4("uShinyColor", g_VboGlowMaterial.Shiny[0],
+		g_VboGlowMaterial.Shiny[1], g_VboGlowMaterial.Shiny[2], 0.f);
+
+	if (chromeOn)
+	{
+		BindGlowLayer(1, g_VboGlowMaterial.ChromeTexture);
+		gShaderGL->vboSetInt("uChromeTex", 1);
+	}
+	if (shinyOn)
+	{
+		BindGlowLayer(2, g_VboGlowMaterial.ShinyTexture);
+		gShaderGL->vboSetInt("uShinyTex", 2);
+	}
 
 	RenderProfilerBindVertexArray(m->VAO);
 	glDrawElements(GL_TRIANGLES, m->VBO_ElementCount, GL_UNSIGNED_SHORT, 0);
