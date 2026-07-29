@@ -2353,8 +2353,27 @@ void BMD::AddMeshShadowTriangles(const int blendMesh, const int hiddenMesh, cons
 }
 
 
+// The projected character/object ground shadow SHIMMERS during movement - worst
+// on the Apostle Devin NPC and on the character up close. Diagnosed over several
+// rounds: it is NOT z-fighting (polygon offset and disabling GL_DEPTH_TEST both
+// changed nothing, and CalcShadowPosition snaps every vertex to
+// RequestTerrainHeight(x,y)+5). The flattened-mesh silhouette produces
+// near-degenerate triangles whose pixel coverage flips frame to frame, and this
+// fork draws them OPAQUE black, double-sided (DisableCullFace), with no stencil,
+// so every flip shows as hard black on/off.
+//
+// A working 5.2 reference draws the same shadow TRANSLUCENT (glColor4f(0,0,0,0.35),
+// blended) with GL_STENCIL_TEST + glStencilOp(GL_KEEP,GL_KEEP,GL_INCR) and keeps
+// culling on. Reproducing that needs the stencil func and per-frame stencil clear
+// this fork does not set, so it is real work, not a flag flip.
+//
+// Until then the shadow is OFF: no shadow reads better than one that strobes.
+bool g_bDrawCharacterShadow = false;
+
 void BMD::RenderBodyShadow(int BlendMesh, int HiddenMesh, int StartMeshNumber, int EndMeshNumber, void* pClothes, int ClothesCount)
 {
+	if (!g_bDrawCharacterShadow)
+		return;
 	if (NumMeshs == 0)
 		return;
 
