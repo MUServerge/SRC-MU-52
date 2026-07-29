@@ -28,6 +28,11 @@ uniform int u_translate;
 
 out vec2 vTex;
 out vec4 vColor;
+// Reflection coordinates for the single-pass item glow. The overlay passes
+// recomputed these on the CPU every frame (ZzzBMD.cpp g_chrome) only because a
+// separate draw had no other way to reach the transformed normal; it is
+// already here, so they cost nothing.
+out vec2 vChromeTex;
 
 vec3 ApplyBonePosition(vec3 pos, uint boneIndex)
 {
@@ -60,6 +65,13 @@ void main()
     }
 
     vTex = aTex;
+
+    // The reflection mapping the chrome/metal layers use: the normal projected
+    // straight into texture space. Length is meaningless for a reflection
+    // direction, only orientation is, so the unit normal is the right input
+    // here even though the lighting term below wants the raw one.
+    vec3 reflectNormal = normalize(normal);
+    vChromeTex = vec2(reflectNormal.z * 0.5 + 0.2, reflectNormal.y * 0.5 + 0.5);
 
     // Match the legacy fixed-function lighting exactly (ZzzBMD.cpp RenderMesh /
     // BMD::Transform): body colour modulated per-vertex by clamp(dot(N,L)*0.8+0.4, min 0.2)
