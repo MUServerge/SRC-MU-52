@@ -610,8 +610,7 @@ void CGMInvasionManager::RenderNotifyIcon(float fAgX, float fAgY, float fAgW)
 	m_ShieldIconY = iconY;
 	m_CharacterIconX = m_ShieldIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
 	m_CharacterIconY = iconY;
-	const float effectMargin = (NOTIFY_EFFECT_SIZE - NOTIFY_ICON_SIZE) * 0.5f;
-	m_NotifyIconX = m_CharacterIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X - effectMargin;
+	m_NotifyIconX = m_CharacterIconX - NOTIFY_ICON_SIZE - NOTIFY_ICON_GAP_X;
 	m_NotifyIconY = iconY;
 
 	struct HUD_ICON_DRAW

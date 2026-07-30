@@ -2756,6 +2756,7 @@ bool GetAttackDamage(int* iMinDamage, int* iMaxDamage)
 
 void RenderSkillInfo(int sx, int sy, int Type, int SkillNum, int iRenderPoint /*= STRP_NONE*/)
 {
+	const int TooltipAnchorY = sy;
 	char lpszName[256];
 	int  iMinDamage, iMaxDamage;
 	int  HeroClass = gCharacterManager.GetBaseClass(Hero->Class);
@@ -3165,7 +3166,173 @@ void RenderSkillInfo(int sx, int sy, int Type, int SkillNum, int iRenderPoint /*
 		int Height = ((TextNum - SkipNum) * TextSize.cy + SkipNum * TextSize.cy / 2) / g_fScreenRate_y;
 		sy -= Height;
 	}
-	RenderTipTextList(sx, sy, TextNum, 0, RT3_SORT_CENTER, iRenderPoint, TRUE, false, gmProtect->LookAndFeel == 5);
+	if (gmProtect->LookAndFeel == 5)
+	{
+		const float BoxWidth = 150.f;
+		const float HeaderHeight = 34.f;
+		const float RowHeight = 9.f;
+		const float FooterPadding = 5.f;
+		const float ScreenMargin = 2.f;
+		const float TextPadding = 7.f;
+		const float ValueColumnWidth = 58.f;
+		const float HudGap = 4.f;
+		int FirstStat = 2;
+		int LastStat = FirstStat;
+
+		while (LastStat < TextNum && TextList[LastStat][0] != '\n')
+			LastStat++;
+
+		int StatCount = LastStat - FirstStat;
+		int FirstNote = LastStat + 1;
+		int LastNote = FirstNote;
+		while (LastNote < TextNum && TextList[LastNote][0] != '\n')
+			LastNote++;
+		int NoteCount = LastNote - FirstNote;
+		int RequirementCount = 0;
+		if (SkillAttribute[SkillType].Energy > 0)
+			RequirementCount++;
+		if (SkillAttribute[SkillType].Charisma > 0)
+			RequirementCount++;
+		if (SkillAttribute[SkillType].Strength > 0)
+			RequirementCount++;
+		if (SkillAttribute[SkillType].Dexterity > 0)
+			RequirementCount++;
+
+		const float BodyHeight = max(1, StatCount) * RowHeight + 6.f;
+		const int FooterRowCount = NoteCount + RequirementCount;
+		const float FooterHeight = FooterRowCount > 0 ? FooterRowCount * RowHeight + FooterPadding * 2.f : 0.f;
+		const float BoxHeight = HeaderHeight + BodyHeight + FooterHeight;
+		const float ScreenWidth = (float)WindowWidth / g_fScreenRate_x;
+		const float ScreenHeight = (float)WindowHeight / g_fScreenRate_y;
+		float BoxX = sx - BoxWidth * 0.5f;
+		const float HudAgTop = GetWindowsY - 57.f;
+		const float TooltipBottomY = (iRenderPoint == STRP_NONE) ? HudAgTop - HudGap : (float)TooltipAnchorY;
+		float BoxY = TooltipBottomY - BoxHeight;
+
+		BoxX = max(ScreenMargin, min(ScreenWidth - BoxWidth - ScreenMargin, BoxX));
+		BoxY = max(ScreenMargin, min(ScreenHeight - BoxHeight - ScreenMargin, BoxY));
+
+		HudTooltip::RenderBoxScreen(BoxX * g_fScreenRate_x, BoxY * g_fScreenRate_y,
+			BoxWidth * g_fScreenRate_x, BoxHeight * g_fScreenRate_y, 0.96f);
+
+		EnableAlphaTest(false);
+		glColor4f(0.35f, 0.29f, 0.10f, 0.85f);
+		RenderColor(BoxX * g_fScreenRate_x, (BoxY + HeaderHeight) * g_fScreenRate_y,
+			BoxWidth * g_fScreenRate_x, 1.f, 0.f, 0, false);
+		if (FooterRowCount > 0)
+		{
+			RenderColor(BoxX * g_fScreenRate_x, (BoxY + HeaderHeight + BodyHeight) * g_fScreenRate_y,
+				BoxWidth * g_fScreenRate_x, 1.f, 0.f, 0, false);
+		}
+		EndRenderColor();
+
+		HudTooltip::RenderBoxScreen((BoxX + TextPadding) * g_fScreenRate_x, (BoxY + 5.f) * g_fScreenRate_y,
+			24.f * g_fScreenRate_x, 24.f * g_fScreenRate_y, 0.80f);
+		g_pSkillList->RenderSkillIcon(Type, BoxX + TextPadding + 4.5f, BoxY + 6.5f, 15.f, 21.f, false);
+
+		const HFONT OldFont = g_pRenderText->GetFont();
+		const DWORD OldTextColor = g_pRenderText->GetTextColor();
+		const DWORD OldBgColor = g_pRenderText->GetBgColor();
+		g_pRenderText->SetBgColor(0, 0, 0, 0);
+		g_pRenderText->SetFont(g_hFontBold);
+		g_pRenderText->SetTextColor(RGBA(208, 224, 72, 255));
+		g_pRenderText->RenderTextClipped((BoxX + 39.f) * g_fScreenRate_x, (BoxY + 7.f) * g_fScreenRate_y,
+			lpszName, (BoxWidth - 46.f) * g_fScreenRate_x, 10.f * g_fScreenRate_y, RT3_SORT_LEFT);
+		g_pRenderText->SetFont(g_hFont);
+		g_pRenderText->SetTextColor(RGBA(182, 153, 90, 255));
+		g_pRenderText->RenderTextClipped((BoxX + 39.f) * g_fScreenRate_x, (BoxY + 19.f) * g_fScreenRate_y,
+			"SKILL", (BoxWidth - 46.f) * g_fScreenRate_x, 8.f * g_fScreenRate_y, RT3_SORT_LEFT);
+
+		float TextY = BoxY + HeaderHeight + 4.f;
+		for (int i = FirstStat; i < LastStat; i++)
+		{
+			char* Separator = strchr(TextList[i], ':');
+			g_pRenderText->SetTextColor(RGBA(190, 164, 105, 255));
+			if (Separator != NULL)
+			{
+				char Label[256];
+				int LabelLength = min((int)(Separator - TextList[i]), (int)sizeof(Label) - 1);
+				memcpy(Label, TextList[i], LabelLength);
+				Label[LabelLength] = '\0';
+				while (LabelLength > 0 && Label[LabelLength - 1] == ' ')
+					Label[--LabelLength] = '\0';
+
+				const char* Value = Separator + 1;
+				while (*Value == ' ')
+					Value++;
+
+				g_pRenderText->RenderTextClipped((BoxX + TextPadding) * g_fScreenRate_x, TextY * g_fScreenRate_y,
+					Label, (BoxWidth - TextPadding * 2.f - ValueColumnWidth) * g_fScreenRate_x,
+					RowHeight * g_fScreenRate_y, RT3_SORT_LEFT);
+				g_pRenderText->SetTextColor(RGBA(245, 245, 242, 255));
+				g_pRenderText->RenderTextClipped((BoxX + BoxWidth - TextPadding - ValueColumnWidth) * g_fScreenRate_x,
+					TextY * g_fScreenRate_y, Value, ValueColumnWidth * g_fScreenRate_x,
+					RowHeight * g_fScreenRate_y, RT3_SORT_RIGHT);
+			}
+			else
+			{
+				g_pRenderText->RenderTextClipped((BoxX + TextPadding) * g_fScreenRate_x, TextY * g_fScreenRate_y,
+					TextList[i], (BoxWidth - TextPadding * 2.f) * g_fScreenRate_x,
+					RowHeight * g_fScreenRate_y, RT3_SORT_LEFT);
+			}
+			TextY += RowHeight;
+		}
+
+		if (FooterRowCount > 0)
+		{
+			char Requirement[64];
+			TextY = BoxY + HeaderHeight + BodyHeight + FooterPadding;
+			g_pRenderText->SetTextColor(RGBA(190, 164, 105, 255));
+
+			for (int i = FirstNote; i < LastNote; i++)
+			{
+				HookColorFont(TextListColor[i]);
+				g_pRenderText->RenderTextClipped((BoxX + TextPadding) * g_fScreenRate_x, TextY * g_fScreenRate_y,
+					TextList[i], (BoxWidth - TextPadding * 2.f) * g_fScreenRate_x,
+					RowHeight * g_fScreenRate_y, RT3_SORT_LEFT);
+				TextY += RowHeight;
+			}
+			g_pRenderText->SetTextColor(RGBA(190, 164, 105, 255));
+
+			if (SkillAttribute[SkillType].Energy > 0)
+			{
+				sprintf(Requirement, "Requires Energy %d", SkillAttribute[SkillType].Energy);
+				g_pRenderText->RenderTextClipped((BoxX + TextPadding) * g_fScreenRate_x, TextY * g_fScreenRate_y,
+					Requirement, (BoxWidth - TextPadding * 2.f) * g_fScreenRate_x, RowHeight * g_fScreenRate_y, RT3_SORT_LEFT);
+				TextY += RowHeight;
+			}
+			if (SkillAttribute[SkillType].Charisma > 0)
+			{
+				sprintf(Requirement, "Requires Command %d", SkillAttribute[SkillType].Charisma);
+				g_pRenderText->RenderTextClipped((BoxX + TextPadding) * g_fScreenRate_x, TextY * g_fScreenRate_y,
+					Requirement, (BoxWidth - TextPadding * 2.f) * g_fScreenRate_x, RowHeight * g_fScreenRate_y, RT3_SORT_LEFT);
+				TextY += RowHeight;
+			}
+			if (SkillAttribute[SkillType].Strength > 0)
+			{
+				sprintf(Requirement, "Requires Strength %d", SkillAttribute[SkillType].Strength);
+				g_pRenderText->RenderTextClipped((BoxX + TextPadding) * g_fScreenRate_x, TextY * g_fScreenRate_y,
+					Requirement, (BoxWidth - TextPadding * 2.f) * g_fScreenRate_x, RowHeight * g_fScreenRate_y, RT3_SORT_LEFT);
+				TextY += RowHeight;
+			}
+			if (SkillAttribute[SkillType].Dexterity > 0)
+			{
+				sprintf(Requirement, "Requires Dexterity %d", SkillAttribute[SkillType].Dexterity);
+				g_pRenderText->RenderTextClipped((BoxX + TextPadding) * g_fScreenRate_x, TextY * g_fScreenRate_y,
+					Requirement, (BoxWidth - TextPadding * 2.f) * g_fScreenRate_x, RowHeight * g_fScreenRate_y, RT3_SORT_LEFT);
+			}
+		}
+
+		g_pRenderText->SetFont(OldFont);
+		g_pRenderText->SetTextColor(OldTextColor);
+		g_pRenderText->SetBgColor(OldBgColor);
+		glColor4f(1.f, 1.f, 1.f, 1.f);
+		DisableAlphaBlend();
+	}
+	else
+	{
+		RenderTipTextList(sx, sy, TextNum, 0, RT3_SORT_CENTER, iRenderPoint, TRUE, false, false);
+	}
 }
 
 namespace

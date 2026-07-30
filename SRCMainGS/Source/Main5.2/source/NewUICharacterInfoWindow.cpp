@@ -222,8 +222,6 @@ void SEASON3B::CNewUICharacterInfoWindow::SetPos(int x, int y)
 {
 	m_Pos.x = x;
 	m_Pos.y = y;
-
-
 #if MAIN_UPDATE > 603
 	float RenderPosY = m_Pos.y - 10.f;
 	float RenderPosX = m_Pos.x;
@@ -2257,59 +2255,32 @@ void SEASON3B::CNewUICharacterInfoWindow::RenderAttribute()
 
 void SEASON3B::CNewUICharacterInfoWindow::RenderButtons()
 {
-	float PosX, PosY;
+	float PosX = m_Pos.x + 12;
+	float PosY;
 
 #if MAIN_UPDATE > 303
 #ifdef test_main_dev
-	PosX = m_Pos.x + 12;
 	PosY = m_Pos.y + 32;
 #else
-	PosX = m_Pos.x + 12;
 	PosY = m_Pos.y + 42;
 #endif // test_main_dev
 #else
-	PosX = m_Pos.x + 12;
 	PosY = m_Pos.y + 32;
 #endif // MAIN_UPDATE != 303
 
-	int Text[] = { 681 , 685 , 0 };
+	int Text[] = { 681, 685 };
 
 	g_pRenderText->SetFont(g_hFontBold);
 	g_pRenderText->SetBgColor(0, 0, 0, 0);
 	g_pRenderText->SetTextColor(CLRDW_WHITE);
 
-#ifdef test_main_dev
 	for (int i = 0; i < 2; i++)
 	{
-		if (i == m_iCurTab)
-		{
-			SEASON3B::RenderImageF(BITMAP_guild_tab04, PosX, PosY, 56.f, 22.f, 0.0, 77.f, 173.f, 77.f);
-			g_pRenderText->RenderFont(PosX, PosY, GlobalText[Text[i]], 56, 22, RT3_SORT_CENTER);
-		}
-		else
-		{
-			SEASON3B::RenderImageF(BITMAP_guild_tab04, PosX, PosY, 56.f, 22.f, 0.0, 0.0, 173.f, 77.f);
-			g_pRenderText->RenderFont(PosX, PosY + 2, GlobalText[Text[i]], 56, 22, RT3_SORT_CENTER);
-		}
+		float SourceY = (i == m_iCurTab) ? 88.f : 0.f;
+		SEASON3B::RenderImageF(CNewUIPetInfoWindow::IMAGE_PETINFO_TAB_BUTTON, PosX, PosY, 56.f, 22.f, 0.f, SourceY, 224.f, 88.f);
+		g_pRenderText->RenderFont(PosX, PosY + ((i == m_iCurTab) ? 0.f : 2.f), GlobalText[Text[i]], 56, 22, RT3_SORT_CENTER);
 		PosX += 57;
 	}
-#else
-	for (int i = 0; i < 2; i++)
-	{
-		if (i == m_iCurTab)
-		{
-
-			SEASON3B::RenderImage(CNewUIPetInfoWindow::IMAGE_PETINFO_TAB_BUTTON, PosX, PosY, 56.f, 22.f, 0.0, 22.f);
-			g_pRenderText->RenderFont(PosX, PosY, GlobalText[Text[i]], 56, 22, RT3_SORT_CENTER);
-		}
-		else
-		{
-			SEASON3B::RenderImage(CNewUIPetInfoWindow::IMAGE_PETINFO_TAB_BUTTON, PosX, PosY, 56.f, 22.f, 0.0, 0.0);
-			g_pRenderText->RenderFont(PosX, PosY + 2, GlobalText[Text[i]], 56, 22, RT3_SORT_CENTER);
-		}
-		PosX += 57;
-	}
-#endif // test_main_dev
 
 
 #ifdef test_main_dev
@@ -2547,6 +2518,8 @@ void SEASON3B::CNewUICharacterInfoWindow::EventOrderWindows(double WindowsX, dou
 
 void SEASON3B::CNewUICharacterInfoWindow::LoadImages()
 {
+	LoadBitmap("Interface\\newui_guild_tab04.tga", CNewUIPetInfoWindow::IMAGE_PETINFO_TAB_BUTTON, GL_LINEAR);
+
 #ifdef test_main_dev
 	LoadBitmap("Interface\\HUD_TEST\\interface_back1.dds", BITMAP_interface_back1, GL_LINEAR);
 	LoadBitmap("Interface\\HUD_TEST\\interface_back2.dds", BITMAP_interface_back2, GL_LINEAR);
@@ -2555,7 +2528,6 @@ void SEASON3B::CNewUICharacterInfoWindow::LoadImages()
 	LoadBitmap("Interface\\HUD_TEST\\chainfo_btn_quest.dds", BITMAP_chainfo_btn_quest, GL_LINEAR);
 	LoadBitmap("Interface\\HUD_TEST\\chainfo_btn_pet.dds", BITMAP_chainfo_btn_pet, GL_LINEAR);
 	LoadBitmap("Interface\\HUD_TEST\\btn_exit_00.dds", BITMAP_btn_exit_00, GL_LINEAR);
-	LoadBitmap("Interface\\HUD_TEST\\guild_tab04.dds", BITMAP_guild_tab04, GL_LINEAR);
 	LoadBitmap("Interface\\HUD_TEST\\chainfo_btn_master.dds", BITMAP_chainfo_btn_master, GL_LINEAR);	
 #else
 	LoadBitmap("Interface\\newui_msgbox_back.jpg", IMAGE_CHAINFO_BACK, GL_LINEAR);

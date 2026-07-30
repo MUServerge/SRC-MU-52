@@ -254,6 +254,27 @@ void Projection(vec3_t Position, int* sx, int* sy)
 {
 	vec3_t TrasformPosition;
 	VectorTransform(Position, CameraMatrix, TrasformPosition);
+
+	// Reject anything at or behind the camera plane before dividing by depth.
+	//
+	// Without this, a point behind the camera has a POSITIVE z, the divide
+	// mirrors it, and it lands back inside the screen - which is why NPC and
+	// monster name labels appeared long before their owner entered the view and
+	// then piled up along the screen edges. It is also a division by zero for a
+	// point exactly on the camera plane.
+	//
+	// Projection2 already guards this way via CameraProjection::WorldToScreen;
+	// this is the same contract, keeping the logical-pixel scaling that only
+	// this function applies. -10000 is the off-screen sentinel callers expect.
+	if (TrasformPosition[2] >= -0.001f)
+	{
+		if (sx != NULL)
+			*sx = -10000;
+		if (sy != NULL)
+			*sy = -10000;
+		return;
+	}
+
 	*sx = ScreenCenterX - (int)(TrasformPosition[0] / PerspectiveX / TrasformPosition[2]);
 	*sy = ScreenCenterY + (int)(TrasformPosition[1] / PerspectiveY / TrasformPosition[2]);
 	*sx = *sx / g_fScreenRate_x;

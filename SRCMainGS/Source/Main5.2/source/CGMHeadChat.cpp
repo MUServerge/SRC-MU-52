@@ -470,6 +470,32 @@ bool CGMHeadChat::ProjectCharacterAnchor(const CHARACTER* character, int* screen
 	return true;
 }
 
+namespace
+{
+	bool IsCharacterNameInViewport(const CHARACTER* character)
+	{
+		if (character == NULL)
+			return false;
+
+		const OBJECT* object = &character->Object;
+		float baseHeight = object->Position[2];
+		const float terrainHeight = RequestTerrainHeight(object->Position[0], object->Position[1]);
+		if (baseHeight < terrainHeight)
+			baseHeight = terrainHeight;
+
+		vec3_t position;
+		Vector(object->Position[0], object->Position[1],
+			baseHeight + object->BoundingBoxMax[2] * 0.5f, position);
+
+		int screenX, screenY;
+		if (!CameraProjection::WorldToScreen(position, &screenX, &screenY))
+			return false;
+
+		return screenX >= 0 && screenX < (int)WindowWidth
+			&& screenY >= 0 && screenY < (int)WindowHeight;
+	}
+}
+
 void CGMHeadChat::RenderBooleans()
 {
 	g_pRenderText->SetFont(g_hFont);
@@ -548,8 +574,13 @@ void CGMHeadChat::RenderBooleans()
 		if (ci->IDLifeTime > 0 || ci->LifeTime[0] > 0)
 		{
 			CHARACTER* pCharacter = ci->Owner;
+			const bool isNpcOrMonster = pCharacter != NULL
+				&& (pCharacter->GetKind() == KIND_NPC || pCharacter->GetKind() == KIND_MONSTER);
 
-			if (gmProtect->m_RenderCharacterName == 0 || (gmProtect->m_RenderCharacterName && !(pCharacter->GetKind() == KIND_PLAYER || pCharacter->GetKind() == KIND_MONSTER)))
+			if (isNpcOrMonster && !IsCharacterNameInViewport(pCharacter))
+				continue;
+
+			if (!isNpcOrMonster && (gmProtect->m_RenderCharacterName == 0 || (gmProtect->m_RenderCharacterName && !(pCharacter->GetKind() == KIND_PLAYER || pCharacter->GetKind() == KIND_MONSTER))))
 			{
 				//. Fit to screen
 				if (ci->x < 0)
