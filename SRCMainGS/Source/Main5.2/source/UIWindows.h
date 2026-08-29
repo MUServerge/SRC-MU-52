@@ -178,6 +178,11 @@ public:
 	//virtual void SetMonsterIndex(BYTE byClass);
 	virtual void SetEquipmentPacket(DWORD* pbyEquip);
 	virtual void CopyPlayer();
+	//. Drops any mount/pet left over from a previously shown character.
+	//. ChangeCharacterExt() only marks the helper object not-live and relies on
+	//. the next character re-creating it, so a viewer that is reused for one
+	//. character after another keeps showing the last mount.
+	void ResetHelper();
 	virtual void SetAngle(float fDegree);
 	virtual void SetZoom(float fZoom);
 	virtual void SetHeight(float fHeight);

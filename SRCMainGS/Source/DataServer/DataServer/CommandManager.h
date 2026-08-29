@@ -177,6 +177,9 @@ struct CUSTOM_RANKING_DATA
 	BYTE Class;
 	BYTE Vip;
 	int Score;
+	//-- Worn items, same 13x5 shape and slot order as SDHP_CHARACTER_LIST, so
+	//-- the GameServer can run the very same CharSet conversion on it.
+	BYTE Equipment[13][5];
 };
 
 class CCommandManager

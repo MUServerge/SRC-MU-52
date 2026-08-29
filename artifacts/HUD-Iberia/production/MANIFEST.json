@@ -1,0 +1,86 @@
+{
+  "ActionBarsView_I2AC.png": [
+    1448,
+    10
+  ],
+  "ActionBarsView_I2B0.png": [
+    1408,
+    8
+  ],
+  "ActionBarsView_I2BB.png": [
+    24,
+    16
+  ],
+  "MainBack.png": [
+    320,
+    160
+  ],
+  "MainBar.png": [
+    1024,
+    24
+  ],
+  "MainDecor.png": [
+    120,
+    39
+  ],
+  "SkillHover.png": [
+    52,
+    52
+  ],
+  "Slot_Selected.png": [
+    52,
+    52
+  ],
+  "UI_Buttons.png": [
+    516,
+    280
+  ],
+  "UI_HelperSettingsButton.png": [
+    105,
+    35
+  ],
+  "UI_HUD_AG.png": [
+    346,
+    11
+  ],
+  "UI_HUD_AG_Empty.png": [
+    346,
+    11
+  ],
+  "UI_HUD_Base.png": [
+    1224,
+    180
+  ],
+  "UI_HUD_LIFE.png": [
+    912,
+    1520
+  ],
+  "UI_HUD_LIFE_POISON.png": [
+    912,
+    1520
+  ],
+  "UI_HUD_MANA.png": [
+    912,
+    1520
+  ],
+  "UI_HUD_MRB.png": [
+    21,
+    13
+  ],
+  "UI_HUD_SD.png": [
+    346,
+    11
+  ],
+  "UI_HUD_SD_Empty.png": [
+    346,
+    11
+  ],
+  "UI_SelectedSkill.png": [
+    65,
+    65
+  ],
+  "UI_SkillsSecondPage.png": [
+    324,
+    19
+  ]
+}

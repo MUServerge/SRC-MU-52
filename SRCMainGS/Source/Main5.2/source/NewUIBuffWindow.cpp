@@ -465,8 +465,8 @@ void SEASON3B::CNewUIBuffWindow::LoadImages()
 	LoadBitmap("Interface\\newui_statusicon2.jpg", IMAGE_BUFF_STATUS2, GL_LINEAR);
 	LoadBitmap("Interface\\newui_statusicon3.jpg", IMAGE_BUFF_STATUS3, GL_LINEAR);
     LoadBitmap("Interface\\newui_statusicon2.jpg", IMAGE_BUFF_STATUS2, GL_LINEAR);
-	LoadBitmap("Interface\\Custom\\Pegasus_BUFFICON.tga", IMAGE_BUFF_arrow, GL_LINEAR);
-	LoadBitmap("Interface\\Custom\\Pegasus_BUFFICON_01.tga", IMAGE_BUFF_arrow_1, GL_LINEAR);
+	LoadBitmap("Interface\\Pegasus_BUFFICON.tga", IMAGE_BUFF_arrow, GL_LINEAR);
+	LoadBitmap("Interface\\Pegasus_BUFFICON_01.tga", IMAGE_BUFF_arrow_1, GL_LINEAR);
 	LoadBitmap("Interface\\HUD\\Look-5\\EffectsHide.tga", IMAGE_BUFF_EFFECTS_HIDE, GL_LINEAR);
 }
 

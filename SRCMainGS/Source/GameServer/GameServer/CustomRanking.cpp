@@ -10,6 +10,7 @@
 #include "CustomRanking.h"
 #include "ObjectManager.h"
 #include "Notice.h"
+#include "SetItemOption.h"
 
 CCustomRanking gCustomRanking;
 
@@ -164,7 +165,7 @@ void CCustomRanking::GDCustomRankingRecv(BYTE* ReceiveBuffer)
 	{
 		CUSTOM_RANKING_DATA* Data2 = (CUSTOM_RANKING_DATA*)(ReceiveBuffer + offset);
 
-		CUSTOM_RANKING_DATA info;
+		CUSTOM_RANKING_ENTRY info;
 
 		memcpy(info.szName, Data2->szName, sizeof(info.szName));
 
@@ -174,9 +175,45 @@ void CCustomRanking::GDCustomRankingRecv(BYTE* ReceiveBuffer)
 
 		info.Class = (BYTE)gCharacterManager.GetCharacterClass(Data2->Class);
 
-		memcpy(&send[size], &info, sizeof(CUSTOM_RANKING_DATA));
+		//-- Same CharSet packing the character list uses (DGCharacterListRecv),
+		//-- so the ranked player is drawn exactly like a character on the select
+		//-- screen instead of as a bare class model.
+		memset(info.Equipment, 0, sizeof(info.Equipment));
 
-		size += sizeof(CUSTOM_RANKING_DATA);
+		PART_t player_body[EQUIPMENT_NEW_LENGTH];
+
+		for (int l = 0; l < EQUIPMENT_NEW_LENGTH; l++)
+		{
+			player_body[l] = Data2->Equipment[l];
+			info.Equipment[l] = player_body[l].GetPackedData();
+			info.Equipment[l] |= (l & 0x1F);
+		}
+
+		const DWORD mask = ~(0x03 << 7);
+		const int pos = EQUIPMENT_HELPER;
+
+		const bool IsFullSet = gSetItemOption.IsFullSet(player_body, EQUIPMENT_NEW_LENGTH);
+
+		if (info.Equipment[pos] != 0 && info.Equipment[pos] != 0xffffffff)
+		{
+			info.Equipment[pos] &= mask;
+		}
+
+		player_body[pos].ExtOption = (IsFullSet == true) ? 1 : 0;
+
+		info.Equipment[pos] |= (player_body[pos].ExtOption & 0x03) << 7;
+
+		//-- The DataServer bounds-checks its own buffer; this one never did, and
+		//-- the entry just grew by the CharSet. A board with enough rows would
+		//-- have walked off the end of send[].
+		if ((size + sizeof(CUSTOM_RANKING_ENTRY)) > sizeof(send))
+		{
+			break;
+		}
+
+		memcpy(&send[size], &info, sizeof(CUSTOM_RANKING_ENTRY));
+
+		size += sizeof(CUSTOM_RANKING_ENTRY);
 
 		offset += (sizeof(CUSTOM_RANKING_DATA));
 

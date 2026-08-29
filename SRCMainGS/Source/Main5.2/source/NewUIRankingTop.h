@@ -5,32 +5,58 @@
 
 namespace SEASON3B
 {
-	struct TEMPLATE_RANKING
+	//-- Master Reset, Reset and Level are merged into one table; everything
+	//-- after them is an event board, paged with the arrows as before.
+	enum { RANK_MERGED_BOARDS = 3 };
+
+	//-- One ranked player. Strings are formatted when the packet arrives, not
+	//-- on every frame of every visible row.
+	struct SRankingEntry
 	{
-		std::string Name;
-		std::string Class;
-		BYTE Vip;
-		DWORD Score;
-		TEMPLATE_RANKING(const std::string& n, const std::string& c, BYTE v, DWORD s)
-			: Name(n), Class(c), Vip(v), Score(s)
+		char	szRank[8];
+		char	szName[24];
+		char	szClass[32];
+		char	szScore[24];
+		BYTE	byClass;
+		BYTE	byVip;
+		int		iScore;
+		DWORD	dwEquipment[EQUIPMENT_LENGTH];
+	};
+
+	struct SRankingBoard
+	{
+		bool						bLoaded;
+		char						szName[24];
+		char						szScoreColumn[24];
+		std::vector<SRankingEntry>	Entries;
+
+		SRankingBoard() : bLoaded(false)
 		{
+			szName[0] = 0;
+			szScoreColumn[0] = 0;
 		}
-		BYTE GetVip() {
-			return Vip;
-		}
-		DWORD GetScore() {
-			return Score;
-		}
-		const char* GetName() {
-			return Name.c_str();
-		}
-		const char* GetClass() {
-			return Class.c_str();
-		}
+	};
+
+	//-- One player folded across the merged boards.
+	struct SRankingMerged
+	{
+		char	szRank[8];
+		char	szName[24];
+		char	szClass[32];
+		char	szScore[RANK_MERGED_BOARDS][16];
+		int		iScore[RANK_MERGED_BOARDS];
+		short	sBoard;			//. where the equipment came from
+		short	sEntry;
 	};
 
 	class CNewUIRankingTop : public CNewUIObj
 	{
+		enum
+		{
+			MAX_RANKING_BOARD = 10,		//. MAX_RANK in the GameServer
+			ROWS_VISIBLE = 10,
+		};
+
 		enum IMAGE_LIST
 		{
 			IMAGE_TOP_BACK1 = BITMAP_IMAGE_FRAME_EMU + 1,
@@ -40,23 +66,29 @@ namespace SEASON3B
 			IMAGE_TOP_LEVEL2 = BITMAP_IMAGE_FRAME_EMU + 5,
 			IMAGE_TOP_LEVEL3 = BITMAP_IMAGE_FRAME_EMU + 6,
 		};
-	private:
-		CUIComboBox m_ComboRankingList;
-		std::vector<std::pair<std::string, int>> m_ComboBXHOptions; // tên + ID
 
+	private:
 		CNewUIManager* m_pNewUIMng;
 		POINT m_Pos;
 		CUIPhotoViewer m_RenderCharacter;
-
-		bool is_request;
-		size_t m_RankListView;
-		size_t m_RankMaxTop;
-		size_t m_RankIndexCur;
-		size_t m_RankSelectIndex;
-		char m_RankName[50];
-		char m_RankColum[50];
 		CNewUIScrollBarHTML m_pScrollBar;
-		std::vector<TEMPLATE_RANKING> m_RankList;
+
+		SRankingBoard m_Board[MAX_RANKING_BOARD];
+		std::vector<SRankingMerged> m_Table;
+		int m_iBoardCount;
+
+		//-- Page 0 is the merged table, 1..n are the event boards.
+		int m_iPage;
+		int m_iSelectRow;
+		int m_iHoverRow;
+
+		int m_iPendingBoard;
+		float m_fRequestTime;
+
+		bool m_bDragging;
+		float m_fDragOffsetX;
+		float m_fDragOffsetY;
+
 	public:
 		CNewUIRankingTop();
 		virtual ~CNewUIRankingTop();
@@ -71,7 +103,7 @@ namespace SEASON3B
 		bool UpdateMouseEvent();
 		bool Render();
 		bool Update();
-		float GetLayerDepth(); //. 10.5f
+		float GetLayerDepth();
 
 		void OpenningProcess();
 		void ClosingProcess();
@@ -79,11 +111,32 @@ namespace SEASON3B
 		void RenderFrame();
 		void RenderTexte();
 
-
 		void ReceiveRankingInfo(BYTE* ReceiveBuffer);
 		void ReceiveRankingListInfo(BYTE* ReceiveBuffer);
+
 	private:
-		void RequestServerRankingInfo(BYTE Index);
+		void RequestServerRankingInfo(int iBoard);
+		void PumpRequests();
+		void RebuildTable();
+
+		int GetPageCount() const;
+		int GetPageBoard() const;			//. -1 while the merged table is shown
+		int GetRowCount() const;
+		int GetFirstVisibleRow();
+		void StepPage(int iDelta);
+		void SelectRow(int iRow);
+
+		void GetListRect(float& x, float& y, float& width, float& height) const;
+		void GetRowRect(int iVisibleSlot, float& x, float& y, float& width, float& height) const;
+		void GetPageArrowRect(bool bRight, float& x, float& y, float& width, float& height) const;
+		void GetTitleRect(float& x, float& y, float& width, float& height) const;
+		void GetCloseRect(float& x, float& y, float& width, float& height) const;
+
+		void RenderHeader();
+		void RenderRows();
+
+		void UpdateChildPositions();
+		void ClampPosition();
+		bool UpdateDragEvent();
 	};
 }
-

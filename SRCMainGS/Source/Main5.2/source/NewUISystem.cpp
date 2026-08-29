@@ -162,7 +162,7 @@ bool SEASON3B::CNewUISystem::Create()
 #endif
 
 	m_pNewOptionWindow = new CNewUIOptionWindow;
-	if (m_pNewOptionWindow->Create(m_pNewUIMng, AddMiddleX(190), 70) == false)
+	if (m_pNewOptionWindow->Create(m_pNewUIMng, 0, 0) == false)
 	{
 		return false;
 	}

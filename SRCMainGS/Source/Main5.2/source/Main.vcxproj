@@ -337,6 +337,7 @@
     <ClCompile Include="FilterNameInfo.cpp" />
     <ClCompile Include="GambleSystem.cpp" />
     <ClCompile Include="GameCensorship.cpp" />
+    <ClCompile Include="GameOptions.cpp" />
     <ClCompile Include="GameShop\FileDownloader\DownloadInfo.cpp" />
     <ClCompile Include="GameShop\FileDownloader\FileDownloader.cpp" />
     <ClCompile Include="GameShop\FileDownloader\FTPConnecter.cpp" />
@@ -513,6 +514,8 @@
     <ClCompile Include="NewUISlideWindow.cpp" />
     <ClCompile Include="NewUIStorageExpansion.cpp" />
     <ClCompile Include="NewUIStorageInventory.cpp" />
+    <ClCompile Include="NewUIDropDown.cpp" />
+    <ClCompile Include="NewUIStyleFX.cpp" />
     <ClCompile Include="NewUISystem.cpp" />
     <ClCompile Include="NewUITextBox.cpp" />
     <ClCompile Include="NewUITrade.cpp" />
@@ -809,6 +812,7 @@
     <ClInclude Include="FilterNameInfo.h" />
     <ClInclude Include="GambleSystem.h" />
     <ClInclude Include="GameCensorship.h" />
+    <ClInclude Include="GameOptions.h" />
     <ClInclude Include="GameShop\FileDownloader\FTPConnecter.h" />
     <ClInclude Include="GameShop\FileDownloader\HTTPConnecter.h" />
     <ClInclude Include="GameShop\FileDownloader\Include.h" />
@@ -995,6 +999,8 @@
     <ClInclude Include="NewUISlideWindow.h" />
     <ClInclude Include="NewUIStorageExpansion.h" />
     <ClInclude Include="NewUIStorageInventory.h" />
+    <ClInclude Include="NewUIDropDown.h" />
+    <ClInclude Include="NewUIStyleFX.h" />
     <ClInclude Include="NewUISystem.h" />
     <ClInclude Include="NewUITextBox.h" />
     <ClInclude Include="NewUITrade.h" />

@@ -3278,6 +3278,10 @@ void GDCustomRankingRecv(SDHP_CUSTOM_RANKING_RECV* lpMsg, int index) // OK
 
 	CUSTOM_RANKING_DATA info;
 
+	//-- Worn slots, in the order the client's ChangeCharacterExt() expects.
+	//-- Identical to the character-list path in GDCharacterListRecv().
+	static const int s_EquipSlot[12] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 237, 238, 241 };
+
 	if (gQueryManager.ExecQuery("EXEC WZ_CustomRanking %d", lpMsg->type) != 0)
 	{
 		while (gQueryManager.Fetch() != SQL_NO_DATA)
@@ -3289,6 +3293,39 @@ void GDCustomRankingRecv(SDHP_CUSTOM_RANKING_RECV* lpMsg, int index) // OK
 			info.Class = gQueryManager.GetAsInteger("VALUE3");
 
 			info.Vip = gQueryManager.GetAsInteger("VALUE4");
+
+			//-- VALUE5 is the raw Character.Inventory blob. An older procedure
+			//-- that does not return it simply leaves the slots empty, and the
+			//-- ranked player is drawn unequipped instead of not at all.
+			BYTE Inventory[INVENTORY_SIZE][16];
+
+			memset(Inventory, 0xFF, sizeof(Inventory));
+
+			gQueryManager.GetAsBinary("VALUE5", Inventory[0], sizeof(Inventory));
+
+			memset(info.Equipment, 0xFF, sizeof(info.Equipment));
+
+			for (int i = 0; i < 12; i++)
+			{
+				const int slot = s_EquipSlot[i];
+
+				if (Inventory[slot][0] == 0xFF && (Inventory[slot][7] & 0x80) == 0x80 && (Inventory[slot][9] & 0xF0) == 0xF0)
+				{
+					info.Equipment[i][0] = 0xFF;
+					info.Equipment[i][1] = 0xFF;
+					info.Equipment[i][2] = 0xFF;
+					info.Equipment[i][3] = 0xFF;
+					info.Equipment[i][4] = 0xFF;
+				}
+				else
+				{
+					info.Equipment[i][0] = Inventory[slot][0];
+					info.Equipment[i][1] = Inventory[slot][1];
+					info.Equipment[i][2] = Inventory[slot][7];
+					info.Equipment[i][3] = Inventory[slot][8];
+					info.Equipment[i][4] = Inventory[slot][9];
+				}
+			}
 
 			if ((size + sizeof(info)) < sizeof(send))
 			{

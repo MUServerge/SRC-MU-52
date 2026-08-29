@@ -79,6 +79,7 @@
 #include "CShaderScene.h"
 
 #include "TextClien.h"
+#include "GameOptions.h"
 
 
 extern BOOL g_bIMEBlock;
@@ -1680,6 +1681,10 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLin
 
 
 	gTextClien.Load();
+
+	//-- Per-machine render preferences. Not part of the account options byte,
+	//-- so they are read here and never sent to the server.
+	gGameOptions.Load();
 
 
 

@@ -11,6 +11,7 @@
 #include "NewUIMyInventory.h"
 #include "NewUIQuestProgress.h"
 #include "NewUIListGroupButton.h"
+#include "NewUIDropDown.h"
 
 namespace SEASON3B
 {
@@ -93,13 +94,54 @@ namespace SEASON3B
 		bool GetRenderObjects();
 		void RenderTable(float x, float y, float width, float height);
 	private:
+		enum OPTION_TAB
+		{
+			TAB_GAME = 0,
+			TAB_GRAPHICS,
+			TAB_OPTIONS,
+			TAB_COUNT,
+		};
+
+		enum SKIN_IMAGE
+		{
+			SKIN_WINDOW = BITMAP_INTERFACE_OPTION_SKIN_BEGIN,
+			SKIN_TAB,
+			SKIN_CLOSE,
+			SKIN_SECTION,
+			SKIN_CHECKBOX,
+			SKIN_DROPDOWN,
+			SKIN_DROPDOWN_LIST,
+			SKIN_DROPDOWN_ROW,
+			SKIN_EFFECT_SELECTOR,
+			SKIN_ACTION_BUTTON,
+			SKIN_VOLUME_TRACK,
+			SKIN_VOLUME_FILL,
+			SKIN_VOLUME_THUMB,
+			SKIN_SCROLL_TRACK,
+			SKIN_SCROLL_THUMB,
+			SKIN_SCROLL_ARROW,
+		};
+
 		void LoadImages();
 		void UnloadImages();
 		void SetButtonInfo();
+		void UpdateChildPositions();
+		bool UpdateDragEvent();
+		bool UpdateTabMouseEvent();
+		bool UpdateCheckboxMouseEvent();
+		bool UpdateSliderMouseEvent();
+		bool UpdateActionMouseEvent();
 		void RenderFrame();
 		void RenderContents();
 		void RenderChecked(float x, float y, bool bEnable);
 		void RenderButtons();
+		void RenderTabs();
+		void RenderSection(float y, const char* pszText);
+		void RenderOptionRow(float y, const char* pszText, bool bChecked, bool bEnabled = true);
+		void RenderGameTab();
+		void RenderGraphicsTab();
+		void RenderOptionsTab();
+		void RenderActionButton(float x, float y, float width, const char* pszText, bool bEnabled = true);
 		void change_resolution();
 		void change_fontsize();
 		void LoadResolution(const char* filename);
@@ -118,6 +160,11 @@ namespace SEASON3B
 		bool m_RenderObjects;
 		CNewUIListGroupButton resolutionList;
 		CNewUIListGroupButton fonttextList;
+		CNewUIDropDown m_ResolutionDropDown;
+		CNewUIDropDown m_FontDropDown;
+		int m_iActiveTab;
+		bool m_bDragging;
+		POINT m_DragOffset;
 	};
 }
 

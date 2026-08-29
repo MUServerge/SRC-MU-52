@@ -68,7 +68,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_EX603|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>D:\NewSource5.2Tkm\Build</OutDir>
+    <OutDir>$(SolutionDir)Release\DataServer_EX603\</OutDir>
     <IntDir>Release\DataServer_EX603\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_EX401|Win32'">

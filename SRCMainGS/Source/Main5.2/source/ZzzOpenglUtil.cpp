@@ -345,6 +345,11 @@ void BindTexture(int tex)
 	}
 }
 
+void InvalidateTextureCache()
+{
+	CachTexture = -0x7fffffff;
+}
+
 bool TextureStream = false;
 
 extern  int test;

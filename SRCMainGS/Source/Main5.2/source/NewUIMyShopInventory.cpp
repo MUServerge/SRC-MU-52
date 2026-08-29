@@ -187,9 +187,6 @@ void SEASON3B::CNewUIMyShopInventory::Release()
 
 void SEASON3B::CNewUIMyShopInventory::LoadImages()
 {
-#ifdef test_main_dev
-	LoadBitmap("Interface\\HUD_TEST\\box_openTitle.dds", BITMAP_box_opentitle, GL_LINEAR);
-#else
 	LoadBitmap("Interface\\newui_msgbox_back.jpg", IMAGE_MYSHOPINVENTORY_BACK, GL_LINEAR);
 	LoadBitmap("Interface\\newui_item_back01.tga", IMAGE_MYSHOPINVENTORY_TOP, GL_LINEAR);
 	LoadBitmap("Interface\\newui_item_back02-L.tga", IMAGE_MYSHOPINVENTORY_LEFT, GL_LINEAR);
@@ -199,16 +196,14 @@ void SEASON3B::CNewUIMyShopInventory::LoadImages()
 	LoadBitmap("Interface\\newui_Box_openTitle.tga", IMAGE_MYSHOPINVENTORY_EDIT, GL_LINEAR);
 	LoadBitmap("Interface\\newui_Bt_openshop.tga", IMAGE_MYSHOPINVENTORY_OPEN, GL_LINEAR);
 	LoadBitmap("Interface\\newui_Bt_closeshop.tga", IMAGE_MYSHOPINVENTORY_CLOSE, GL_LINEAR);
-#endif // test_main_dev
 	LoadBitmap("Interface\\HUD\\Button.tga", IMAGE_MYSHOPINVENTORY_BUTTON, GL_LINEAR);
 }
 
 void SEASON3B::CNewUIMyShopInventory::UnloadImages()
 {
-#ifdef test_main_dev
-	DeleteBitmap(BITMAP_box_opentitle);
+	//-- Loaded unconditionally in LoadImages(); only the removed development
+	//-- branch used to release it, so it leaked a bitmap slot on every close.
 	DeleteBitmap(IMAGE_MYSHOPINVENTORY_BUTTON);
-#else
 	DeleteBitmap(IMAGE_MYSHOPINVENTORY_CLOSE);
 	DeleteBitmap(IMAGE_MYSHOPINVENTORY_OPEN);
 	DeleteBitmap(IMAGE_MYSHOPINVENTORY_EDIT);
@@ -218,7 +213,6 @@ void SEASON3B::CNewUIMyShopInventory::UnloadImages()
 	DeleteBitmap(IMAGE_MYSHOPINVENTORY_LEFT);
 	DeleteBitmap(IMAGE_MYSHOPINVENTORY_TOP);
 	DeleteBitmap(IMAGE_MYSHOPINVENTORY_BACK);
-#endif // BITMAP_box_opentitle
 }
 
 void SEASON3B::CNewUIMyShopInventory::SetPos(int x, int y)
@@ -890,14 +884,10 @@ void SEASON3B::CNewUIMyShopInventory::EventOrderWindows(double WindowsX, double 
 
 	if (m_pNewInventoryCtrl != NULL)
 	{
-#ifdef test_main_dev
-		m_pNewInventoryCtrl->SetPos(m_Pos.x + 22, m_Pos.y + 90);
-#else
 		if (gmProtect->checkold_school())
 			m_pNewInventoryCtrl->SetPos(m_Pos.x + 15, m_Pos.y + 110);
 		else
 			m_pNewInventoryCtrl->SetPos(m_Pos.x + 15, m_Pos.y + 90);
-#endif // test_main_dev
 
 	}
 }

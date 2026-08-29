@@ -12,7 +12,7 @@ extern unsigned int WindowWidth;
 extern unsigned int WindowHeight;
 extern vec3_t CollisionPosition;
 extern float  FPS;
-#if defined(LDS_FOR_DEVELOPMENT_TESTMODE) || defined(LDS_UNFIXED_FIXEDFRAME_FORDEBUG)		// ½ÇFPS.(°íÁ¤ 20FPS »óÈ²¿¡¼­ ÃßÁ¤¿ë.)
+#if defined(LDS_FOR_DEVELOPMENT_TESTMODE) || defined(LDS_UNFIXED_FIXEDFRAME_FORDEBUG)		// ï¿½ï¿½FPS.(ï¿½ï¿½ï¿½ï¿½ 20FPS ï¿½ï¿½È²ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.)
 extern float g_fFrameEstimate;
 #endif // defined(LDS_FOR_DEVELOPMENT_TESTMODE) || defined(LDS_UNFIXED_FIXEDFRAME_FORDEBUG)
 extern float  WorldTime;
@@ -82,6 +82,10 @@ extern void EnableAlphaBlend2();
 extern void EnableAlphaBlend3();
 extern void EnableAlphaBlend4();
 extern void BindTexture(int tex);
+// BindTexture() caches the last index, but CGMFontLayer (and a few other sites)
+// call glBindTexture directly, which leaves that cache stale - a later request
+// for the cached index then skips the rebind and draws with the font texture.
+extern void InvalidateTextureCache();
 extern void BindTextureStream(int tex);
 extern void EndTextureStream();
 extern void BeginOpengl(int x = 0, int y = 0, int Width = 640, int Height = 480, bool Screen = false);
@@ -113,6 +117,8 @@ extern void RenderBitmapAlpha(int Texture, float sx, float sy, float Width, floa
 extern void RenderBitmapUV(int Texture, float x, float y, float Width, float Height, float u, float v, float uWidth, float vHeight);
 extern void BeginBitmap();
 extern void EndBitmap();
+extern float ConvertX(float x);
+extern float ConvertY(float y);
 extern float ConvertNoX(float x);
 extern float ConvertNoY(float y);
 extern float absf(float a);

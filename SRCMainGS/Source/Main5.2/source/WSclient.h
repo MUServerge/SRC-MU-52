@@ -303,6 +303,7 @@ typedef struct
 	BYTE          PlayerClass;
 	BYTE          LevelVip;
 	int           TotalScore;
+	DWORD         Equipment[EQUIPMENT_LENGTH];
 }PCREATE_RANKING_INFO, * LPPCREATE_RANKING_INFO;
 
 

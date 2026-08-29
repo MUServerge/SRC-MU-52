@@ -13,7 +13,30 @@
 #include "pugixml.hpp"
 #include "./ExternalObject/leaf/regkey.h"
 #include "TextClien.h"
+#include "GameOptions.h"
+#include "NewUIStyleFX.h"
 using namespace SEASON3B;
+
+namespace
+{
+	const float OPTION_WIDTH = 320.f;
+	const float OPTION_HEIGHT = 300.f;
+	const float OPTION_TITLE_HEIGHT = 38.f;
+	const float OPTION_TAB_Y = 45.f;
+	const float OPTION_TAB_WIDTH = 92.f;
+	const float OPTION_TAB_HEIGHT = 24.f;
+	const float OPTION_ROW_HEIGHT = 19.f;
+	const float OPTION_CHECK_SIZE = 16.f;
+
+	int ClampInt(int iValue, int iMin, int iMax)
+	{
+		if (iValue < iMin)
+			return iMin;
+		if (iValue > iMax)
+			return iMax;
+		return iValue;
+	}
+}
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -35,6 +58,11 @@ SEASON3B::CNewUIOptionWindow::CNewUIOptionWindow()
 	m_RenderEquipment = true;
 	m_RenderTerrain = true;
 	m_RenderObjects = true;
+
+	m_iActiveTab = TAB_GAME;
+	m_bDragging = false;
+	m_DragOffset.x = 0;
+	m_DragOffset.y = 0;
 }
 
 SEASON3B::CNewUIOptionWindow::~CNewUIOptionWindow()
@@ -63,15 +91,16 @@ bool SEASON3B::CNewUIOptionWindow::Create(CNewUIManager* pNewUIMng, int x, int y
 
 void SEASON3B::CNewUIOptionWindow::SetButtonInfo()
 {
-	//m_BtnClose.ChangeTextBackColor(RGBA(255, 255, 255, 0));
-	//m_BtnClose.ChangeButtonImgState(true, IMAGE_OPTION_BTN_CLOSE, true);
-	//m_BtnClose.ChangeButtonInfo(m_Pos.x + 68, m_Pos.y + 209, 54, 30);
-	//m_BtnClose.ChangeImgColor(BUTTON_STATE_UP, RGBA(255, 255, 255, 255));
-	//m_BtnClose.ChangeImgColor(BUTTON_STATE_DOWN, RGBA(255, 255, 255, 255));
-
-	resolutionList.Create(m_Pos.x + 20.f, m_Pos.y + 50.f, 4);
-
-	fonttextList.Create(m_Pos.x + 20.f, m_Pos.y + 175.f, 3);
+	m_ResolutionDropDown.Create(m_Pos.x + 158.f, m_Pos.y + 94.f, 140.f, 20.f, 7);
+	m_FontDropDown.Create(m_Pos.x + 158.f, m_Pos.y + 123.f, 140.f, 20.f, 7);
+	m_ResolutionDropDown.SetSkin(SKIN_DROPDOWN, 300.f, 44.f, 18.f, -2, 0.f);
+	m_FontDropDown.SetSkin(SKIN_DROPDOWN, 300.f, 44.f, 18.f, -2, 0.f);
+	m_ResolutionDropDown.SetPopupSkin(SKIN_DROPDOWN_LIST, 300.f, 220.f,
+		SKIN_DROPDOWN_ROW, 300.f, 40.f, SKIN_SCROLL_TRACK, 28.f, 240.f,
+		SKIN_SCROLL_THUMB, 120.f, 96.f, SKIN_SCROLL_ARROW, 48.f, 74.f);
+	m_FontDropDown.SetPopupSkin(SKIN_DROPDOWN_LIST, 300.f, 220.f,
+		SKIN_DROPDOWN_ROW, 300.f, 40.f, SKIN_SCROLL_TRACK, 28.f, 240.f,
+		SKIN_SCROLL_THUMB, 120.f, 96.f, SKIN_SCROLL_ARROW, 48.f, 74.f);
 
 	LoadResolution("Data\\Resolutions.xml");
 }
@@ -89,119 +118,246 @@ void SEASON3B::CNewUIOptionWindow::Release()
 
 void SEASON3B::CNewUIOptionWindow::SetPos(int x, int y)
 {
-	float RenderFrameX = pos_center() + 190;
-	float RenderFrameY = PositionY_In_The_Mid(0) + y;
+	const float fScreenX = (float)GetWindowsX;
+	const float fScreenY = (float)GetWindowsY;
 
-	m_Pos.x = RenderFrameX;
-	m_Pos.y = RenderFrameY;
+	m_Pos.x = (LONG)((fScreenX - OPTION_WIDTH) * 0.5f + (float)x);
+	m_Pos.y = (LONG)((fScreenY - OPTION_HEIGHT) * 0.5f + (float)y);
 
-	resolutionList.SetPosition(m_Pos.x + 20.f, m_Pos.y + 50.f);
+	if (m_Pos.x < 0) m_Pos.x = 0;
+	if (m_Pos.y < 0) m_Pos.y = 0;
+	if (m_Pos.x + OPTION_WIDTH > fScreenX) m_Pos.x = (LONG)(fScreenX - OPTION_WIDTH);
+	if (m_Pos.y + OPTION_HEIGHT > fScreenY) m_Pos.y = (LONG)(fScreenY - OPTION_HEIGHT);
 
-	fonttextList.SetPosition(m_Pos.x + 20.f, m_Pos.y + 175.f);
+	UpdateChildPositions();
+}
+
+void SEASON3B::CNewUIOptionWindow::UpdateChildPositions()
+{
+	m_ResolutionDropDown.SetPosition(m_Pos.x + 158.f, m_Pos.y + 94.f);
+	m_FontDropDown.SetPosition(m_Pos.x + 158.f, m_Pos.y + 123.f);
 }
 
 bool SEASON3B::CNewUIOptionWindow::UpdateMouseEvent()
 {
-	float RenderFrameX = m_Pos.x;
-	float RenderFrameY = m_Pos.y;
-
-	//if (m_BtnClose.UpdateMouseEvent() == true)
-	//{
-	//	g_pNewUISystem->Hide(SEASON3B::INTERFACE_OPTION);
-	//	return false;
-	//}
-
-	if (SEASON3B::IsPress(VK_LBUTTON) && CheckMouseIn(RenderFrameX + 210.0, RenderFrameY + 40.0, 15, 15))
+	if (m_iActiveTab == TAB_OPTIONS)
 	{
-		m_bAutoAttack = !m_bAutoAttack;
-	}
-	if (SEASON3B::IsPress(VK_LBUTTON) && CheckMouseIn(RenderFrameX + 210.0, RenderFrameY + 58.0, 15, 15))
-	{
-		m_bWhisperSound = !m_bWhisperSound;
-	}
-	if (SEASON3B::IsPress(VK_LBUTTON) && CheckMouseIn(RenderFrameX + 210.0, RenderFrameY + 76.0, 15, 15))
-	{
-		m_bSlideHelp = !m_bSlideHelp;
-	}
-
-	if (SEASON3B::IsPress(VK_LBUTTON) && CheckMouseIn(RenderFrameX + 210.0, RenderFrameY + 94.0, 15, 15))
-	{
-		m_RenderEffect = !m_RenderEffect;
-	}
-	if (SEASON3B::IsPress(VK_LBUTTON) && CheckMouseIn(RenderFrameX + 210.0, RenderFrameY + 112.0, 15, 15))
-	{
-		m_RenderEquipment = !m_RenderEquipment;
-	}
-	if (SEASON3B::IsPress(VK_LBUTTON) && CheckMouseIn(RenderFrameX + 210.0, RenderFrameY + 130.0, 15, 15))
-	{
-		m_RenderTerrain = !m_RenderTerrain;
-	}
-	if (SEASON3B::IsPress(VK_LBUTTON) && CheckMouseIn(RenderFrameX + 210.0, RenderFrameY + 148.0, 15, 15))
-	{
-		m_RenderObjects = !m_RenderObjects;
-	}
-
-	if (CheckMouseIn(RenderFrameX + 108 - 8, RenderFrameY + 185, 124 + 8, 16))
-	{
-		int iOldValue = m_iVolumeLevel;
-		if (MouseWheel > 0)
+		if (m_ResolutionDropDown.IsOpen())
 		{
-			MouseWheel = 0;
-			m_iVolumeLevel++;
-			if (m_iVolumeLevel > 10)
-			{
-				m_iVolumeLevel = 10;
-			}
+			if (m_ResolutionDropDown.UpdateMouseEvent())
+				change_resolution();
+			return false;
 		}
-		else if (MouseWheel < 0)
+
+		if (m_FontDropDown.IsOpen())
 		{
-			MouseWheel = 0;
-			m_iVolumeLevel--;
-			if (m_iVolumeLevel < 0)
+			if (m_FontDropDown.UpdateMouseEvent())
+				change_fontsize();
+			return false;
+		}
+
+		if (m_ResolutionDropDown.UpdateMouseEvent())
+			change_resolution();
+		if (m_ResolutionDropDown.IsOpen())
+			return false;
+
+		if (m_FontDropDown.UpdateMouseEvent())
+			change_fontsize();
+
+		if (m_ResolutionDropDown.IsMouseOver() || m_FontDropDown.IsMouseOver())
+			return false;
+	}
+
+	if (UpdateDragEvent())
+		return false;
+
+	if (SEASON3B::IsPress(VK_LBUTTON) &&
+		CheckMouseIn(m_Pos.x + 292.f, m_Pos.y + 6.f, 18.f, 18.f))
+	{
+		g_pNewUISystem->Hide(SEASON3B::INTERFACE_OPTION);
+		PlayBuffer(SOUND_CLICK01);
+		return false;
+	}
+
+	if (UpdateTabMouseEvent() || UpdateCheckboxMouseEvent() ||
+		UpdateSliderMouseEvent() || UpdateActionMouseEvent())
+	{
+		return false;
+	}
+
+	return !CheckMouseIn((float)m_Pos.x, (float)m_Pos.y, OPTION_WIDTH, OPTION_HEIGHT);
+}
+
+bool SEASON3B::CNewUIOptionWindow::UpdateDragEvent()
+{
+	const bool bTitle = CheckMouseIn((float)m_Pos.x + 12.f, (float)m_Pos.y + 4.f,
+		OPTION_WIDTH - 42.f, OPTION_TITLE_HEIGHT - 4.f) != 0;
+
+	if (!m_bDragging && bTitle && SEASON3B::IsPress(VK_LBUTTON))
+	{
+		m_bDragging = true;
+		m_DragOffset.x = (LONG)MouseX - m_Pos.x;
+		m_DragOffset.y = (LONG)MouseY - m_Pos.y;
+	}
+
+	if (!m_bDragging)
+		return false;
+
+	if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0)
+	{
+		m_bDragging = false;
+		return true;
+	}
+
+	const float fScreenX = (float)GetWindowsX;
+	const float fScreenY = (float)GetWindowsY;
+	m_Pos.x = (LONG)MouseX - m_DragOffset.x;
+	m_Pos.y = (LONG)MouseY - m_DragOffset.y;
+	m_Pos.x = ClampInt(m_Pos.x, 0, (int)(fScreenX - OPTION_WIDTH));
+	m_Pos.y = ClampInt(m_Pos.y, 0, (int)(fScreenY - OPTION_HEIGHT));
+	UpdateChildPositions();
+	return true;
+}
+
+bool SEASON3B::CNewUIOptionWindow::UpdateTabMouseEvent()
+{
+	if (!SEASON3B::IsPress(VK_LBUTTON))
+		return false;
+
+	for (int i = 0; i < TAB_COUNT; ++i)
+	{
+		const float x = m_Pos.x + 14.f + (OPTION_TAB_WIDTH + 8.f) * (float)i;
+		if (CheckMouseIn(x, m_Pos.y + OPTION_TAB_Y, OPTION_TAB_WIDTH, OPTION_TAB_HEIGHT))
+		{
+			m_iActiveTab = i;
+			m_ResolutionDropDown.Close();
+			m_FontDropDown.Close();
+			PlayBuffer(SOUND_CLICK01);
+			return true;
+		}
+	}
+	return false;
+}
+
+bool SEASON3B::CNewUIOptionWindow::UpdateCheckboxMouseEvent()
+{
+	if (!SEASON3B::IsPress(VK_LBUTTON))
+		return false;
+
+	const float x = m_Pos.x + 16.f;
+	const float width = OPTION_WIDTH - 32.f;
+
+	if (m_iActiveTab == TAB_GAME)
+	{
+		const float rows[] = { 104.f, 123.f, 142.f, 188.f, 207.f, 226.f, 245.f };
+		for (int i = 0; i < 7; ++i)
+		{
+			if (!CheckMouseIn(x, m_Pos.y + rows[i], width, OPTION_ROW_HEIGHT))
+				continue;
+
+			switch (i)
 			{
-				m_iVolumeLevel = 0;
+			case 0: m_bAutoAttack = !m_bAutoAttack; break;
+			case 1: m_bWhisperSound = !m_bWhisperSound; break;
+			case 2: m_bSlideHelp = !m_bSlideHelp; break;
+			case 3: gGameOptions.Toggle(GAMEOPT_SHOW_MY_NAME); break;
+			case 4: gGameOptions.Toggle(GAMEOPT_SHOW_PLAYER_NAME); break;
+			case 5: gGameOptions.Toggle(GAMEOPT_SHOW_NPC_NAME); break;
+			case 6: gGameOptions.Toggle(GAMEOPT_SHOW_MONSTER_NAME); break;
 			}
+			PlayBuffer(SOUND_CLICK01);
+			return true;
+		}
+	}
+	else if (m_iActiveTab == TAB_GRAPHICS)
+	{
+		const float rows[] = { 104.f, 123.f, 142.f, 161.f, 206.f, 225.f, 244.f };
+		for (int i = 0; i < 7; ++i)
+		{
+			if (!CheckMouseIn(x, m_Pos.y + rows[i], width, OPTION_ROW_HEIGHT))
+				continue;
+
+			switch (i)
+			{
+			case 0: m_RenderEffect = !m_RenderEffect; break;
+			case 1: m_RenderEquipment = !m_RenderEquipment; break;
+			case 2: m_RenderTerrain = !m_RenderTerrain; break;
+			case 3: m_RenderObjects = !m_RenderObjects; break;
+			case 4: gGameOptions.Toggle(GAMEOPT_ENABLE_FOG); break;
+			case 5: gGameOptions.Toggle(GAMEOPT_ENABLE_WEATHER); break;
+			case 6: gGameOptions.Toggle(GAMEOPT_ENABLE_AURA); break;
+			}
+			PlayBuffer(SOUND_CLICK01);
+			return true;
+		}
+	}
+	else if (m_iActiveTab == TAB_OPTIONS)
+	{
+		if (CheckMouseIn(x, m_Pos.y + 249.f, width, OPTION_ROW_HEIGHT))
+		{
+			gGameOptions.Toggle(GAMEOPT_BACKGROUND_THROTTLE);
+			PlayBuffer(SOUND_CLICK01);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool SEASON3B::CNewUIOptionWindow::UpdateSliderMouseEvent()
+{
+	if (m_iActiveTab != TAB_OPTIONS)
+		return false;
+
+	const float fVolumeX = m_Pos.x + 158.f;
+	const float fVolumeY = m_Pos.y + 174.f;
+	const float fVolumeWidth = 140.f;
+
+	if (CheckMouseIn(fVolumeX, fVolumeY - 3.f, fVolumeWidth, 18.f))
+	{
+		const int iOld = m_iVolumeLevel;
+		if (MouseWheel != 0)
+		{
+			m_iVolumeLevel += (MouseWheel > 0) ? 1 : -1;
+			MouseWheel = 0;
 		}
 		if (SEASON3B::IsRepeat(VK_LBUTTON))
-		{
-			int x = MouseX - (RenderFrameX + 108);
-			if (x < 0)
-			{
-				m_iVolumeLevel = 0;
-			}
-			else
-			{
-				float fValue = (10.f * x) / 124.f;
-				m_iVolumeLevel = (int)fValue + 1;
-			}
-		}
+			m_iVolumeLevel = (int)(((MouseX - fVolumeX) * 10.f / fVolumeWidth) + 0.5f);
 
-		if (iOldValue != m_iVolumeLevel)
-		{
+		m_iVolumeLevel = ClampInt(m_iVolumeLevel, 0, 10);
+		if (iOld != m_iVolumeLevel)
 			SetEffectVolumeLevel(m_iVolumeLevel);
-		}
+		return true;
 	}
-	if (CheckMouseIn(RenderFrameX + 100, RenderFrameY + 220, 141, 29))
+
+	if (SEASON3B::IsPress(VK_LBUTTON))
 	{
-		if (SEASON3B::IsRepeat(VK_LBUTTON))
+		for (int i = 0; i < 5; ++i)
 		{
-			int x = MouseX - (RenderFrameX + 85);
-			float fValue = (5.f * x) / 141.f;
-			m_iRenderLevel = (int)fValue;
+			const float x = m_Pos.x + 158.f + (float)i * 28.f;
+			if (CheckMouseIn(x, m_Pos.y + 222.f, 24.f, 20.f))
+			{
+				m_iRenderLevel = i;
+				PlayBuffer(SOUND_CLICK01);
+				return true;
+			}
 		}
 	}
 
-	if (resolutionList.UpdateMouseEvent())
-	{
-		change_resolution();
-	}
+	return false;
+}
 
-	if (fonttextList.UpdateMouseEvent())
+bool SEASON3B::CNewUIOptionWindow::UpdateActionMouseEvent()
+{
+	if (SEASON3B::IsPress(VK_LBUTTON) &&
+		CheckMouseIn(m_Pos.x + 117.f, m_Pos.y + 267.f, 86.f, 22.f))
 	{
-		change_fontsize();
+		gGameOptions.Save();
+		g_pNewUISystem->Hide(SEASON3B::INTERFACE_OPTION);
+		PlayBuffer(SOUND_CLICK01);
+		return true;
 	}
-
-	return !CheckMouseIn(RenderFrameX, RenderFrameY, 260.0, 270.0);
+	return false;
 }
 
 bool SEASON3B::CNewUIOptionWindow::UpdateKeyEvent()
@@ -236,6 +392,12 @@ bool SEASON3B::CNewUIOptionWindow::Render()
 
 	RenderButtons();
 
+	if (m_iActiveTab == TAB_OPTIONS)
+	{
+		m_ResolutionDropDown.RenderPopup();
+		m_FontDropDown.RenderPopup();
+	}
+
 	DisableAlphaBlend();
 
 	return true;
@@ -258,6 +420,7 @@ void SEASON3B::CNewUIOptionWindow::OpenningProcess()
 
 void SEASON3B::CNewUIOptionWindow::ClosingProcess()
 {
+	gGameOptions.Save();
 	SaveOptions();
 }
 
@@ -329,144 +492,197 @@ void SEASON3B::CNewUIOptionWindow::SetGameOptions(BYTE GameOption)
 
 void SEASON3B::CNewUIOptionWindow::LoadImages()
 {
-	LoadBitmap("Interface\\newui_button_close.tga", IMAGE_OPTION_BTN_CLOSE, GL_LINEAR);
-	LoadBitmap("Interface\\newui_msgbox_back.jpg", IMAGE_OPTION_FRAME_BACK, GL_LINEAR);
-	LoadBitmap("Interface\\newui_item_back03.tga", IMAGE_OPTION_FRAME_DOWN, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_top.tga", IMAGE_OPTION_FRAME_UP, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_back06(L).tga", IMAGE_OPTION_FRAME_LEFT, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_back06(R).tga", IMAGE_OPTION_FRAME_RIGHT, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_line.jpg", IMAGE_OPTION_LINE, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_point.tga", IMAGE_OPTION_POINT, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_check.tga", IMAGE_OPTION_BTN_CHECK, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_effect03.tga", IMAGE_OPTION_EFFECT_BACK, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_effect04.tga", IMAGE_OPTION_EFFECT_COLOR, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_volume01.tga", IMAGE_OPTION_VOLUME_BACK, GL_LINEAR);
-	LoadBitmap("Interface\\newui_option_volume02.tga", IMAGE_OPTION_VOLUME_COLOR, GL_LINEAR);
-
-	LoadBitmap("Interface\\HUD\\checkbox.tga", IMAGE_CHECK_LIVE);
-	LoadBitmap("Interface\\HUD\\uncheckbox.tga", IMAGE_UNCHECK_LIVE);
+	LoadBitmap("Interface\\Iberia\\GameOption\\window.png", SKIN_WINDOW, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\tabs.png", SKIN_TAB, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\close.png", SKIN_CLOSE, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\section-header.png", SKIN_SECTION, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\checkbox.png", SKIN_CHECKBOX, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\dropdown.png", SKIN_DROPDOWN, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\dropdown-list.png", SKIN_DROPDOWN_LIST, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\dropdown-row.png", SKIN_DROPDOWN_ROW, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\effect-selector.png", SKIN_EFFECT_SELECTOR, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\action-button.png", SKIN_ACTION_BUTTON, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\volume-track.png", SKIN_VOLUME_TRACK, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\volume-fill.png", SKIN_VOLUME_FILL, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\volume-thumb.png", SKIN_VOLUME_THUMB, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\scrollbar-track.png", SKIN_SCROLL_TRACK, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\scrollbar-thumb.png", SKIN_SCROLL_THUMB, GL_LINEAR);
+	LoadBitmap("Interface\\Iberia\\GameOption\\scrollbar-arrow.png", SKIN_SCROLL_ARROW, GL_LINEAR);
 }
 
 void SEASON3B::CNewUIOptionWindow::UnloadImages()
 {
-	DeleteBitmap(IMAGE_OPTION_BTN_CLOSE);
-	DeleteBitmap(IMAGE_OPTION_FRAME_BACK);
-	DeleteBitmap(IMAGE_OPTION_FRAME_DOWN);
-	DeleteBitmap(IMAGE_OPTION_FRAME_UP);
-	DeleteBitmap(IMAGE_OPTION_FRAME_LEFT);
-	DeleteBitmap(IMAGE_OPTION_FRAME_RIGHT);
-	DeleteBitmap(IMAGE_OPTION_LINE);
-	DeleteBitmap(IMAGE_OPTION_POINT);
-	DeleteBitmap(IMAGE_OPTION_BTN_CHECK);
-	DeleteBitmap(IMAGE_OPTION_EFFECT_BACK);
-	DeleteBitmap(IMAGE_OPTION_EFFECT_COLOR);
-	DeleteBitmap(IMAGE_OPTION_VOLUME_BACK);
-	DeleteBitmap(IMAGE_OPTION_VOLUME_COLOR);
+	for (int i = SKIN_WINDOW; i <= SKIN_SCROLL_ARROW; ++i)
+		DeleteBitmap(i);
 }
 
 void SEASON3B::CNewUIOptionWindow::RenderFrame()
 {
-	window_backmsg(m_Pos.x, m_Pos.y, 260.f, 270.f);
+	SEASON3B::BeginSkinDraw();
+	RenderImageF(SKIN_WINDOW, (float)m_Pos.x, (float)m_Pos.y, OPTION_WIDTH, OPTION_HEIGHT,
+		0.f, 0.f, 640.f, 600.f);
 
-	RenderTable(m_Pos.x + 15.f, m_Pos.y + 45.f, 75.f, 110.f);
+	RenderTabs();
 
-	RenderTable(m_Pos.x + 15.f, m_Pos.y + 170.f, 75.f, 85.f);
-
-	int Bitmap_point_draw = CNewUICursedTempleSystem::IMAGE_CURSEDTEMPLESYSTEM_MINIMAPICON_HOLYITEM_PC;
-
-	RenderBitmap(Bitmap_point_draw, ((float)m_Pos.x + 18.f), (float)m_Pos.y + 32.f, 8.f, 8.f, 0.f, 0.f, 14.f / 16.f, 14.f / 16.f);
-
-	RenderBitmap(Bitmap_point_draw, ((float)m_Pos.x + 18.f), (float)m_Pos.y + 157.f, 8.f, 8.f, 0.f, 0.f, 14.f / 16.f, 14.f / 16.f);
-
-	resolutionList.Render();
-
-	fonttextList.Render();
+	int iCloseState = 0;
+	if (CheckMouseIn(m_Pos.x + 292.f, m_Pos.y + 6.f, 18.f, 18.f))
+		iCloseState = SEASON3B::IsRepeat(VK_LBUTTON) ? 2 : 1;
+	RenderImageF(SKIN_CLOSE, m_Pos.x + 292.f, m_Pos.y + 6.f, 18.f, 18.f,
+		56.f * (float)iCloseState, 0.f, 56.f, 56.f);
 }
 
 void SEASON3B::CNewUIOptionWindow::RenderContents()
 {
-	float RenderFrameX = m_Pos.x;
-	float RenderFrameY = m_Pos.y;
-
 	g_pRenderText->SetBgColor(0);
-
 	g_pRenderText->SetFont(g_hFontBold);
+	g_pRenderText->SetTextColor(224, 203, 126, 255);
+	g_pRenderText->RenderText(m_Pos.x, m_Pos.y + 14, "Game Options", (int)OPTION_WIDTH, 0, 3);
 
-	g_pRenderText->SetTextColor(CLRDW_GOLD);
-
-	g_pRenderText->RenderText(RenderFrameX + 130, RenderFrameY + 8, GlobalText[3450], 0, 0, 8);
-
-	g_pRenderText->RenderText(RenderFrameX + 30, RenderFrameY + 32, gTextClien.TextClien_Khac[4]); //--
-
-	g_pRenderText->RenderText(RenderFrameX + 30, RenderFrameY + 157, gTextClien.TextClien_Khac[5]); //--
-
-	g_pRenderText->SetFont(g_hFont);
-
-	g_pRenderText->SetTextColor(255, 255, 255, 255);
-
-	g_pRenderText->SetBgColor(0);
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 40, GlobalText[386], 0, 15); //-- Automatic Attack
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 58, GlobalText[387], 0, 15); //-- Beep sound for whispering
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 76, GlobalText[919], 0, 15); //-- Slide Help
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 94, gTextClien.TextClien_Khac[6], 0, 15); //-- Slide Help
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 112, gTextClien.TextClien_Khac[7], 0, 15); //-- Slide Help
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 130, gTextClien.TextClien_Khac[8], 0, 15); //-- Slide Help
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 148, gTextClien.TextClien_Khac[9], 0, 15); //-- Slide Help
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 175, GlobalText[389]); //-- Volume
-
-	g_pRenderText->RenderText(RenderFrameX + 100, RenderFrameY + 210, GlobalText[1840]); //-- +Effect limitation
-
+	switch (m_iActiveTab)
+	{
+	case TAB_GAME: RenderGameTab(); break;
+	case TAB_GRAPHICS: RenderGraphicsTab(); break;
+	default: RenderOptionsTab(); break;
+	}
 }
 
 void SEASON3B::CNewUIOptionWindow::RenderChecked(float RenderFrameX, float RenderFrameY, bool bEnable)
 {
-	if (bEnable)
-		RenderImage(IMAGE_CHECK_LIVE, RenderFrameX, RenderFrameY, 15.0, 15.0, 0.0, 0.0, 0.75, 0.75);
-	else
-		RenderImage(IMAGE_UNCHECK_LIVE, RenderFrameX, RenderFrameY, 15.0, 15.0, 0.0, 0.0, 0.75, 0.75);
+	const int iState = bEnable ? 2 : 0;
+	RenderImageF(SKIN_CHECKBOX, RenderFrameX, RenderFrameY, OPTION_CHECK_SIZE, OPTION_CHECK_SIZE,
+		40.f * (float)iState, 0.f, 40.f, 40.f);
 }
 
 void SEASON3B::CNewUIOptionWindow::RenderButtons()
 {
-	float RenderFrameX = m_Pos.x;
-	float RenderFrameY = m_Pos.y;
+	RenderActionButton(m_Pos.x + 117.f, m_Pos.y + 267.f, 86.f, "Close");
+}
 
-	RenderChecked(RenderFrameX + 210.0, RenderFrameY + 40.0, m_bAutoAttack);
+void SEASON3B::CNewUIOptionWindow::RenderTabs()
+{
+	static const char* s_TabText[TAB_COUNT] = { "Game", "Graphics", "Options" };
 
-	RenderChecked(RenderFrameX + 210.0, RenderFrameY + 58.0, m_bWhisperSound);
-
-	RenderChecked(RenderFrameX + 210.0, RenderFrameY + 76.0, m_bSlideHelp);
-
-	RenderChecked(RenderFrameX + 210.0, RenderFrameY + 94.0, m_RenderEffect);
-
-	RenderChecked(RenderFrameX + 210.0, RenderFrameY + 112.0, m_RenderEquipment);
-
-	RenderChecked(RenderFrameX + 210.0, RenderFrameY + 130.0, m_RenderTerrain);
-
-	RenderChecked(RenderFrameX + 210.0, RenderFrameY + 148.0, m_RenderObjects);
-
-
-	RenderImage(IMAGE_OPTION_VOLUME_BACK, RenderFrameX + 108, RenderFrameY + 185, 124.f, 16.f);
-
-	if (m_iVolumeLevel > 0)
+	for (int i = 0; i < TAB_COUNT; ++i)
 	{
-		RenderImage(IMAGE_OPTION_VOLUME_COLOR, RenderFrameX + 108, RenderFrameY + 185, 124.f * 0.1f * (m_iVolumeLevel), 16.f);
+		const float x = m_Pos.x + 14.f + (OPTION_TAB_WIDTH + 8.f) * (float)i;
+		const bool bHover = CheckMouseIn(x, m_Pos.y + OPTION_TAB_Y, OPTION_TAB_WIDTH, OPTION_TAB_HEIGHT) != 0;
+		int iState = (i == m_iActiveTab) ? 2 : (bHover ? 1 : 0);
+		if (bHover && SEASON3B::IsRepeat(VK_LBUTTON)) iState = 3;
+
+		RenderImageF(SKIN_TAB, x, m_Pos.y + OPTION_TAB_Y, OPTION_TAB_WIDTH, OPTION_TAB_HEIGHT,
+			200.f * (float)iState, 0.f, 200.f, 64.f);
+
+		g_pRenderText->SetFont((i == m_iActiveTab) ? g_hFontBold : g_hFont);
+		g_pRenderText->SetBgColor(0);
+		g_pRenderText->SetTextColor((i == m_iActiveTab) ? RGBA(210, 255, 160, 255) : RGBA(210, 205, 188, 255));
+		g_pRenderText->RenderText((int)x, m_Pos.y + 51, s_TabText[i], (int)OPTION_TAB_WIDTH, 0, 3);
 	}
+}
 
-	RenderImage(IMAGE_OPTION_EFFECT_BACK, RenderFrameX + 100, RenderFrameY + 220, 141.f, 29.f);
+void SEASON3B::CNewUIOptionWindow::RenderSection(float y, const char* pszText)
+{
+	RenderImageF(SKIN_SECTION, m_Pos.x + 14.f, m_Pos.y + y, OPTION_WIDTH - 28.f, 18.f,
+		0.f, 0.f, 560.f, 44.f);
+	g_pRenderText->SetFont(g_hFontBold);
+	g_pRenderText->SetBgColor(0);
+	g_pRenderText->SetTextColor(215, 196, 126, 255);
+	g_pRenderText->RenderText(m_Pos.x + 32, m_Pos.y + (int)y + 2, pszText);
+}
 
-	if (m_iRenderLevel >= 0)
+void SEASON3B::CNewUIOptionWindow::RenderOptionRow(float y, const char* pszText, bool bChecked, bool bEnabled)
+{
+	const bool bHover = bEnabled && CheckMouseIn(m_Pos.x + 16.f, m_Pos.y + y, OPTION_WIDTH - 32.f, OPTION_ROW_HEIGHT);
+	int iState = bChecked ? 2 : (bHover ? 1 : 0);
+	if (!bEnabled) iState = 3;
+
+	g_pRenderText->SetFont(g_hFont);
+	g_pRenderText->SetBgColor(0);
+	g_pRenderText->SetTextColor(bEnabled ? (bHover ? RGBA(235, 245, 225, 255) : RGBA(210, 210, 205, 255)) : RGBA(120, 120, 120, 255));
+	g_pRenderText->RenderText(m_Pos.x + 22, m_Pos.y + (int)y + 2, pszText);
+
+	RenderImageF(SKIN_CHECKBOX, m_Pos.x + 281.f, m_Pos.y + y + 1.f, OPTION_CHECK_SIZE, OPTION_CHECK_SIZE,
+		40.f * (float)iState, 0.f, 40.f, 40.f);
+}
+
+void SEASON3B::CNewUIOptionWindow::RenderGameTab()
+{
+	RenderSection(80.f, "Gameplay");
+	RenderOptionRow(104.f, "Automatic Attack", m_bAutoAttack);
+	RenderOptionRow(123.f, "Whisper Sound", m_bWhisperSound);
+	RenderOptionRow(142.f, "Slide Help", m_bSlideHelp);
+
+	RenderSection(164.f, "Names and Interface");
+	RenderOptionRow(188.f, "Show My Name", gGameOptions.IsOn(GAMEOPT_SHOW_MY_NAME));
+	RenderOptionRow(207.f, "Show Player Names", gGameOptions.IsOn(GAMEOPT_SHOW_PLAYER_NAME));
+	RenderOptionRow(226.f, "Show NPC Names", gGameOptions.IsOn(GAMEOPT_SHOW_NPC_NAME));
+	RenderOptionRow(245.f, "Show Monster Names", gGameOptions.IsOn(GAMEOPT_SHOW_MONSTER_NAME));
+}
+
+void SEASON3B::CNewUIOptionWindow::RenderGraphicsTab()
+{
+	RenderSection(80.f, "World Rendering");
+	RenderOptionRow(104.f, "Visual Effects", m_RenderEffect);
+	RenderOptionRow(123.f, "Equipment Effects", m_RenderEquipment);
+	RenderOptionRow(142.f, "Terrain", m_RenderTerrain);
+	RenderOptionRow(161.f, "World Objects", m_RenderObjects);
+
+	RenderSection(182.f, "Atmosphere");
+	RenderOptionRow(206.f, "Fog", gGameOptions.IsOn(GAMEOPT_ENABLE_FOG));
+	RenderOptionRow(225.f, "Weather", gGameOptions.IsOn(GAMEOPT_ENABLE_WEATHER));
+	RenderOptionRow(244.f, "Character Aura", gGameOptions.IsOn(GAMEOPT_ENABLE_AURA));
+}
+
+void SEASON3B::CNewUIOptionWindow::RenderOptionsTab()
+{
+	RenderSection(76.f, "Display");
+	g_pRenderText->SetFont(g_hFont);
+	g_pRenderText->SetBgColor(0);
+	g_pRenderText->SetTextColor(210, 210, 205, 255);
+	g_pRenderText->RenderText(m_Pos.x + 22, m_Pos.y + 98, "Resolution");
+	g_pRenderText->RenderText(m_Pos.x + 22, m_Pos.y + 127, "Font Size");
+	m_ResolutionDropDown.Render();
+	m_FontDropDown.Render();
+
+	RenderSection(151.f, "Audio");
+	g_pRenderText->RenderText(m_Pos.x + 22, m_Pos.y + 175, "Volume");
+	const float fVolume = (float)ClampInt(m_iVolumeLevel, 0, 10) / 10.f;
+	RenderImageF(SKIN_VOLUME_TRACK, m_Pos.x + 158.f, m_Pos.y + 177.f, 140.f, 8.f, 0.f, 0.f, 600.f, 32.f);
+	if (fVolume > 0.f)
+		RenderImageF(SKIN_VOLUME_FILL, m_Pos.x + 158.f, m_Pos.y + 179.f, 140.f * fVolume, 6.f,
+			0.f, 0.f, 600.f * fVolume, 24.f);
+	const float fThumbX = m_Pos.x + 158.f + 140.f * fVolume - 6.f;
+	const bool bVolumeHover = CheckMouseIn(m_Pos.x + 158.f, m_Pos.y + 171.f, 140.f, 20.f) != 0;
+	const int iThumbState = bVolumeHover ? (SEASON3B::IsRepeat(VK_LBUTTON) ? 2 : 1) : 0;
+	RenderImageF(SKIN_VOLUME_THUMB, fThumbX, m_Pos.y + 171.f, 12.f, 16.f,
+		48.f * (float)iThumbState, 0.f, 48.f, 64.f);
+
+	RenderSection(199.f, "Performance");
+	g_pRenderText->RenderText(m_Pos.x + 22, m_Pos.y + 224, "Effect Limit");
+	static const int s_EffectValue[5] = { 5, 7, 9, 11, 13 };
+	for (int i = 0; i < 5; ++i)
 	{
-		RenderImage(IMAGE_OPTION_EFFECT_COLOR, RenderFrameX + 100, RenderFrameY + 220, 141.f * 0.2f * (m_iRenderLevel + 1), 29.f);
+		const float x = m_Pos.x + 158.f + (float)i * 28.f;
+		const bool bHover = CheckMouseIn(x, m_Pos.y + 222.f, 24.f, 20.f) != 0;
+		const int iState = (m_iRenderLevel == i) ? 2 : (bHover ? 1 : 0);
+		RenderImageF(SKIN_EFFECT_SELECTOR, x, m_Pos.y + 222.f, 24.f, 20.f,
+			72.f * (float)iState, 0.f, 72.f, 56.f);
+		char szValue[8];
+		sprintf_s(szValue, "%d", s_EffectValue[i]);
+		g_pRenderText->RenderText((int)x, m_Pos.y + 226, szValue, 24, 0, 3);
 	}
+	RenderOptionRow(249.f, "Throttle In Background", gGameOptions.IsOn(GAMEOPT_BACKGROUND_THROTTLE));
+}
+
+void SEASON3B::CNewUIOptionWindow::RenderActionButton(float x, float y, float width, const char* pszText, bool bEnabled)
+{
+	const bool bHover = bEnabled && CheckMouseIn(x, y, width, 22.f) != 0;
+	int iState = bEnabled ? (bHover ? 1 : 0) : 3;
+	if (bHover && SEASON3B::IsRepeat(VK_LBUTTON)) iState = 2;
+	RenderImageF(SKIN_ACTION_BUTTON, x, y, width, 22.f, 200.f * (float)iState, 0.f, 200.f, 56.f);
+	g_pRenderText->SetFont(g_hFontBold);
+	g_pRenderText->SetBgColor(0);
+	g_pRenderText->SetTextColor(bEnabled ? RGBA(226, 211, 164, 255) : RGBA(120, 120, 120, 255));
+	g_pRenderText->RenderText((int)x, (int)y + 4, pszText, (int)width, 0, 3);
 }
 
 void SEASON3B::CNewUIOptionWindow::RenderTable(float x, float y, float width, float height)
@@ -590,7 +806,7 @@ bool SEASON3B::CNewUIOptionWindow::GetRenderObjects()
 
 void SEASON3B::CNewUIOptionWindow::change_resolution()
 {
-	int index = gwinhandle->GetDisplayIndex(resolutionList.as_string());
+	int index = gwinhandle->GetDisplayIndex(m_ResolutionDropDown.AsString());
 	if (index < 0)
 		return;
 
@@ -622,7 +838,7 @@ void SEASON3B::CNewUIOptionWindow::change_resolution()
 
 			g_pMoveCommandWindow->SetPos(1, 1);
 
-			this->SetPos(0, 70);
+			this->SetPos(0, 0);
 
 			g_pNewUISystem->RenderFrameUpdate(backupWidth, backupHight);
 
@@ -633,7 +849,7 @@ void SEASON3B::CNewUIOptionWindow::change_resolution()
 
 void SEASON3B::CNewUIOptionWindow::change_fontsize()
 {
-	int fontsize = fonttextList.as_interget();
+	int fontsize = m_FontDropDown.AsInteger();
 
 	if (fontsize != FontHeight)
 	{
@@ -670,6 +886,9 @@ void SEASON3B::CNewUIOptionWindow::LoadResolution(const char* filename)
 		return;
 	}
 
+	m_ResolutionDropDown.Clear();
+	m_FontDropDown.Clear();
+
 	int fontSize = 17;
 	int fontindex = 0;
 	int resolutionPosition = 0;
@@ -682,7 +901,7 @@ void SEASON3B::CNewUIOptionWindow::LoadResolution(const char* filename)
 	{
 		std::string text_name = child_io.attribute("name").as_string();
 
-		resolutionList.push_back(text_name);
+		m_ResolutionDropDown.PushBack(text_name);
 
 		if (gwinhandle->GetDisplayIndex() == child_io.attribute("index").as_int())
 		{
@@ -699,7 +918,7 @@ void SEASON3B::CNewUIOptionWindow::LoadResolution(const char* filename)
 	{
 		std::string text_name = child_io.attribute("fontsize").as_string();
 
-		fonttextList.push_back(text_name);
+		m_FontDropDown.PushBack(text_name);
 
 		if (fontSize == child_io.attribute("fontsize").as_int())
 		{
@@ -707,10 +926,10 @@ void SEASON3B::CNewUIOptionWindow::LoadResolution(const char* filename)
 		}
 	}
 
-	fonttextList.SetCurrent(fontindex);
+	m_FontDropDown.SetCurrent(fontindex);
 
 	// The list stores positions while the registry/XML stores explicit indices.
 	// Keep them separate so gaps or reordered XML entries cannot select past the
 	// end of the list (the previous 15 -> 16 gap exposed this at 2560x1440).
-	resolutionList.SetCurrent(selectedResolutionPosition);
+	m_ResolutionDropDown.SetCurrent(selectedResolutionPosition);
 }

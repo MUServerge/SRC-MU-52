@@ -17,6 +17,20 @@ struct CUSTOM_RANKING_DATA
 	BYTE Class;
 	BYTE Vip;
 	int Score;
+	//-- Worn items as the DataServer read them, same 13x5 shape and slot order
+	//-- as SDHP_CHARACTER_LIST.
+	BYTE Equipment[EQUIPMENT_NEW_LENGTH][5];
+};
+
+//-- What the client actually receives per ranked player: the packed CharSet,
+//-- not the raw slots.
+struct CUSTOM_RANKING_ENTRY
+{
+	char szName[20];
+	BYTE Class;
+	BYTE Vip;
+	int Score;
+	DWORD Equipment[EQUIPMENT_NEW_LENGTH];
 };
 
 //**********************************************//

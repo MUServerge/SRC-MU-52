@@ -3,6 +3,198 @@
 ============================================================
 
 ------------------------------------------------------------
+ 2026-08-12
+------------------------------------------------------------
+
+- Client: rolled the Character and Inventory windows back to their native
+  texture sets, original layouts and controls after the Iberia replacements
+  were rejected visually. Game Options and unrelated interfaces are unchanged.
+  (CNewUICharacterInfoWindow, CNewUIMyInventory, CNewUIInventoryCtrl)
+
+------------------------------------------------------------
+ 2026-08-02
+------------------------------------------------------------
+
+- Client: replaced the LookAndFeel5 lower HUD runtime texture set with the
+  approved Iberia dark-metal skin. Life, poison and mana crystal atlases,
+  distinct AG/SD empty and fill gauges, EXP rails, skill states, utility
+  controls, orb backplates, bottom rail and mirrored side ornaments preserve
+  the existing texture dimensions, atlas UVs and percentage-driven rendering.
+  Original PNG/OZT assets were retained in the HUD artifact rollback backup.
+  (CNewUIMainFrameWindow, Interface/HUD/Look-5)
+
+------------------------------------------------------------
+ 2026-08-01
+------------------------------------------------------------
+
+- Client: rebuilt the Inventory window with the resolution-aware Iberia skin,
+  preserving the native 190x429 virtual layout and 8x8 (64-slot) inventory
+  controller. Equipment now uses a non-overlapping three-column layout with
+  pendant, two earrings and two rings; repeated grid cells, Zen panel, close
+  control and centered Exit, Repair, Jewel Bank and Expansion actions use the
+  new production textures without changing item or button behavior.
+  (CNewUIMyInventory, CNewUIInventoryCtrl)
+
+- Client: removed generated edge halos from the Inventory Repair and Expansion
+  actions, centered the English Ancient/Socket option labels inside their
+  80-unit tabs, and added a dedicated recessed cell state for occupied base
+  inventory slots while preserving item hover and durability overlays.
+  (CNewUIMyInventory, CNewUIInventoryCtrl)
+
+- Client: rebuilt the Character window with the resolution-aware Iberia skin,
+  including the master frame, tabs, close control, summary/stat/advanced
+  panels and native two-state stat, Exit, Quest, Pet and Master Skill buttons.
+  Existing Character actions, tooltips and virtual 190x429 layout behavior are
+  preserved. (CNewUICharacterInfoWindow)
+
+- Client: fixed the Pegasus buff-window bitmap registrations to use the
+  deployed Interface root paths, preventing startup from failing while looking
+  for the existing OZT textures under a nonexistent Custom subfolder.
+  (CNewUIBuffWindow::LoadImages)
+
+- Client: completed the Game Options drop-down skin wiring. Open lists now use
+  their dedicated list, row and scrollbar textures instead of the legacy blue
+  code-drawn overlays; value and row text is centered in the textured bounds.
+  The window drag now follows the Custom Menu's physical button-state model.
+  (CNewUIDropDown, CNewUIOptionWindow::UpdateDragEvent)
+
+- Client: aligned the Game Options popup list with the generated drop-down's
+  visible width, added the dedicated up/down arrow texture with clickable
+  scrolling, and made open drop-downs exclusively own input to prevent a click
+  from activating the neighbouring control. All bounds remain in responsive
+  virtual coordinates. (CNewUIDropDown)
+
+------------------------------------------------------------
+ 2026-07-30
+------------------------------------------------------------
+
+- Ranking: the window now shows the ranked player with their equipment instead
+  of a bare class model. The board packet carried only name/class/vip/score, so
+  the gear is added at every hop: WZ_CustomRanking returns Character.Inventory
+  as VALUE5 (Update17), the DataServer extracts the 12 worn slots exactly as
+  the character-list path does, the GameServer packs them into a CharSet with
+  the same code as DGCharacterListRecv (including the full-set bit), and the
+  client feeds it to CUIPhotoViewer::SetEquipmentPacket. Requires the client,
+  GameServer and DataServer to be deployed together - the per-entry packet grew
+  by 13 DWORDs. Also adds the missing send-buffer bounds check to the
+  GameServer's ranking loop, which the larger entry would otherwise overrun.
+  (CCustomRanking, GDCustomRankingRecv, CNewUIRankingTop)
+
+- Client: fixed CUIPhotoViewer::SetClass having an inverted initialised guard,
+  so it only ever ran before the viewer existed. The class of a preview could
+  never be changed after Init(), which is why the ranking preview always showed
+  the local player and the mail photo never switched either.
+  (CUIPhotoViewer::SetClass)
+
+- Server: CustomRanking.txt board names translated from Vietnamese to English.
+  DataServer's Release_EX603 output path pointed at a drive that does not exist
+  on this machine (D:\NewSource5.2Tkm\Build); it now follows the same
+  $(SolutionDir)Release\ pattern as the other configurations.
+
+- Client: reworked the Ranking window. Every board the server publishes is now
+  fetched once per opening and cached, with a drop-down to switch between them
+  instead of arrow-key paging that re-requested on every press; switching a
+  cached board costs no packet. Selecting a row shows that player in the
+  preview (class model and name - the board packet carries no equipment); the
+  window can be dragged by its caption bar. Fixes: row hit testing used the
+  absolute index while drawing used the visible slot, so every click landed on
+  the wrong row once the list was scrolled; the single is_request flag was only
+  cleared by a reply, so one request the server drops (board disabled, type out
+  of range) wedged the window permanently - requests now time out; the preview
+  kept auto-copying the local player, so it could never show anyone else; and
+  the client-side re-sort by descending score scrambled any board whose best
+  score is the lowest. Row text is formatted once on receive instead of on
+  every frame. (CNewUIRankingTop)
+
+- Client: added Data\GameOptions.xml, a per-machine store for render
+  preferences that have no business on the wire. The account options byte
+  packed by SaveOptions() has one free bit left, so nameplate, guild logo, fog,
+  aura, glow, shadow and load-shedding toggles are kept here instead. Values
+  live in a flat array indexed by eGameOption so render hot paths read them
+  without a string lookup; unknown names in the file are preserved rather than
+  dropped, and a missing file is written out complete with defaults.
+  (CGameOptions)
+
+- Client: fixed skin plates in the Game Option window drawing as white
+  rectangles. BindTexture() caches the last bound index, but CGMFontLayer binds
+  its font texture with a raw glBindTexture, leaving that cache stale - a later
+  request for the cached index then skipped the rebind and the plate inherited
+  the font atlas. Adds InvalidateTextureCache() and routes every skin draw
+  through SEASON3B::BeginSkinDraw(), which also re-asserts GL_TEXTURE_2D
+  because the TextureEnable mirror goes stale the same way.
+  (InvalidateTextureCache, BeginSkinDraw)
+
+- Client: rebuilt the Game Option window on the Pegasus skin and a new
+  code-drawn style layer. Adds NewUIStyleFX (gradients, rounded panels,
+  strokes, soft dividers, drop shadows and framerate-independent hover fades
+  on the fixed-function path) and NewUIDropDown (a combo box whose popup is
+  drawn after the frame so it overlays the rows below it). The window is now
+  split into Game / Graphics / Display tabs with group bars, the control column
+  right-aligned, the resolution and font-size scroll lists replaced by
+  drop-downs, the whole row as the click target for a check, and a working
+  title X plus bottom Close button. Every plate - tab, group bar, drop-down box
+  and arrow, slider track/fill/knob, quality segments, checkbox - is a Pegasus
+  texture, three-sliced so bevelled caps never stretch; the drawn layer is left
+  for hover washes, the panel tint and the drop shadow. Also fixes two
+  long-standing overflow bugs: the
+  volume drag could reach 11 and draw past the track, and the effect-limit hit
+  box was offset 15px from the value it computed.
+  (CNewUIOptionWindow)
+
+- Client: the Game Option window can now be dragged by its title strip, using
+  the same model as the custom game menu (grab, follow while held, drop on
+  release) and clamped to the screen. The resolution and font-size lists hold
+  absolute positions, so they are repositioned from a single
+  UpdateChildPositions helper shared by SetPos and every drag step.
+  (CNewUIOptionWindow::UpdateDragEvent)
+
+------------------------------------------------------------
+ 2026-07-26
+------------------------------------------------------------
+
+- Client: redesigned the LookAndFeel5 skill tooltip as a compact icon-and-name
+  card with separated stat and requirement sections, right-aligned stat values,
+  preserved contextual warnings, screen-edge clamping, a resolution-aware
+  bottom anchor above the AG gauge, and legacy tooltip fallback for
+  LookAndFeel1-4. (RenderSkillInfo)
+
+- Client: aligned the Active Invasion notification with the Character and
+  Calendar HUD icon row by removing the duplicated glow-width X offset; visual,
+  hover, click and tooltip bounds now share the regular icon spacing.
+  (CGMInvasionManager::RenderNotifyIcon)
+
+- Client: prevented NPC and monster nameplates from appearing on screen edges
+  before their model enters the viewport; nameplates now require the projected
+  model midpoint to be on-screen and no longer use edge clamping.
+  (CGMHeadChat::RenderBooleans)
+
+- Client: corrected the Character/My Info tab atlas rendering to use
+  RenderImageF with the real 224x88 source frames from newui_guild_tab04,
+  while preserving the original 56x22 bounds, tab positions and input logic.
+  (CNewUICharacterInfoWindow::RenderButtons)
+
+------------------------------------------------------------
+ 2026-07-22
+------------------------------------------------------------
+
+- Client shadow (KNOWN ISSUE, left temporarily): the projected character/object
+  ground shadow (BMD::RenderBodyShadow) shimmers - the flattened mesh's
+  near-degenerate silhouette triangles flip pixel coverage frame to frame, worst
+  on the Apostle Devin NPC and on the character up close. Confirmed NOT z-fighting
+  (polygon offset and disabling depth test both had no effect in earlier rounds).
+  A reference 5.2 client (SRC ThangCuoi) avoids the visible shimmer by drawing the
+  shadow TRANSLUCENT (blended ~35% black) with a stencil increment instead of the
+  opaque-black double-sided pass used here. Adopting that translucent approach was
+  attempted; with the current state setup the shadow does not render at all
+  (dropping DisableCullFace culled the whole shadow; the reference's stencil path
+  also relies on an ambient glStencilFunc / stencil clear this fork does not set).
+  Left in the non-rendering (effectively off) state for now - acceptable
+  temporarily since the shimmer was the complaint. Proper fix still pending:
+  replicate the reference's full translucent + stencil context (stencil func +
+  per-frame clear, single-sided winding), or move the shadow onto a render-to-
+  texture + blur path. (ZzzBMD.cpp RenderBodyShadow)
+
+------------------------------------------------------------
  2026-07-18
 ------------------------------------------------------------
 
