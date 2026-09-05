@@ -424,7 +424,6 @@ void CShaderScene::Release()
 			RenderProfilerDeleteProgram(m_Program[i]);
 		m_Program[i] = 0;
 	}
-
 	ClearUniformCache();
 	m_CurrentProgram = -1;
 	if (!canDelete)

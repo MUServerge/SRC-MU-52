@@ -88,7 +88,11 @@ int csteady_clock::GetFixedUpdateStepCount() const
 
 bool csteady_clock::ShouldRunFixedVisualEmission() const
 {
-	return fixedUpdateStepCount > 0;
+	const bool shouldRun = fixedUpdateStepCount > 0;
+	g_RenderProfiler.AddCounter(RPC_VISUAL_EMISSION_CHECKS);
+	if (shouldRun)
+		g_RenderProfiler.AddCounter(RPC_VISUAL_EMISSION_OPPORTUNITIES);
+	return shouldRun;
 }
 
 int csteady_clock::GetDroppedFixedUpdateStepCount() const

@@ -89,6 +89,30 @@ applied to translated draws. Build verification is not runtime parity: character
 equipment, set-effect flicker and like-for-like frame-time A/B remain the first
 required tests before this path can be enabled by default.
 
+## 2026-08-30 R0 Models/Characters audit
+
+The T0.1 steady Lorencia capture measured `RP_RENDER_MODELS` at 14.0459 ms/frame,
+69.12% of scene render CPU time. BMD work showed 989.30 mesh calls/frame: 499.87
+legacy client-array draws consumed 7.4157 ms/frame, while 487.04 successful VBO
+draws consumed 1.5640 ms/frame. BMD transforms consumed 1.8823 ms/frame, including
+about 1.83 ms in vertex/normal materialization scopes.
+
+The current VBO path remains a migration seam, not the target architecture. It
+still submits each mesh independently: the capture recorded about 978 program
+switches, 974 VAO binds, 974 uniform-buffer binds, 487 bone-palette uploads and
+2,922 material uniform uploads per frame. Translate remained the largest first
+eligibility gate at 434.72 meshes/frame, but special-material, unlit, missing-VAO
+and excluded paths preserve compatibility requirements.
+
+Installed Bless Reforged shader assets and runtime logs are the primary external
+target evidence: they demonstrate instanced model/shadow interfaces, std430 bone
+storage, instance and indirect buffers, mega VBO/IBO ownership, separate depth/
+shadow/composition shaders and compute-capable animation/skinning candidates.
+Bless source is unavailable; shader presence and log messages do not prove unseen
+scheduling, production use of every path, correctness or benefit in MU. Full call
+graph, evidence boundaries and ranked migration candidates are recorded in
+`docs/RENDERER_PERFORMANCE_AUDIT_R0_2026-08-30.md`.
+
 ## First actions
 
 1. Audit actual GLSL assets.

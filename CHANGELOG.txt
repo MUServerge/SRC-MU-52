@@ -3,6 +3,132 @@
 ============================================================
 
 ------------------------------------------------------------
+2026-08-30
+------------------------------------------------------------
+
+- Client renderer: added a separate default-off direct Bless `model_sync`
+  experiment. The client now loads the untouched `Client\\Bless Shader\\model_sync.vert`
+  and `.frag` files, adapts the compatible BMD vertex layout and uploads the
+  original binding-0 std430 bone-matrix contract from C++. Only validated plain
+  lit multi-bone meshes enter this first slice; static one-bone world objects
+  retain their established legacy path because Bless uses a separate world-object
+  SSBO/instance contract for them. Special materials remain on the legacy path
+  until their exact contracts are integrated and runtime-verified.
+  (CShaderGL, BMD, Client/RunBlessOriginalModelSync.bat)
+
+- Client renderer: withdrew the direct Bless `model_sync` launcher after runtime
+  validation showed that it is not a safe substitute for Bless's separate
+  world-object renderer. The established Bless GL43/SSBO launcher remains the
+  supported experimental path.
+
+- Client renderer diagnostics: added aggregate legacy BMD material-family
+  attribution for chrome/metal/oil, bright, wave, shadow, color, plain and
+  other submissions. It is reported only through the existing opt-in
+  RenderProfiler and does not change render decisions or state. (RenderProfiler, BMD::RenderMeshInternal)
+
+- Client renderer: consolidated the GPU-skinned BMD mesh vertex attributes
+  into one static interleaved VBO plus the existing index buffer. The VAO
+  attribute contract, model shader inputs, mesh draw order, materials and
+  legacy fallback remain unchanged; this reduces per-mesh GPU buffer ownership
+  from five objects to two. (BMD::CreateVertexBuffer)
+
+- Client renderer: added a separate opt-in Bless-model SSBO launcher for the
+  existing `-vbotranslate` compatibility path. It is intended only for visual
+  parity validation of plain translated meshes; special/unlit/unsupported
+  materials retain their established legacy fallback. (Client/RunBlessModelSSBOTranslate.bat)
+
+- Client renderer: added opt-in startup diagnostics through the existing
+  RenderProfiler owner. `-renderdiagnostics` writes only renderer capability,
+  context-selection and model-program information to RendererDiagnostics.log;
+  MuError.log remains encrypted and is not used as a plaintext sink. The
+  included Bless GL 4.3 launcher enables this safe diagnostic capture.
+  (RenderProfiler, Winmain, CShaderGL, Client/RunBlessGL43.bat)
+
+- Client renderer: added the first Bless-model SSBO bone transport. When the
+  opt-in Bless model program and GL 4.3 storage capabilities are available,
+  one CShaderGL-owned shared SSBO receives each RenderBody palette once and
+  meshes address it through a per-body base offset. Existing UBO and legacy
+  mesh paths remain validation fallbacks; no model data, gameplay or render
+  ordering contract was changed. (CShaderGL, BlessModel, BMD, scene frame start)
+
+- Client renderer: added a temporary-marker launcher for repeatable Bless-model
+  SSBO profiling. It enables the existing RenderProfiler only while Main.exe is
+  running and removes the marker after exit. (Client/RunBlessModelSSBOProfiler.bat)
+
+- Client renderer: added an opt-in `-blessgl43` OpenGL 4.3 Compatibility context
+  request for the staged Bless renderer migration. The client verifies the required
+  SSBO and compute entry points after GLEW initialization and restores the existing
+  legacy WGL context if they are unavailable. Default and `-gl33compat` behavior
+  remain unchanged. Capability diagnostics now report Bless SSBO/compute readiness.
+  (Winmain context selection and renderer capability diagnostics)
+
+- Client renderer: added the first isolated Bless-derived GLSL 3.3 model shader
+  pair through the existing CShaderGL/CShaderScene program owner. The experimental
+  path is disabled by default, can be enabled with `-blessmodelshader` or
+  `MU_BLESS_MODEL_SHADER`, retains the current BMD bindings and bone transports,
+  and retries the established Model shader when experimental compilation/linking
+  is unavailable. Matched its chrome/shiny material uniforms to the existing vec4
+  C++ upload contract so animated equipment layers receive their intended RGB
+  values. No render ordering, model format or legacy mesh fallback changed.
+  (CShaderGL, Data/Effect/VBO/BlessModel)
+
+- Project governance: documented the long-term architecture direction, one-owner
+  responsibility model, additive migration lifecycle, explicit legacy-removal
+  gates, active migration register and unverified/runtime-validation boundaries.
+  Established Bless Reforged as the primary external reference for long-term Shader,
+  OpenGL, Renderer and PostProcess architecture, with concept-by-concept mapping and
+  compatibility validation required before adoption. Recorded that Bless source is not
+  available and that persistent mapping, indirect drawing, compute skinning and newer GL
+  features are later-stage candidates rather than immediate requirements.
+  Clarified that additive-first migration does not require permanent duplication,
+  while retaining all existing compatibility, approval and verification rules.
+  (AGENTS.md, docs/ARCHITECTURE.md, docs/ARCHITECTURE_MIGRATIONS.md,
+  mu-main52-refactor architecture target)
+
+- Client timing audit: mapped the current frame clock, pacing, 25 Hz scheduler, legacy
+  compensation helpers, render-driven scene loop, animation, movement, effects, physics,
+  UI, network, service and profiler timing domains. Classified migration and interpolation
+  risk, retained `csteady_clock` as the preferred client authority, and documented phased
+  instrumentation plus the required 25/60/120 parity matrix. No runtime behavior changed.
+  (docs/FPS_TIMING_ARCHITECTURE_AUDIT_2026-08-30.md)
+
+- Client diagnostics: extended the existing opt-in RenderProfiler with fixed-capacity
+  timing distributions, fixed-step state, coarse frame update costs, animation/emission,
+  physics anomaly and aggregate packet cadence counters. Diagnostics remain disabled by
+  default and do not alter simulation, rendering, packet or pacing decisions.
+  (RenderProfiler, MainScene/MoveMainScene, csteady_clock, BMD::PlayAnimation,
+  CPhysicsVertex::Move, DataSend/ProtocolCompiler)
+
+- Client diagnostics: moved outbound packet count/byte telemetry to the active final
+  `SendPacket` boundary and split main-scene render CPU cost into world/terrain,
+  models/characters, effects/particles and UI owner-level sections. The existing parent
+  render, physics-render, swap and default-off profiler behavior remain unchanged.
+  (RenderProfiler, SendPacket, RenderMainScene)
+
+- Client renderer audit: mapped the active Models/Characters call graph, BMD material,
+  transform, VBO/legacy fallback and shader/bone ownership; analyzed the T0.1 Lorencia
+  draw/state/bind evidence; classified confirmed and unverified bottlenecks; and compared
+  each major gap with observed Bless Reforged shader/log architecture without treating
+  either the historical baseline or current VBO path as the final target. No runtime,
+  shader, GL-state, asset or rendering behavior changed.
+  (docs/RENDERER_PERFORMANCE_AUDIT_R0_2026-08-30.md)
+
+- Client renderer diagnostics: extended the existing opt-in RenderProfiler with
+  Models/Characters-attributed draw, state, texture, buffer, bone-palette and material
+  counters; visible character/player/monster-NPC/pet population; successful BMD body and
+  mesh submissions; and aggregate body, direct-overlay, shadow, selection, alpha,
+  special-material and texture-script repeat pass classification. Hot render paths use
+  integer counters only; no per-model/per-mesh timers, logging, allocation or render-state
+  behavior were added. (RenderProfiler, RenderMainScene, BMD::RenderBody/RenderMeshInternal)
+
+- Client effect diagnostics: extended the existing opt-in RenderProfiler with aggregate
+  creation-attempt, successful-creation and no-free-slot rejection counters plus current
+  and peak live occupancy for the fixed Effect, Particle and Joint pools. Existing pool
+  sizes, allocation order, lifetimes, RNG, rendering and gameplay behavior remain
+  unchanged. (RenderProfiler, CreateEffect/MoveEffects, CreateParticle/MoveParticles,
+  CreateJoint/MoveJoints)
+
+------------------------------------------------------------
  2026-08-12
 ------------------------------------------------------------
 

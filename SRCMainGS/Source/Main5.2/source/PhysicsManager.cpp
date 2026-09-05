@@ -137,6 +137,13 @@ void CPhysicsVertex::Move(float fTime)
 		m_vVel[i] += m_vForce[i] * s_fInvOfMass * fTime;
 		m_vPos[i] += m_vVel[i] * fTime;
 	}
+
+	if (g_RenderProfiler.IsEnabled()
+		&& (!_finite(m_vVel[0]) || !_finite(m_vVel[1]) || !_finite(m_vVel[2])
+			|| !_finite(m_vPos[0]) || !_finite(m_vPos[1]) || !_finite(m_vPos[2])))
+	{
+		g_RenderProfiler.AddCounter(RPC_PHYSICS_NONFINITE);
+	}
 }
 
 void CPhysicsVertex::GetPosition(vec3_t* pPos)

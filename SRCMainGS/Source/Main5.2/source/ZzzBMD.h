@@ -278,11 +278,17 @@ public:
 		GLuint UploadedMatrixPrograms[MATRIX_PROGRAM_CAPACITY];
 		int UploadedMatrixProgramCount;
 		bool BodyTransformUploaded;
+		bool BonePaletteUploaded;
+		bool BoneBaseUploaded;
+		int BoneBaseVec4;
 
 		ShaderMatrixSnapshot()
 			: Captured(false)
 			, UploadedMatrixProgramCount(0)
 			, BodyTransformUploaded(false)
+			, BonePaletteUploaded(false)
+			, BoneBaseUploaded(false)
+			, BoneBaseVec4(0)
 		{
 			for (int i = 0; i < MATRIX_PROGRAM_CAPACITY; ++i)
 				UploadedMatrixPrograms[i] = 0;

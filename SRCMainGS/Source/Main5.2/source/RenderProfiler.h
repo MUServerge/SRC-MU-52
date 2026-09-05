@@ -13,6 +13,18 @@ enum RenderProfilerSection
 	RP_BMD_RENDER_MESH,
 	RP_BMD_RENDER_MESH_VBO,
 	RP_BMD_RENDER_MESH_LEGACY,
+	RP_INPUT,
+	RP_SCENE_MOVE,
+	RP_OBJECT_UPDATE,
+	RP_CHARACTER_UPDATE,
+	RP_EFFECT_UPDATE,
+	RP_PHYSICS_MOVE,
+	RP_UI_NOTICES,
+	RP_NETWORK_TAIL,
+	RP_RENDER_WORLD,
+	RP_RENDER_MODELS,
+	RP_RENDER_EFFECTS,
+	RP_RENDER_UI,
 	RP_SECTION_COUNT
 };
 
@@ -87,7 +99,70 @@ enum RenderProfilerCounter
 	RPC_SHADER_COMPILE_FAILED,
 	RPC_PROGRAM_LINK_SUCCEEDED,
 	RPC_PROGRAM_LINK_FAILED,
+	RPC_FIXED_ZERO_STEP_FRAMES,
+	RPC_FIXED_MULTI_STEP_FRAMES,
+	RPC_ANIMATION_KEY_CROSSINGS,
+	RPC_VISUAL_EMISSION_CHECKS,
+	RPC_VISUAL_EMISSION_OPPORTUNITIES,
+	RPC_PHYSICS_NONFINITE,
+	RPC_PACKETS_SENT,
+	RPC_PACKET_BYTES_SENT,
+	RPC_PACKETS_RECEIVED,
+	RPC_PACKET_BYTES_RECEIVED,
+	RPC_MODEL_DRAW_CALLS,
+	RPC_MODEL_DRAW_ARRAYS,
+	RPC_MODEL_DRAW_ELEMENTS,
+	RPC_MODEL_IMMEDIATE_DRAW_CALLS,
+	RPC_MODEL_LEGACY_BMD_MESH_DRAWS,
+	RPC_MODEL_PROGRAM_SWITCHES,
+	RPC_MODEL_TEXTURE_BIND_REQUESTS,
+	RPC_MODEL_TEXTURE_BIND_CHANGES,
+	RPC_MODEL_VAO_BINDS,
+	RPC_MODEL_ARRAY_BUFFER_BINDS,
+	RPC_MODEL_ELEMENT_BUFFER_BINDS,
+	RPC_MODEL_UNIFORM_BUFFER_BINDS,
+	RPC_MODEL_BONE_PALETTE_UPLOADS,
+	RPC_MODEL_MATERIAL_UNIFORM_UPLOADS,
+	RPC_MODEL_VISIBLE_CHARACTERS,
+	RPC_MODEL_VISIBLE_PLAYERS,
+	RPC_MODEL_VISIBLE_MONSTERS_NPCS,
+	RPC_MODEL_VISIBLE_PETS,
+	RPC_MODEL_RENDERED_BODIES,
+	RPC_MODEL_RENDERED_MESHES,
+	RPC_MODEL_PASS_BODY,
+	RPC_MODEL_PASS_DIRECT_OVERLAY,
+	RPC_MODEL_PASS_SHADOW,
+	RPC_MODEL_PASS_SELECTION,
+	RPC_MODEL_PASS_TEXTURE_SCRIPT_REPEAT,
+	RPC_MODEL_PASS_ALPHA,
+	RPC_MODEL_MATERIAL_PLAIN,
+	RPC_MODEL_MATERIAL_SPECIAL,
+	RPC_MODEL_LEGACY_MATERIAL_CHROME,
+	RPC_MODEL_LEGACY_MATERIAL_BRIGHT,
+	RPC_MODEL_LEGACY_MATERIAL_WAVE,
+	RPC_MODEL_LEGACY_MATERIAL_SHADOW,
+	RPC_MODEL_LEGACY_MATERIAL_COLOR,
+	RPC_MODEL_LEGACY_MATERIAL_PLAIN,
+	RPC_MODEL_LEGACY_MATERIAL_OTHER,
+	RPC_MODEL_PASS_UNCLASSIFIED,
+	RPC_EFFECT_CREATE_ATTEMPTS,
+	RPC_EFFECT_CREATE_SUCCEEDED,
+	RPC_EFFECT_CREATE_NO_FREE_SLOT,
+	RPC_PARTICLE_CREATE_ATTEMPTS,
+	RPC_PARTICLE_CREATE_SUCCEEDED,
+	RPC_PARTICLE_CREATE_NO_FREE_SLOT,
+	RPC_JOINT_CREATE_ATTEMPTS,
+	RPC_JOINT_CREATE_SUCCEEDED,
+	RPC_JOINT_CREATE_NO_FREE_SLOT,
 	RPC_COUNTER_COUNT
+};
+
+enum RenderProfilerPool
+{
+	RPP_EFFECT = 0,
+	RPP_PARTICLE,
+	RPP_JOINT,
+	RPP_POOL_COUNT
 };
 
 enum RenderProfilerResource
@@ -105,9 +180,19 @@ public:
 	CRenderProfiler();
 
 	bool IsEnabled() const { return m_enabled; }
+	bool IsRendererDiagnosticsEnabled() const { return m_rendererDiagnosticsEnabled; }
+	void WriteRendererDiagnostic(const char* format, ...) const;
 	void BeginFrame(int sceneFlag, float currentFps, bool loadingFrame = false);
 	void Add(RenderProfilerSection section, double milliseconds);
 	void AddCounter(RenderProfilerCounter counter, int amount = 1);
+	void AddModelsCounter(RenderProfilerCounter counter, int amount = 1);
+	void SamplePoolOccupancy(RenderProfilerPool pool, int liveCount);
+	void EnterSection(RenderProfilerSection section);
+	void LeaveSection(RenderProfilerSection section);
+	bool IsModelsScopeActive() const { return m_enabled && m_modelsScopeDepth > 0; }
+	int RecordPacketSendResult(int result, int knownBytes);
+	void SampleTimingFrame(double rawDeltaMs, double visualDeltaMs, float renderFps,
+		int fixedSteps, int droppedSteps, double fixedAccumulatorMs, double interpolationAlpha);
 	void EndFrame();
 
 	void RecordDraw(GLenum mode, GLsizei count, bool indexed);
@@ -124,22 +209,31 @@ public:
 private:
 	static const int FRAME_SAMPLE_CAPACITY = 512;
 
-	void ReportFrameSamples(const char* name, const double* samples, int sampleCount) const;
+	void ReportFrameSamples(const char* name, const double* samples, int sampleCount, const char* unit) const;
 	void ReportAndReset();
 	void ResetWindow();
 	static unsigned long long TriangleCount(GLenum mode, GLsizei count);
 
 	bool m_enabled;
+	bool m_rendererDiagnosticsEnabled;
 	bool m_started;
 	bool m_loadingFrame;
 	double m_sectionMs[RP_SECTION_COUNT];
 	unsigned long long m_sectionCalls[RP_SECTION_COUNT];
 	unsigned long long m_counters[RPC_COUNTER_COUNT];
 	long long m_liveResources[RPR_RESOURCE_COUNT];
+	int m_poolCurrent[RPP_POOL_COUNT];
+	int m_poolPeak[RPP_POOL_COUNT];
 	double m_stableFrameSamples[FRAME_SAMPLE_CAPACITY];
 	double m_loadingFrameSamples[FRAME_SAMPLE_CAPACITY];
+	double m_rawDeltaSamples[FRAME_SAMPLE_CAPACITY];
+	double m_visualDeltaSamples[FRAME_SAMPLE_CAPACITY];
+	double m_renderFpsSamples[FRAME_SAMPLE_CAPACITY];
+	double m_fixedAccumulatorSamples[FRAME_SAMPLE_CAPACITY];
+	double m_interpolationAlphaSamples[FRAME_SAMPLE_CAPACITY];
 	int m_stableFrameSampleCount;
 	int m_loadingFrameSampleCount;
+	int m_timingSampleCount;
 	int m_frameCount;
 	int m_sceneFlag;
 	float m_currentFps;
@@ -149,6 +243,7 @@ private:
 	GLuint m_lastProgram;
 	GLenum m_lastTextureTarget;
 	GLuint m_lastTexture;
+	int m_modelsScopeDepth;
 };
 
 class CRenderProfilerScope

@@ -350,8 +350,11 @@ MSG CWINHANDLE::winLoop()
 				}
 			}
 		}
-		ProtocolCompiler();
-		g_pChatRoomSocketList->ProtocolCompile();
+		{
+			CRenderProfilerScope networkProfilerScope(RP_NETWORK_TAIL);
+			ProtocolCompiler();
+			g_pChatRoomSocketList->ProtocolCompile();
+		}
 	}
 
 	return msg;

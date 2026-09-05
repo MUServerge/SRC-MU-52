@@ -15,20 +15,55 @@ namespace
 	const GLuint kBoneBlockBindingPoint = 0;
 	const char* const kBoneBlockName = "BoneBlock";
 	const char* const kBoneUboDefine = "MU_USE_BONE_UBO";
+	const GLuint kBoneStorageBindingPoint = 1;
+	const char* const kBoneStorageBlockName = "BoneStorage";
+	const char* const kBoneSsboDefine = "MU_USE_BONE_SSBO";
+	const int kBoneStoragePaletteCapacity = 512;
+	const int kBoneStorageVec4Capacity = kBoneStoragePaletteCapacity * kBoneVec4Capacity;
+	const int kBoneStorageBytes = kBoneStorageVec4Capacity * 4 * sizeof(float);
+	const GLuint kBlessOriginalBoneStorageBindingPoint = 0;
+	const char* const kBlessOriginalBoneStorageBlockName = "BoneMatricesBuffer";
+	const int kBlessOriginalBoneMatrixFloatCount = 16;
+	const int kBlessOriginalBoneStorageBytes =
+		kBoneCapacity * kBlessOriginalBoneMatrixFloatCount * sizeof(float);
 }
 
 CShaderGL::CShaderGL()
 	: m_MaxVertexUniformComponents(0)
 	, m_MaxUniformBlockSize(0)
 	, m_BoneUniformBuffer(0)
+	, m_BoneStorageBuffer(0)
+	, m_BoneStorageCursorVec4(0)
 	, m_BoneTransport(eVBOBoneTransport_None)
 	, m_TranslatedVboEnabled(false)
+	, m_BlessModelShaderEnabled(false)
+	, m_BlessOriginalModelSyncEnabled(false)
 {
 	for (int i = 0; i < eVBO_Max; ++i)
 	{
 		m_VBOProgram[i] = 0;
 		m_VBOBoneCapacity[i] = 0;
 	}
+}
+
+void CShaderGL::ReleaseShaderStorageBuffer(bool canDelete)
+{
+	if (m_BoneStorageBuffer == 0)
+		return;
+
+	if (canDelete && glDeleteBuffers != NULL)
+	{
+		if (glBindBufferBase != NULL)
+		{
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, kBoneStorageBindingPoint, 0);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, kBlessOriginalBoneStorageBindingPoint, 0);
+		}
+		g_RenderProfiler.ResourceDeleted(RPR_BUFFER);
+		glDeleteBuffers(1, &m_BoneStorageBuffer);
+	}
+
+	m_BoneStorageBuffer = 0;
+	m_BoneStorageCursorVec4 = 0;
 }
 
 CShaderGL::~CShaderGL()
@@ -39,6 +74,11 @@ CShaderGL::~CShaderGL()
 bool IsTranslatedVBOEnabled()
 {
 	return gShaderGL->IsTranslatedVBOEnabled();
+}
+
+bool IsBlessOriginalModelSyncEnabled()
+{
+	return gShaderGL->IsBlessOriginalModelSyncEnabled();
 }
 
 void CShaderGL::ReleaseUniformBuffer(bool canDelete)
@@ -63,7 +103,7 @@ void CShaderGL::Release()
 	for (int i = 0; i < eVBO_Max; ++i)
 		hasPrograms = hasPrograms || (m_VBOProgram[i] != 0);
 
-	const bool hasResources = hasPrograms || m_BoneUniformBuffer != 0;
+	const bool hasResources = hasPrograms || m_BoneUniformBuffer != 0 || m_BoneStorageBuffer != 0;
 	if (!hasResources)
 	{
 		m_MaxVertexUniformComponents = 0;
@@ -86,6 +126,7 @@ void CShaderGL::Release()
 		RestoreProgram(0);
 
 	ReleaseUniformBuffer(canDelete);
+	ReleaseShaderStorageBuffer(canDelete);
 
 	for (int i = 0; i < eVBO_Max; ++i)
 	{
@@ -108,6 +149,18 @@ void CShaderGL::Init()
 	m_TranslatedVboEnabled =
 		commandLine != NULL && strstr(commandLine, "-vbotranslate") != NULL;
 
+	char blessShaderOption[8] = { 0 };
+	const DWORD blessShaderOptionLength = GetEnvironmentVariableA(
+		"MU_BLESS_MODEL_SHADER", blessShaderOption, sizeof(blessShaderOption));
+	m_BlessModelShaderEnabled =
+		(commandLine != NULL && strstr(commandLine, "-blessmodelshader") != NULL) ||
+		(blessShaderOptionLength > 0 && blessShaderOptionLength < sizeof(blessShaderOption) &&
+			 strcmp(blessShaderOption, "1") == 0);
+	m_BlessOriginalModelSyncEnabled =
+		commandLine != NULL && strstr(commandLine, "-blessoriginalmodelsync") != NULL;
+	if (m_BlessOriginalModelSyncEnabled)
+		m_BlessModelShaderEnabled = false;
+
 	InitVBOShaders();
 
 	const char* transport = "none (legacy mesh fallback)";
@@ -115,6 +168,8 @@ void CShaderGL::Init()
 		transport = "uniform array";
 	else if (m_BoneTransport == eVBOBoneTransport_UniformBuffer)
 		transport = "uniform buffer (UBO)";
+	else if (m_BoneTransport == eVBOBoneTransport_ShaderStorageBuffer)
+		transport = "shared shader storage buffer (SSBO)";
 
 	g_ErrorReport.Write("<Renderer VBO model program>\r\n");
 	g_ErrorReport.Write("Model program\t\t: %u\r\n", m_VBOProgram[eVBO_Model]);
@@ -123,19 +178,52 @@ void CShaderGL::Init()
 	g_ErrorReport.Write("GPU skinning ready\t: %s\r\n", IsReadyVBO() ? "yes" : "no");
 	g_ErrorReport.Write("Translated plain VBO\t: %s\r\n",
 		m_TranslatedVboEnabled ? "enabled (opt-in)" : "disabled (legacy default)");
+	g_ErrorReport.Write("Bless model shader\t: %s\r\n",
+		m_BlessModelShaderEnabled ? "enabled (experimental)" : "disabled (legacy default)");
+	g_ErrorReport.Write("Bless original model_sync\t: %s\r\n",
+		m_BlessOriginalModelSyncEnabled ? "enabled (experimental)" : "disabled (legacy default)");
+	g_RenderProfiler.WriteRendererDiagnostic("Model_program: %u\r\n", m_VBOProgram[eVBO_Model]);
+	g_RenderProfiler.WriteRendererDiagnostic("Bone_transport: %s\r\n", transport);
+	g_RenderProfiler.WriteRendererDiagnostic("Bless_model_shader: %s\r\n",
+		m_BlessModelShaderEnabled ? "enabled (experimental)" : "disabled (legacy default)");
+	g_RenderProfiler.WriteRendererDiagnostic("Bless_original_model_sync: %s\r\n",
+		m_BlessOriginalModelSyncEnabled ? "enabled (experimental)" : "disabled (legacy default)");
 	g_ErrorReport.AddSeparator();
 }
 
 GLuint CShaderGL::LoadVBOProgram(const char* baseName, const char* vertexDefine)
 {
-	const std::string vertexPath =
-		std::string("Data\\Effect\\VBO\\") + baseName + ".vs";
-	const std::string fragmentPath =
-		std::string("Data\\Effect\\VBO\\") + baseName + ".fs";
-	const char* tag = vertexDefine != NULL ? "Model UBO" : "Model UniformArray";
+	if (m_BlessOriginalModelSyncEnabled && strcmp(baseName, "Model") == 0)
+	{
+		return CShaderScene::BuildProgramFromFiles(
+			"Bless Shader\\model_sync.vert", "Bless Shader\\model_sync.frag",
+			"Bless original model_sync");
+	}
+	const char* selectedBaseName = baseName;
+	if (m_BlessModelShaderEnabled && strcmp(baseName, "Model") == 0)
+		selectedBaseName = "BlessModel";
 
-	const GLuint program = CShaderScene::BuildProgramFromFiles(
+	const std::string vertexPath =
+		std::string("Data\\Effect\\VBO\\") + selectedBaseName + ".vs";
+	const std::string fragmentPath =
+		std::string("Data\\Effect\\VBO\\") + selectedBaseName + ".fs";
+	const char* tag = m_BlessModelShaderEnabled ? "BlessModel experimental" :
+		(vertexDefine != NULL ? "Model UBO" : "Model UniformArray");
+
+	GLuint program = CShaderScene::BuildProgramFromFiles(
 		vertexPath.c_str(), fragmentPath.c_str(), tag, vertexDefine);
+	if (program == 0 && m_BlessModelShaderEnabled && strcmp(baseName, "Model") == 0)
+	{
+		g_RenderProfiler.WriteRendererDiagnostic("BlessModel: unavailable; established Model fallback requested\r\n");
+		g_ConsoleDebug->Write(5,
+			"[VBO Shader] experimental BlessModel unavailable; retrying established Model program");
+		const std::string fallbackVertexPath =
+			std::string("Data\\Effect\\VBO\\") + baseName + ".vs";
+		const std::string fallbackFragmentPath =
+			std::string("Data\\Effect\\VBO\\") + baseName + ".fs";
+		program = CShaderScene::BuildProgramFromFiles(
+			fallbackVertexPath.c_str(), fallbackFragmentPath.c_str(), "Model fallback", vertexDefine);
+	}
 	if (program == 0)
 	{
 		g_ConsoleDebug->Write(5,
@@ -283,6 +371,96 @@ bool CShaderGL::ConfigureUniformBuffer(GLuint program, const char* tag)
 	return true;
 }
 
+bool CShaderGL::ConfigureShaderStorageBuffer(GLuint program, const char* tag)
+{
+	const bool capability = (GLEW_VERSION_4_3 || GLEW_ARB_shader_storage_buffer_object) &&
+		glGetProgramResourceIndex != NULL && glShaderStorageBlockBinding != NULL &&
+		glBindBufferBase != NULL && glGenBuffers != NULL && glBindBuffer != NULL &&
+		glBufferData != NULL && glGetBufferParameteriv != NULL && glDeleteBuffers != NULL;
+	if (program == 0 || !capability)
+		return false;
+
+	const GLuint blockIndex = glGetProgramResourceIndex(program, GL_SHADER_STORAGE_BLOCK,
+		kBoneStorageBlockName);
+	if (blockIndex == GL_INVALID_INDEX)
+		return false;
+
+	GLuint buffer = 0;
+	RenderProfilerGenBuffers(1, &buffer);
+	if (buffer == 0)
+		return false;
+
+	GLint previousBuffer = 0;
+	glGetIntegerv(GL_SHADER_STORAGE_BUFFER_BINDING, &previousBuffer);
+	RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, kBoneStorageBytes, NULL, GL_STREAM_DRAW);
+	GLint allocatedSize = 0;
+	glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &allocatedSize);
+	if (allocatedSize < kBoneStorageBytes)
+	{
+		RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, (GLuint)previousBuffer);
+		g_RenderProfiler.ResourceDeleted(RPR_BUFFER);
+		glDeleteBuffers(1, &buffer);
+		return false;
+	}
+
+	glShaderStorageBlockBinding(program, blockIndex, kBoneStorageBindingPoint);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, kBoneStorageBindingPoint, buffer);
+	RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, (GLuint)previousBuffer);
+	m_BoneStorageBuffer = buffer;
+	m_BoneStorageCursorVec4 = 0;
+	m_BoneTransport = eVBOBoneTransport_ShaderStorageBuffer;
+	m_VBOBoneCapacity[eVBO_Model] = kBoneCapacity;
+	g_ConsoleDebug->Write(5, "[VBO Shader] '%s' selected SSBO bone transport: %d palettes, binding %u",
+		tag, kBoneStoragePaletteCapacity, kBoneStorageBindingPoint);
+	return true;
+}
+
+bool CShaderGL::ConfigureBlessOriginalBoneStorageBuffer(GLuint program, const char* tag)
+{
+	const bool capability = (GLEW_VERSION_4_3 || GLEW_ARB_shader_storage_buffer_object) &&
+		glGetProgramResourceIndex != NULL && glBindBufferBase != NULL &&
+		glGenBuffers != NULL && glBindBuffer != NULL && glBufferData != NULL &&
+		glGetBufferParameteriv != NULL && glDeleteBuffers != NULL;
+	if (program == 0 || !capability)
+		return false;
+
+	const GLuint blockIndex = glGetProgramResourceIndex(program, GL_SHADER_STORAGE_BLOCK,
+		kBlessOriginalBoneStorageBlockName);
+	if (blockIndex == GL_INVALID_INDEX)
+		return false;
+
+	GLuint buffer = 0;
+	RenderProfilerGenBuffers(1, &buffer);
+	if (buffer == 0)
+		return false;
+
+	GLint previousBuffer = 0;
+	glGetIntegerv(GL_SHADER_STORAGE_BUFFER_BINDING, &previousBuffer);
+	RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, kBlessOriginalBoneStorageBytes, NULL, GL_STREAM_DRAW);
+	GLint allocatedSize = 0;
+	glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &allocatedSize);
+	if (allocatedSize < kBlessOriginalBoneStorageBytes)
+	{
+		RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, (GLuint)previousBuffer);
+		g_RenderProfiler.ResourceDeleted(RPR_BUFFER);
+		glDeleteBuffers(1, &buffer);
+		return false;
+	}
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, kBlessOriginalBoneStorageBindingPoint, buffer);
+	RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, (GLuint)previousBuffer);
+	m_BoneStorageBuffer = buffer;
+	m_BoneStorageCursorVec4 = 0;
+	m_BoneTransport = eVBOBoneTransport_ShaderStorageBuffer;
+	m_VBOBoneCapacity[eVBO_Model] = kBoneCapacity;
+	g_ConsoleDebug->Write(5,
+		"[VBO Shader] '%s' selected original std430 bone storage: %d bones, binding %u",
+		tag, kBoneCapacity, kBlessOriginalBoneStorageBindingPoint);
+	return true;
+}
+
 void CShaderGL::InitVBOShaders()
 {
 	m_MaxVertexUniformComponents = 0;
@@ -305,12 +483,48 @@ void CShaderGL::InitVBOShaders()
 		_stricmp(requestedTransport, "uniform") == 0;
 	const bool forceUniformBuffer = hasTransportOverride &&
 		_stricmp(requestedTransport, "ubo") == 0;
+	const bool forceShaderStorage = hasTransportOverride &&
+		_stricmp(requestedTransport, "ssbo") == 0;
 
 	if (forceLegacy)
 	{
 		g_ConsoleDebug->Write(5,
 			"[VBO Shader] MU_BONE_TRANSPORT=legacy; GPU BMD draw disabled for validation");
 		return;
+	}
+
+	if (m_BlessOriginalModelSyncEnabled)
+	{
+		m_VBOProgram[eVBO_Model] = LoadVBOProgram("Model");
+		if (m_VBOProgram[eVBO_Model] != 0 &&
+			ConfigureBlessOriginalBoneStorageBuffer(m_VBOProgram[eVBO_Model], "Bless original model_sync"))
+			return;
+
+		if (m_VBOProgram[eVBO_Model] != 0)
+		{
+			gShaderScene.ForgetProgram(m_VBOProgram[eVBO_Model]);
+			RenderProfilerDeleteProgram(m_VBOProgram[eVBO_Model]);
+			m_VBOProgram[eVBO_Model] = 0;
+		}
+		ReleaseShaderStorageBuffer(true);
+		m_BlessOriginalModelSyncEnabled = false;
+		g_RenderProfiler.WriteRendererDiagnostic(
+			"Bless_original_model_sync: unavailable; established Model fallback requested\r\n");
+	}
+
+	if (!forceUniformArray && (m_BlessModelShaderEnabled || forceShaderStorage))
+	{
+		m_VBOProgram[eVBO_Model] = LoadVBOProgram("Model", kBoneSsboDefine);
+		if (m_VBOProgram[eVBO_Model] != 0 &&
+			ConfigureShaderStorageBuffer(m_VBOProgram[eVBO_Model], "BlessModel SSBO"))
+			return;
+		if (m_VBOProgram[eVBO_Model] != 0)
+		{
+			gShaderScene.ForgetProgram(m_VBOProgram[eVBO_Model]);
+			RenderProfilerDeleteProgram(m_VBOProgram[eVBO_Model]);
+			m_VBOProgram[eVBO_Model] = 0;
+		}
+		ReleaseShaderStorageBuffer(true);
 	}
 
 	// Prefer the portable std140 block. The same source is recompiled without
@@ -339,7 +553,7 @@ void CShaderGL::InitVBOShaders()
 			"[VBO Shader] UBO transport unavailable or bypassed; trying uniform-array fallback");
 	}
 
-	if (forceUniformBuffer)
+	if (forceUniformBuffer || forceShaderStorage)
 	{
 		g_ConsoleDebug->Write(5,
 			"[VBO Shader] MU_BONE_TRANSPORT=ubo failed; legacy mesh fallback active");
@@ -463,7 +677,22 @@ void CShaderGL::RestoreProgram(GLuint program)
 	BindTrackedProgram(program);
 }
 
-bool CShaderGL::UploadBones(const float* data, int boneCount) const
+void CShaderGL::BeginBoneFrame()
+{
+	if (m_BoneTransport != eVBOBoneTransport_ShaderStorageBuffer || m_BoneStorageBuffer == 0)
+		return;
+	if (m_BlessOriginalModelSyncEnabled)
+		return;
+
+	GLint previousBuffer = 0;
+	glGetIntegerv(GL_SHADER_STORAGE_BUFFER_BINDING, &previousBuffer);
+	RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, m_BoneStorageBuffer);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, kBoneStorageBytes, NULL, GL_STREAM_DRAW);
+	RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, (GLuint)previousBuffer);
+	m_BoneStorageCursorVec4 = 0;
+}
+
+bool CShaderGL::UploadBones(const float* data, int boneCount, int* baseVec4)
 {
 	const GLuint program = GetBoundVBOProgram();
 	if (program == 0 || data == NULL || boneCount <= 0 ||
@@ -473,6 +702,50 @@ bool CShaderGL::UploadBones(const float* data, int boneCount) const
 	}
 
 	const int vec4Count = boneCount * kVec4PerBone;
+	if (m_BoneTransport == eVBOBoneTransport_ShaderStorageBuffer)
+	{
+		if (m_BlessOriginalModelSyncEnabled)
+		{
+			if (m_BoneStorageBuffer == 0 || glBufferSubData == NULL)
+				return false;
+
+			float matrices[kBoneCapacity][kBlessOriginalBoneMatrixFloatCount];
+			for (int bone = 0; bone < boneCount; ++bone)
+			{
+				memcpy(matrices[bone], data + bone * kVec4PerBone * 4,
+					kVec4PerBone * 4 * sizeof(float));
+				matrices[bone][12] = 0.f;
+				matrices[bone][13] = 0.f;
+				matrices[bone][14] = 0.f;
+				matrices[bone][15] = 1.f;
+			}
+
+			GLint previousBuffer = 0;
+			glGetIntegerv(GL_SHADER_STORAGE_BUFFER_BINDING, &previousBuffer);
+			RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, m_BoneStorageBuffer);
+			glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
+				boneCount * kBlessOriginalBoneMatrixFloatCount * sizeof(float), matrices);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER,
+				kBlessOriginalBoneStorageBindingPoint, m_BoneStorageBuffer);
+			RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, (GLuint)previousBuffer);
+			if (baseVec4 != NULL)
+				*baseVec4 = 0;
+			return true;
+		}
+		if (m_BoneStorageBuffer == 0 || glBufferSubData == NULL ||
+			m_BoneStorageCursorVec4 + vec4Count > kBoneStorageVec4Capacity)
+			return false;
+		GLint previousBuffer = 0;
+		glGetIntegerv(GL_SHADER_STORAGE_BUFFER_BINDING, &previousBuffer);
+		RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, m_BoneStorageBuffer);
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, m_BoneStorageCursorVec4 * 4 * sizeof(float),
+			vec4Count * 4 * sizeof(float), data);
+		RenderProfilerBindBuffer(GL_SHADER_STORAGE_BUFFER, (GLuint)previousBuffer);
+		if (baseVec4 != NULL)
+			*baseVec4 = m_BoneStorageCursorVec4;
+		m_BoneStorageCursorVec4 += vec4Count;
+		return true;
+	}
 	if (m_BoneTransport == eVBOBoneTransport_UniformBuffer)
 	{
 		if (m_BoneUniformBuffer == 0 || glBufferSubData == NULL)
@@ -510,6 +783,18 @@ void CShaderGL::vboSetInt(const char* name, int value) const
 	{
 		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
 		glUniform1i(loc, value);
+	}
+}
+
+void CShaderGL::vboSetFloat(const char* name, float value) const
+{
+	const GLuint program = GetBoundVBOProgram();
+	if (program == 0) return;
+	const GLint loc = GetUniformLocation(program, name);
+	if (loc >= 0)
+	{
+		g_RenderProfiler.AddCounter(RPC_UNIFORM_UPLOAD_MATERIAL);
+		glUniform1f(loc, value);
 	}
 }
 

@@ -16,9 +16,11 @@ enum eVBOBoneTransport
 	eVBOBoneTransport_None = 0,
 	eVBOBoneTransport_UniformArray,
 	eVBOBoneTransport_UniformBuffer,
+	eVBOBoneTransport_ShaderStorageBuffer,
 };
 
 bool IsTranslatedVBOEnabled();
+bool IsBlessOriginalModelSyncEnabled();
 
 class CShaderGL
 {
@@ -41,14 +43,18 @@ public:
 	int GetVBOBoneCapacity(eVBOShader shader) const;
 	eVBOBoneTransport GetBoneTransport() const { return m_BoneTransport; }
 	bool IsTranslatedVBOEnabled() const { return m_TranslatedVboEnabled; }
+	bool IsBlessModelShaderEnabled() const { return m_BlessModelShaderEnabled; }
+	bool IsBlessOriginalModelSyncEnabled() const { return m_BlessOriginalModelSyncEnabled; }
 	bool UseVBO(eVBOShader shader, GLuint* previousProgram = NULL);
 	void RestoreProgram(GLuint program);
 
 	// Upload one validated model palette through the selected transport.
-	bool UploadBones(const float* data, int boneCount) const;
+	bool UploadBones(const float* data, int boneCount, int* baseVec4 = NULL);
+	void BeginBoneFrame();
 
 	// Uniform setters operate on the currently bound VBO program.
 	void vboSetInt(const char* name, int value) const;
+	void vboSetFloat(const char* name, float value) const;
 	void vboSetVec4(const char* name, float x, float y, float z, float w) const;
 	void vboSetMat4(const char* name, const float* m16) const;
 
@@ -59,7 +65,10 @@ private:
 	int InspectUniformArrayBoneCapacity(GLuint program, const char* tag) const;
 	bool CanUseUniformBuffer() const;
 	bool ConfigureUniformBuffer(GLuint program, const char* tag);
+	bool ConfigureShaderStorageBuffer(GLuint program, const char* tag);
+	bool ConfigureBlessOriginalBoneStorageBuffer(GLuint program, const char* tag);
 	void ReleaseUniformBuffer(bool canDelete);
+	void ReleaseShaderStorageBuffer(bool canDelete);
 	GLuint BindTrackedProgram(GLuint program) const;
 	GLuint GetTrackedProgram() const;
 	GLuint GetBoundVBOProgram() const;
@@ -70,8 +79,12 @@ private:
 	int m_MaxVertexUniformComponents;
 	int m_MaxUniformBlockSize;
 	GLuint m_BoneUniformBuffer;
+	GLuint m_BoneStorageBuffer;
+	int m_BoneStorageCursorVec4;
 	eVBOBoneTransport m_BoneTransport;
 	bool m_TranslatedVboEnabled;
+	bool m_BlessModelShaderEnabled;
+	bool m_BlessOriginalModelSyncEnabled;
 };
 
 #define gShaderGL (CShaderGL::Instance())

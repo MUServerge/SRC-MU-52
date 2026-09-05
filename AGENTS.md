@@ -20,6 +20,9 @@ over rewriting working code. Keep old behavior unless removal is explicitly requ
 **Never delete or silently replace code you don't fully understand.**
 _This governs adding features/systems. **Bug fixes are the carve-out** — see Rule #11: fix the
 broken code at its source, cleanly, instead of bolting a compensating patch on top of it._
+Additive-first is the migration strategy, not a requirement for permanent duplication. After a
+replacement is fully migrated and validated, its superseded implementation may be removed only
+after the documented removal gates are satisfied and the user specifically approves that removal.
 
 ### 2. Reuse before reinvent
 Before writing anything new, **search** (Grep/Glob) in order: current file → folder → project

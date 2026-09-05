@@ -36,6 +36,7 @@
 #include "./Utilities/Log/muConsoleDebug.h"
 #include "ProtocolSend.h"
 #include "ProtectSysKey.h"
+#include "RenderProfiler.h"
 
 #include "CBTMessageBox.h"
 #include "./ExternalObject/leaf/regkey.h"
@@ -543,10 +544,11 @@ namespace
 		return commandLine != NULL && option != NULL && strstr(commandLine, option) != NULL;
 	}
 
-	bool SelectRendererContext(bool requestGL33Compatibility, HGLRC legacyContext, HGLRC& selectedContext)
+	bool SelectRendererContext(bool requestGL43Compatibility, bool requestGL33Compatibility,
+		HGLRC legacyContext, HGLRC& selectedContext)
 	{
 		selectedContext = legacyContext;
-		if (!requestGL33Compatibility)
+		if (!requestGL43Compatibility && !requestGL33Compatibility)
 			return true;
 
 		PROC proc = wglGetProcAddress("wglCreateContextAttribsARB");
@@ -558,10 +560,12 @@ namespace
 
 		PFNWGLCREATECONTEXTATTRIBSARBPROC createContextAttributes =
 			(PFNWGLCREATECONTEXTATTRIBSARBPROC)proc;
+		const int requestedMajor = requestGL43Compatibility ? 4 : 3;
+		const int requestedMinor = requestGL43Compatibility ? 3 : 3;
 		const int contextAttributes[] =
 		{
-			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-			WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+			WGL_CONTEXT_MAJOR_VERSION_ARB, requestedMajor,
+			WGL_CONTEXT_MINOR_VERSION_ARB, requestedMinor,
 			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
 			0
 		};
@@ -595,6 +599,22 @@ namespace
 
 		selectedContext = compatibilityContext;
 		return true;
+	}
+
+	bool IsBlessGL43Ready()
+	{
+		int major = 0;
+		int minor = 0;
+		const char* version = (const char*)glGetString(GL_VERSION);
+		const bool versionReady = ParseOpenGLVersion(version, major, minor) &&
+			IsOpenGLVersionAtLeast(major, minor, 4, 3);
+		const bool storageEntries = glShaderStorageBlockBinding != NULL &&
+			glBindBufferBase != NULL;
+		const bool computeEntries = glDispatchCompute != NULL && glMemoryBarrier != NULL;
+		const bool extensionsReady = GLEW_VERSION_4_3 ||
+			(GLEW_ARB_shader_storage_buffer_object && GLEW_ARB_compute_shader);
+
+		return versionReady && storageEntries && computeEntries && extensionsReady;
 	}
 
 	const char* PixelFormatAcceleration(const PIXELFORMATDESCRIPTOR& pfd)
@@ -650,9 +670,12 @@ namespace
 
 	void WriteOpenGLCapabilityDiagnostics(GLenum glewResult)
 	{
+		g_RenderProfiler.WriteRendererDiagnostic("<Renderer diagnostics>\r\n");
 		g_ErrorReport.Write("<Renderer OpenGL capability diagnostics>\r\n");
 		if (glewResult != GLEW_OK)
 		{
+			g_RenderProfiler.WriteRendererDiagnostic("GLEW: FAILED (%u: %s)\r\n", (unsigned int)glewResult,
+				(const char*)glewGetErrorString(glewResult));
 			g_ErrorReport.Write("GLEW\t\t\t: FAILED (%u: %s)\r\n", (unsigned int)glewResult,
 				(const char*)glewGetErrorString(glewResult));
 			g_ErrorReport.Write("Extended GL queries\t: unavailable; startup continues with the existing unsafe behavior\r\n");
@@ -660,12 +683,16 @@ namespace
 		}
 
 		g_ErrorReport.Write("GLEW\t\t\t: OK (%s)\r\n", (const char*)glewGetString(GLEW_VERSION));
+		g_RenderProfiler.WriteRendererDiagnostic("GLEW: OK (%s)\r\n", (const char*)glewGetString(GLEW_VERSION));
 		const char* vendor = (const char*)glGetString(GL_VENDOR);
 		const char* renderer = (const char*)glGetString(GL_RENDERER);
 		const char* version = (const char*)glGetString(GL_VERSION);
 		g_ErrorReport.Write("GL_VENDOR\t\t: %s\r\n", vendor != NULL ? vendor : "unavailable");
 		g_ErrorReport.Write("GL_RENDERER\t\t: %s\r\n", renderer != NULL ? renderer : "unavailable");
 		g_ErrorReport.Write("GL_VERSION\t\t: %s\r\n", version != NULL ? version : "unavailable");
+		g_RenderProfiler.WriteRendererDiagnostic("GL_VENDOR: %s\r\n", vendor != NULL ? vendor : "unavailable");
+		g_RenderProfiler.WriteRendererDiagnostic("GL_RENDERER: %s\r\n", renderer != NULL ? renderer : "unavailable");
+		g_RenderProfiler.WriteRendererDiagnostic("GL_VERSION: %s\r\n", version != NULL ? version : "unavailable");
 
 		int major = 0;
 		int minor = 0;
@@ -678,6 +705,7 @@ namespace
 		const bool shaderVersion = versionParsed && IsOpenGLVersionAtLeast(major, minor, 2, 0);
 		const char* shadingLanguage = shaderVersion ? (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION) : NULL;
 		g_ErrorReport.Write("GLSL version\t\t: %s\r\n", shadingLanguage != NULL ? shadingLanguage : "unavailable");
+		g_RenderProfiler.WriteRendererDiagnostic("GLSL_VERSION: %s\r\n", shadingLanguage != NULL ? shadingLanguage : "unavailable");
 
 		if (versionParsed && IsOpenGLVersionAtLeast(major, minor, 3, 0))
 		{
@@ -798,6 +826,14 @@ namespace
 			glGetActiveUniformBlockiv != NULL && glUniformBlockBinding != NULL &&
 			glBindBufferBase != NULL && glGetBufferParameteriv != NULL;
 		const bool textureBufferSupport = textureBufferCapability && glTexBuffer != NULL;
+		const bool blessStorageSupport =
+			((versionParsed && IsOpenGLVersionAtLeast(major, minor, 4, 3)) ||
+				GLEW_ARB_shader_storage_buffer_object) &&
+			glShaderStorageBlockBinding != NULL && glBindBufferBase != NULL;
+		const bool blessComputeSupport =
+			((versionParsed && IsOpenGLVersionAtLeast(major, minor, 4, 3)) ||
+				GLEW_ARB_compute_shader) &&
+			glDispatchCompute != NULL && glMemoryBarrier != NULL;
 
 		g_ErrorReport.Write("<Renderer capability summary>\r\n");
 		g_ErrorReport.Write("VAO support\t\t: %s\r\n", vaoSupport ? "yes" : "no");
@@ -806,6 +842,10 @@ namespace
 		g_ErrorReport.Write("Timer-query support\t: %s (GPU timing not implemented in Phase 0)\r\n", timerQuerySupport ? "yes" : "no");
 		g_ErrorReport.Write("UBO support\t\t: %s\r\n", uboSupport ? "yes" : "no");
 		g_ErrorReport.Write("Texture-buffer support\t: %s\r\n", textureBufferSupport ? "yes" : "no");
+		g_ErrorReport.Write("Bless SSBO support\t: %s\r\n", blessStorageSupport ? "yes" : "no");
+		g_ErrorReport.Write("Bless compute support\t: %s\r\n", blessComputeSupport ? "yes" : "no");
+		g_RenderProfiler.WriteRendererDiagnostic("Bless_SSBO: %s\r\n", blessStorageSupport ? "yes" : "no");
+		g_RenderProfiler.WriteRendererDiagnostic("Bless_compute: %s\r\n", blessComputeSupport ? "yes" : "no");
 
 		const bool activeVboEntries = vaoEntries && bufferEntries && attributeEntries &&
 			integerAttributeEntry && shaderEntries && programEntries && uniformEntries &&
@@ -877,14 +917,17 @@ bool CreateOpenglWindow()
 		return FALSE;
 	}
 
+	const bool requestBlessGL43Compatibility = HasCommandLineSwitch("-blessgl43");
 	const bool requestGL33Compatibility = HasCommandLineSwitch("-gl33compat");
 	const HGLRC legacyContext = g_hRC;
 	HGLRC selectedContext = legacyContext;
 
 	g_ErrorReport.Write("<Renderer context selection>\r\n");
 	g_ErrorReport.Write("Requested context\t: %s\r\n",
-		requestGL33Compatibility ? "OpenGL 3.3 Compatibility" : "legacy default");
-	if (!SelectRendererContext(requestGL33Compatibility, legacyContext, selectedContext))
+		requestBlessGL43Compatibility ? "OpenGL 4.3 Compatibility (Bless opt-in)" :
+		(requestGL33Compatibility ? "OpenGL 3.3 Compatibility" : "legacy default"));
+	if (!SelectRendererContext(requestBlessGL43Compatibility, requestGL33Compatibility,
+		legacyContext, selectedContext))
 	{
 		g_hRC = legacyContext;
 		KillGLWindow();
@@ -918,6 +961,29 @@ bool CreateOpenglWindow()
 		glewResult = glewInit();
 	}
 
+	if (requestBlessGL43Compatibility && selectedContext != legacyContext &&
+		glewResult == GLEW_OK && !IsBlessGL43Ready())
+	{
+		g_ErrorReport.Write("Bless GL 4.3 request\t: required SSBO/compute capability unavailable; restoring legacy context\r\n");
+		if (!wglMakeCurrent(g_hDC, legacyContext))
+		{
+			g_ErrorReport.Write("Legacy context recovery\t: FAILED (%u)\r\n", GetLastError());
+			g_hRC = selectedContext;
+			KillGLWindow();
+			MessageBox(NULL, GlobalText[4], "OpenGL Legacy Context Recovery Error.", MB_OK | MB_ICONEXCLAMATION);
+			return FALSE;
+		}
+
+		if (!wglDeleteContext(selectedContext))
+		{
+			g_ErrorReport.Write("Bless GL 4.3 candidate\t: release failed (%u)\r\n", GetLastError());
+			g_hBootstrapRC = selectedContext;
+		}
+		selectedContext = legacyContext;
+		g_hRC = legacyContext;
+		glewResult = glewInit();
+	}
+
 	if (selectedContext != legacyContext)
 	{
 		if (!wglDeleteContext(legacyContext))
@@ -928,7 +994,16 @@ bool CreateOpenglWindow()
 	}
 
 	g_ErrorReport.Write("Selected context\t: %s\r\n",
-		selectedContext != legacyContext ? "OpenGL 3.3 Compatibility" : "legacy WGL context");
+		selectedContext != legacyContext ?
+			(requestBlessGL43Compatibility ? "OpenGL 4.3 Compatibility" : "OpenGL 3.3 Compatibility") :
+			"legacy WGL context");
+	g_RenderProfiler.WriteRendererDiagnostic("Requested_context: %s\r\n",
+		requestBlessGL43Compatibility ? "OpenGL 4.3 Compatibility (Bless opt-in)" :
+		(requestGL33Compatibility ? "OpenGL 3.3 Compatibility" : "legacy default"));
+	g_RenderProfiler.WriteRendererDiagnostic("Selected_context: %s\r\n",
+		selectedContext != legacyContext ?
+			(requestBlessGL43Compatibility ? "OpenGL 4.3 Compatibility" : "OpenGL 3.3 Compatibility") :
+			"legacy WGL context");
 	g_ErrorReport.AddSeparator();
 	WritePixelFormatDiagnostics(g_hDC, (int)PixelFormat, pfd, glewResult == GLEW_OK);
 	WriteOpenGLCapabilityDiagnostics(glewResult);

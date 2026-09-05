@@ -2,6 +2,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "CShaderGL.h"
 #include "UIManager.h"
 #include "GuildCache.h"
 #include "ZzzOpenglUtil.h"
@@ -2427,18 +2428,24 @@ void MoveMainScene()
 				SetFocus(gwinhandle->GethWnd());
 			}
 		}
-		MoveInterface();
-		MoveTournamentInterface();
-		if (ErrorMessage != MESSAGE_LOG_OUT)
-			g_pUIManager->UpdateInput();
+		{
+			CRenderProfilerScope uiProfilerScope(RP_UI_NOTICES);
+			MoveInterface();
+			MoveTournamentInterface();
+			if (ErrorMessage != MESSAGE_LOG_OUT)
+				g_pUIManager->UpdateInput();
+		}
 	}
 
 	if (ErrorMessage != NULL)
 		MouseOnWindow = true;
 
-	MoveObjects();
-	if (!CameraTopViewEnable)
-		MoveItems();
+	{
+		CRenderProfilerScope objectProfilerScope(RP_OBJECT_UPDATE);
+		MoveObjects();
+		if (!CameraTopViewEnable)
+			MoveItems();
+	}
 
 	if ((World == WD_0LORENCIA && HeroTile != 4) ||
 		(World == WD_2DEVIAS && HeroTile != 3 && HeroTile < 10)
@@ -2471,8 +2478,11 @@ void MoveMainScene()
 	gmHeadChat->MoveChat();
 
 	UpdatePersonalShopTitleImp();
-	MoveHero();
-	MoveCharactersClient();
+	{
+		CRenderProfilerScope characterProfilerScope(RP_CHARACTER_UPDATE);
+		MoveHero();
+		MoveCharactersClient();
+	}
 	MoveMainCamera();
 	ThePetProcess().UpdatePets();
 	gGoboidManager->MoveBugs();
@@ -2480,10 +2490,13 @@ void MoveMainScene()
 
 	MovePoints();
 	MovePlanes();
-	MoveEffects();
-	MoveJoints();
-	MoveParticles();
-	MovePointers();
+	{
+		CRenderProfilerScope effectProfilerScope(RP_EFFECT_UPDATE);
+		MoveEffects();
+		MoveJoints();
+		MoveParticles();
+		MovePointers();
+	}
 
 	g_Direction.CheckDirection();
 
@@ -2601,24 +2614,27 @@ bool RenderMainScene()
 		glClearColor(0 / 256.f, 0 / 256.f, 0 / 256.f, 1.f);
 	}
 
-	BeginOpengl(0, 0, Width, Height, true);
-
-	CreateFrustrum((float)Width / (float)GetScreenWidth(), pos);
-
-	if (gMapManager->InBattleCastle())
 	{
-		if (battleCastle::InBattleCastle2(Hero->Object.Position))
-		{
-			vec3_t Color = { 0.f, 0.f, 0.f };
-			battleCastle::StartFog(Color);
-		}
-		else
-		{
-			glDisable(GL_FOG);
-		}
-	}
+		CRenderProfilerScope worldProfilerScope(RP_RENDER_WORLD);
+		BeginOpengl(0, 0, Width, Height, true);
 
-	CreateScreenVector(MouseX, MouseY, MouseTarget);
+		CreateFrustrum((float)Width / (float)GetScreenWidth(), pos);
+
+		if (gMapManager->InBattleCastle())
+		{
+			if (battleCastle::InBattleCastle2(Hero->Object.Position))
+			{
+				vec3_t Color = { 0.f, 0.f, 0.f };
+				battleCastle::StartFog(Color);
+			}
+			else
+			{
+				glDisable(GL_FOG);
+			}
+		}
+
+		CreateScreenVector(MouseX, MouseY, MouseTarget);
+	}
 
 	if (gwinhandle->CheckPerformance())
 	{
@@ -2627,23 +2643,32 @@ bool RenderMainScene()
 			if (World == WD_39KANTURU_3RD)
 			{
 				if (!g_Direction.m_CKanturu.IsMayaScene())
+				{
+					CRenderProfilerScope worldProfilerScope(RP_RENDER_WORLD);
 					RenderTerrain(false);
+				}
 			}
 			else if (World != WD_10HEAVEN && World != -1)
 			{
 				if (gMapManager->IsPKField() || IsDoppelGanger2())
 				{
+					CRenderProfilerScope modelsProfilerScope(RP_RENDER_MODELS);
 					RenderObjects();
 				}
-				RenderTerrain(false);
+				{
+					CRenderProfilerScope worldProfilerScope(RP_RENDER_WORLD);
+					RenderTerrain(false);
+				}
 			}
 		}
 
-		if (!gMapManager->IsPKField() && !IsDoppelGanger2())
-			RenderObjects();
+		{
+			CRenderProfilerScope modelsProfilerScope(RP_RENDER_MODELS);
+			if (!gMapManager->IsPKField() && !IsDoppelGanger2())
+				RenderObjects();
 
-		RenderEffectShadows();
-		RenderBoids();
+			RenderEffectShadows();
+			RenderBoids();
 
 #ifdef SHADER_PIPELINE
 		// Character shader: shades players / monsters / NPCs only. Inventory item
@@ -2653,127 +2678,167 @@ bool RenderMainScene()
 		bool bCharShader = gShaderScene.Use(eShaderS_Character);
 #endif // SHADER_PIPELINE
 
-		RenderCharactersClient();
+			if (g_RenderProfiler.IsEnabled())
+			{
+				for (int characterIndex = 0; characterIndex < MAX_CHARACTERS_CLIENT; ++characterIndex)
+				{
+					CHARACTER* character = gmCharacters->GetCharacter(characterIndex);
+					OBJECT* object = &character->Object;
+					if (!object->Live || !object->Visible)
+						continue;
+
+					g_RenderProfiler.AddModelsCounter(RPC_MODEL_VISIBLE_CHARACTERS);
+					g_RenderProfiler.AddModelsCounter(object->Kind == KIND_PLAYER
+						? RPC_MODEL_VISIBLE_PLAYERS : RPC_MODEL_VISIBLE_MONSTERS_NPCS);
+					if (character->m_pPet != NULL)
+						g_RenderProfiler.AddModelsCounter(RPC_MODEL_VISIBLE_PETS);
+				}
+			}
+
+			RenderCharactersClient();
 
 #ifdef SHADER_PIPELINE
 		if (bCharShader)
 			gShaderScene.Unuse();
 #endif // SHADER_PIPELINE
+		}
 
 		if (EditFlag != EDIT_NONE)
+		{
+			CRenderProfilerScope worldProfilerScope(RP_RENDER_WORLD);
 			RenderTerrain(true);
+		}
 
-		if (!CameraTopViewEnable)
-			RenderItems();
-
-		RenderFishs();
-		gGoboidManager->RenderBugs();
-		RenderLeaves();
-
-		if (!gMapManager->InChaosCastle())
-			ThePetProcess().RenderPets();
-
-		RenderBoids(true);
-		RenderObjects_AfterCharacter();
-
-		RenderJoints(byWaterMap);
-		RenderEffects();
-		RenderBlurs();
-		CheckSprites();
-		BeginSprite();
-
-		if ((World == WD_2DEVIAS && HeroTile != 3 && HeroTile < 10)
-			|| IsIceCity()
-			|| IsSantaTown()
-			|| gMapManager->IsPKField()
-			|| IsDoppelGanger2()
-			|| gMapManager->IsEmpireGuardian1()
-			|| gMapManager->IsEmpireGuardian2()
-			|| gMapManager->IsEmpireGuardian3()
-			|| gMapManager->IsEmpireGuardian4()
-			|| IsUnitedMarketPlace()
-			)
 		{
+			CRenderProfilerScope modelsProfilerScope(RP_RENDER_MODELS);
+			if (!CameraTopViewEnable)
+				RenderItems();
+
+			RenderFishs();
+			gGoboidManager->RenderBugs();
 			RenderLeaves();
+
+			if (!gMapManager->InChaosCastle())
+				ThePetProcess().RenderPets();
+
+			RenderBoids(true);
+			RenderObjects_AfterCharacter();
 		}
 
-		RenderSprites();
-		RenderParticles();
-
-		if (IsWaterTerrain() == false)
 		{
-			RenderPoints(byWaterMap);
+			CRenderProfilerScope effectsProfilerScope(RP_RENDER_EFFECTS);
+			RenderJoints(byWaterMap);
+			RenderEffects();
+			RenderBlurs();
+			CheckSprites();
+			BeginSprite();
+
+			if ((World == WD_2DEVIAS && HeroTile != 3 && HeroTile < 10)
+				|| IsIceCity()
+				|| IsSantaTown()
+				|| gMapManager->IsPKField()
+				|| IsDoppelGanger2()
+				|| gMapManager->IsEmpireGuardian1()
+				|| gMapManager->IsEmpireGuardian2()
+				|| gMapManager->IsEmpireGuardian3()
+				|| gMapManager->IsEmpireGuardian4()
+				|| IsUnitedMarketPlace()
+				)
+			{
+				RenderLeaves();
+			}
+
+			RenderSprites();
+			RenderParticles();
+
+			if (IsWaterTerrain() == false)
+			{
+				RenderPoints(byWaterMap);
+			}
+
+			EndSprite();
+
+			RenderAfterEffects();
 		}
-
-		EndSprite();
-
-		RenderAfterEffects();
 
 		if (IsWaterTerrain() == true)
 		{
 			byWaterMap = 2;
 
-			EndOpengl();
-			BeginOpengl(0, 0, Width, Height, true);
-			RenderWaterTerrain();
-			RenderJoints(byWaterMap);
-			RenderEffects(true);
-			RenderBlurs();
-			CheckSprites();
-			BeginSprite();
+			{
+				CRenderProfilerScope worldProfilerScope(RP_RENDER_WORLD);
+				EndOpengl();
+				BeginOpengl(0, 0, Width, Height, true);
+				RenderWaterTerrain();
+			}
+			{
+				CRenderProfilerScope effectsProfilerScope(RP_RENDER_EFFECTS);
+				RenderJoints(byWaterMap);
+				RenderEffects(true);
+				RenderBlurs();
+				CheckSprites();
+				BeginSprite();
 
-			if (World == WD_2DEVIAS && HeroTile != 3 && HeroTile < 10)
-				RenderLeaves();
+				if (World == WD_2DEVIAS && HeroTile != 3 && HeroTile < 10)
+					RenderLeaves();
 
-			RenderSprites(byWaterMap);
-			RenderParticles(byWaterMap);
-			RenderPoints(byWaterMap);
+				RenderSprites(byWaterMap);
+				RenderParticles(byWaterMap);
+				RenderPoints(byWaterMap);
 
-			EndSprite();
-			EndOpengl();
-			BeginOpengl(0, 0, Width, Height, true);
+				EndSprite();
+			}
+			{
+				CRenderProfilerScope worldProfilerScope(RP_RENDER_WORLD);
+				EndOpengl();
+				BeginOpengl(0, 0, Width, Height, true);
+			}
 		}
 
 		if (gMapManager->InBattleCastle())
 		{
 			if (battleCastle::InBattleCastle2(Hero->Object.Position))
 			{
+				CRenderProfilerScope worldProfilerScope(RP_RENDER_WORLD);
 				battleCastle::EndFog();
 			}
 		}
 	}
 
-	SelectObjects();
-	BeginBitmap();
-	RenderObjectDescription();
-
-	if (gwinhandle->CheckPerformance())
 	{
-		if (CameraTopViewEnable == false)
-		{
-			RenderInterface(true);
-		}
-		RenderTournamentInterface();
-		EndBitmap();
-
-		g_pPartyManager->Render();
-		g_pNewUISystem->Render();
-
+		CRenderProfilerScope uiProfilerScope(RP_RENDER_UI);
+		SelectObjects();
 		BeginBitmap();
+		RenderObjectDescription();
 
-		RenderInfomation();
+		if (gwinhandle->CheckPerformance())
+		{
+			if (CameraTopViewEnable == false)
+			{
+				RenderInterface(true);
+			}
+			RenderTournamentInterface();
+			EndBitmap();
+
+			g_pPartyManager->Render();
+			g_pNewUISystem->Render();
+
+			BeginBitmap();
+
+			RenderInfomation();
 
 #ifdef ENABLE_EDIT
 		RenderDebugWindow();
 #endif //ENABLE_EDIT
 
-		EndBitmap();
-		BeginBitmap();
+			EndBitmap();
+			BeginBitmap();
 
-		RenderCursor();
+			RenderCursor();
 
-		EndBitmap();
-		EndOpengl();
+			EndBitmap();
+			EndOpengl();
+		}
 	}
 
 	return true;
@@ -2813,44 +2878,65 @@ void MainScene(HDC hDC)
 
 	gsteady_clock->LoadInformationFps();
 	g_RenderProfiler.BeginFrame(SceneFlag, FPS, SceneFlag == MAIN_SCENE && LoadingWorld > 30);
+	if (gShaderGL != NULL)
+		gShaderGL->BeginBoneFrame();
 
 	const int fixedUpdateSteps = gsteady_clock->GetFixedUpdateStepCount();
-	g_RenderProfiler.AddCounter(RPC_FIXED_UPDATE_STEPS, fixedUpdateSteps);
-	g_RenderProfiler.AddCounter(RPC_FIXED_UPDATE_DROPPED, gsteady_clock->GetDroppedFixedUpdateStepCount());
+	const double interpolationAlpha = gsteady_clock->GetFixedUpdateAlpha();
+	g_RenderProfiler.SampleTimingFrame(
+		gsteady_clock->GetFrameDeltaSeconds() * 1000.0,
+		gsteady_clock->GetLegacyVisualStep() * 1000.0 / REFERENCE_FPS,
+		FPS,
+		fixedUpdateSteps,
+		gsteady_clock->GetDroppedFixedUpdateStepCount(),
+		interpolationAlpha * 1000.0 / REFERENCE_FPS,
+		interpolationAlpha);
 
 	{
 		CRenderProfilerScope moveProfilerScope(RP_MOVE_SCENE);
 
-		g_pNewKeyInput->ScanAsyncKeyState();
-
-		if (LOG_IN_SCENE == SceneFlag || CHARACTER_SCENE == SceneFlag)
 		{
-			double dDeltaTick = g_pTimer->GetTimeElapsed();
-			dDeltaTick = MIN(dDeltaTick, 200.0);
-			g_pTimer->ResetTimer();
+			CRenderProfilerScope inputProfilerScope(RP_INPUT);
+			g_pNewKeyInput->ScanAsyncKeyState();
 
-			CInput::Instance().Update();
-			CUIMng::Instance().Update(dDeltaTick);
+			if (LOG_IN_SCENE == SceneFlag || CHARACTER_SCENE == SceneFlag)
+			{
+				double dDeltaTick = g_pTimer->GetTimeElapsed();
+				dDeltaTick = MIN(dDeltaTick, 200.0);
+				g_pTimer->ResetTimer();
+
+				CInput::Instance().Update();
+				CUIMng::Instance().Update(dDeltaTick);
+			}
 		}
 
 		g_dwMouseUseUIID = 0;
 
-		switch (SceneFlag)
 		{
-		case LOG_IN_SCENE:
-			NewMoveLogInScene();
-			break;
-		case CHARACTER_SCENE:
-			NewMoveCharacterScene();
-			break;
-		case MAIN_SCENE:
-			MoveMainScene();
-			break;
+			CRenderProfilerScope sceneProfilerScope(RP_SCENE_MOVE);
+			switch (SceneFlag)
+			{
+			case LOG_IN_SCENE:
+				NewMoveLogInScene();
+				break;
+			case CHARACTER_SCENE:
+				NewMoveCharacterScene();
+				break;
+			case MAIN_SCENE:
+				MoveMainScene();
+				break;
+			}
 		}
 
-		g_PhysicsManager.Move(0.005f);
+		{
+			CRenderProfilerScope physicsProfilerScope(RP_PHYSICS_MOVE);
+			g_PhysicsManager.Move(0.005f);
+		}
 
-		MoveNotices();
+		{
+			CRenderProfilerScope noticesProfilerScope(RP_UI_NOTICES);
+			MoveNotices();
+		}
 
 		if (PressKey(VK_SNAPSHOT))
 		{

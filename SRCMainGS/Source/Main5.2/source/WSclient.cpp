@@ -12665,6 +12665,8 @@ void ProtocolCompiler(CWsctlc* pSocketClient, int iTranslation, int iParam)
 				Size = iSize;
 			}
 			TotalPacketSize += Size;
+			g_RenderProfiler.AddCounter(RPC_PACKETS_RECEIVED);
+			g_RenderProfiler.AddCounter(RPC_PACKET_BYTES_RECEIVED, Size);
 #ifdef SAVE_PACKET
 			SOCKET socket = pSocketClient->GetSocket();
 

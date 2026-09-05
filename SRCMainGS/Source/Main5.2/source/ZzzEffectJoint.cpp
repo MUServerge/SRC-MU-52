@@ -30,6 +30,7 @@ void CreateJointSync(int Type, vec3_t Position, vec3_t TargetPosition, vec3_t An
 
 void CreateJoint(int Type, vec3_t Position, vec3_t TargetPosition, vec3_t Angle, int SubType, OBJECT* Target, float Scale, short PKKey, WORD SkillIndex, WORD SkillSerialNum, int iChaIndex, const float* vPriorColor, short int sTargetindex)
 {
+	g_RenderProfiler.AddCounter(RPC_JOINT_CREATE_ATTEMPTS);
 	for (int i = 0; i < MAX_JOINTS; i++)
 	{
 		JOINT* o = &Joints[i];
@@ -2743,9 +2744,11 @@ void CreateJoint(int Type, vec3_t Position, vec3_t TargetPosition, vec3_t Angle,
 				o->MaxTails = MAX_TAILS;
 
 			o->life_time_work = standlimit((int)o->LifeTime);
+			g_RenderProfiler.AddCounter(RPC_JOINT_CREATE_SUCCEEDED);
 			return;
 		}
 	}
+	g_RenderProfiler.AddCounter(RPC_JOINT_CREATE_NO_FREE_SLOT);
 }
 
 void DeleteJoint(int Type, OBJECT* Target, int SubType)
@@ -7240,6 +7243,8 @@ void MoveJoint(JOINT* o, int iIndex)
 
 void MoveJoints()
 {
+	const bool profilePool = g_RenderProfiler.IsEnabled();
+	int liveCount = 0;
 	for (int i = 0; i < MAX_JOINTS; i++)
 	{
 		JOINT* o = &Joints[i];
@@ -7247,7 +7252,11 @@ void MoveJoints()
 		{
 			MoveJoint(o, i);
 		}
+		if (profilePool && o->Live)
+			liveCount++;
 	}
+	if (profilePool)
+		g_RenderProfiler.SamplePoolOccupancy(RPP_JOINT, liveCount);
 }
 
 void RenderJoints(BYTE bRenderOneMore)

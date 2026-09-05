@@ -96,7 +96,7 @@ __forceinline int SendPacket(char* buf, int len, BOOL bEncrypt = FALSE, BOOL bFo
 
 	if (!bEncrypt)
 	{
-		return (g_pSocketClient->sSend(buf, len));
+		return g_RenderProfiler.RecordPacketSendResult(g_pSocketClient->sSend(buf, len), len);
 	}
 
 	BYTE byBuffer[MAX_SPE_BUFFERSIZE_];
@@ -123,7 +123,7 @@ __forceinline int SendPacket(char* buf, int len, BOOL bEncrypt = FALSE, BOOL bFo
 		g_SimpleModulusCS.Encrypt(bc.byBuffer, byBuffer + iSkip, len - iSkip);
 		assert(iSize < 256);
 
-		return (g_pSocketClient->sSend((char*)&bc, iLength));
+		return g_RenderProfiler.RecordPacketSendResult(g_pSocketClient->sSend((char*)&bc, iLength), iLength);
 	}
 	else
 	{
@@ -136,7 +136,7 @@ __forceinline int SendPacket(char* buf, int len, BOOL bEncrypt = FALSE, BOOL bFo
 		g_SimpleModulusCS.Encrypt(wc.byBuffer, byBuffer + iSkip, len - iSkip);
 
 		assert(iSize <= MAX_SPE_BUFFERSIZE_);
-		return (g_pSocketClient->sSend((char*)&wc, iLength));
+		return g_RenderProfiler.RecordPacketSendResult(g_pSocketClient->sSend((char*)&wc, iLength), iLength);
 	}
 }
 

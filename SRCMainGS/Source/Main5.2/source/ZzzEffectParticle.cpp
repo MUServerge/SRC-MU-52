@@ -56,6 +56,7 @@ int CreateParticleSync(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, in
 
 int CreateParticle(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int SubType, float Scale, OBJECT* Owner)
 {
+	g_RenderProfiler.AddCounter(RPC_PARTICLE_CREATE_ATTEMPTS);
 	for (int i = 0; i < MAX_PARTICLES; i++)
 	{
 		PARTICLE* o = &Particles[i];
@@ -3911,9 +3912,11 @@ int CreateParticle(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int Su
 			}
 			break;
 			}
+			g_RenderProfiler.AddCounter(RPC_PARTICLE_CREATE_SUCCEEDED);
 			return i;
 		}
 	}
+	g_RenderProfiler.AddCounter(RPC_PARTICLE_CREATE_NO_FREE_SLOT);
 	return false;
 }
 
@@ -8902,6 +8905,7 @@ void MoveParticles()
 			}
 		}
 	}
+	g_RenderProfiler.SamplePoolOccupancy(RPP_PARTICLE, count);
 }
 
 void RenderParticles(BYTE byRenderOneMore)

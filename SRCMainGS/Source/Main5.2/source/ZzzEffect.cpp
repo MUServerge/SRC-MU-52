@@ -468,6 +468,7 @@ void CreateEffectSync(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int
 
 void CreateEffect(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int SubType, OBJECT* Owner, short PKKey, WORD SkillIndex, WORD Skill, WORD SkillSerialNum, float Scale, short int sTargetIndex)
 {
+	g_RenderProfiler.AddCounter(RPC_EFFECT_CREATE_ATTEMPTS);
 	for (int icntEffect = 0; icntEffect < MAX_EFFECTS; icntEffect++)
 	{
 		OBJECT* o = &Effects[icntEffect];
@@ -521,9 +522,11 @@ void CreateEffect(int Type, vec3_t Position, vec3_t Angle, vec3_t Light, int Sub
 			CreateEffect(o, Type, Position, Angle, Light, SubType, Owner, PKKey, SkillIndex, Skill, SkillSerialNum, Scale, sTargetIndex);
 
 			o->life_time_work = standlimit((int)o->LifeTime);
+			g_RenderProfiler.AddCounter(RPC_EFFECT_CREATE_SUCCEEDED);
 			return;
 		}
 	}
+	g_RenderProfiler.AddCounter(RPC_EFFECT_CREATE_NO_FREE_SLOT);
 }
 
 
@@ -18530,6 +18533,8 @@ void MoveEffects()
 		g_pCatapultWindow->SetCameraPos();
 	}
 
+	const bool profilePool = g_RenderProfiler.IsEnabled();
+	int liveCount = 0;
 	for (int i = 0; i < MAX_EFFECTS; i++)
 	{
 		OBJECT* o = &Effects[i];
@@ -18537,7 +18542,11 @@ void MoveEffects()
 		{
 			MoveEffect(o, i);
 		}
+		if (profilePool && o->Live)
+			liveCount++;
 	}
+	if (profilePool)
+		g_RenderProfiler.SamplePoolOccupancy(RPP_EFFECT, liveCount);
 	g_SkillEffects.MoveEffects();
 }
 

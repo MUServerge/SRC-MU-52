@@ -26,6 +26,7 @@
 // not affect bare max()/min() usage in the rest of this translation unit.
 #ifdef SHADER_VERSION_TEST
 bool IsTranslatedVBOEnabled();
+bool IsBlessOriginalModelSyncEnabled();
 #endif
 
 extern float MouseX;
@@ -175,6 +176,25 @@ static RenderProfilerCounter ClassifyTranslatedVboMesh(int renderFlags,
 		return RPC_VBO_TRANSLATE_EXCLUDED_BLOCKED;
 
 	return RPC_VBO_TRANSLATE_PLAIN_CANDIDATE;
+}
+
+static RenderProfilerCounter ClassifyLegacyModelMaterial(int renderFlags, bool enableWave, int renderFlag)
+{
+	if (renderFlag & RENDER_SHADOWMAP)
+		return RPC_MODEL_LEGACY_MATERIAL_SHADOW;
+	if (renderFlags == RENDER_COLOR || (renderFlag & RENDER_COLOR))
+		return RPC_MODEL_LEGACY_MATERIAL_COLOR;
+	if (enableWave || (renderFlag & RENDER_WAVE))
+		return RPC_MODEL_LEGACY_MATERIAL_WAVE;
+	if (renderFlag & (RENDER_CHROME | RENDER_METAL | RENDER_CHROME2 | RENDER_CHROME3 |
+		RENDER_CHROME4 | RENDER_CHROME5 | RENDER_CHROME6 | RENDER_CHROME7 |
+		RENDER_CHROME8 | RENDER_OIL))
+		return RPC_MODEL_LEGACY_MATERIAL_CHROME;
+	if (renderFlag & RENDER_BRIGHT)
+		return RPC_MODEL_LEGACY_MATERIAL_BRIGHT;
+	if (renderFlags == RENDER_TEXTURE)
+		return RPC_MODEL_LEGACY_MATERIAL_PLAIN;
+	return RPC_MODEL_LEGACY_MATERIAL_OTHER;
 }
 #endif // SHADER_VERSION_TEST
 
@@ -341,6 +361,7 @@ bool BMD::PlayAnimation(float* AnimationFrame, float* PriorAnimationFrame, unsig
 
 	if (Temp != (int)*AnimationFrame)
 	{
+		g_RenderProfiler.AddCounter(RPC_ANIMATION_KEY_CROSSINGS);
 		*PriorAction = CurrentAction;
 		*PriorAnimationFrame = (float)Temp;
 	}
@@ -1764,6 +1785,12 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 						g_ShaderGPUIneligibleReason == 1 && IsTranslatedVBOEnabled();
 					const bool objectVboEligible =
 						g_bShaderGPUEligible || translatedVboEligible;
+					// Bless model_sync is the single-model skinning contract. Bless
+					// itself uses a separate instance/mesh-SSBO contract for static
+					// world objects, so keep one-bone BMD objects on the established
+					// legacy path until that separate renderer slice exists.
+					const bool blessOriginalModelSyncEligible =
+						!IsBlessOriginalModelSyncEnabled() || NumBones > 1;
 
 					if (g_ShaderGPUIneligibleReason == 1 && g_RenderProfiler.IsEnabled())
 					{
@@ -1796,6 +1823,7 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 					// authoritative legacy path.
 					if (IsVboSceneEnabled()
 						&& objectVboEligible
+						&& blessOriginalModelSyncEligible
 						&& IsVboMaterialEligible(renderFlags, EnableLight, EnableWave)
 						&& m->VAO != 0 // non-zero only when CreateVertexBuffer ran (VBO path ready)
 						&& !HasVboExcludedRenderFlag(RenderFlag))
@@ -1810,6 +1838,22 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 								translatedVboEligible,
 								matrixSnapshot))
 						{
+							g_RenderProfiler.AddModelsCounter(RPC_MODEL_RENDERED_MESHES);
+							if (RenderFlag & RENDER_SHADOWMAP)
+								g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_SHADOW);
+							else if (BoneScale != 1.f)
+								g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_SELECTION);
+							else if (matrixSnapshot == NULL)
+								g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_DIRECT_OVERLAY);
+							else
+								g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_BODY);
+							if (Alpha < 0.99f)
+								g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_ALPHA);
+							g_RenderProfiler.AddModelsCounter((RenderFlag & (RENDER_BRIGHT |
+								RENDER_CHROME | RENDER_METAL | RENDER_CHROME2 | RENDER_CHROME3 |
+								RENDER_CHROME4 | RENDER_CHROME5 | RENDER_CHROME6 | RENDER_CHROME7 |
+								RENDER_CHROME8 | RENDER_OIL | RENDER_WAVE))
+								? RPC_MODEL_MATERIAL_SPECIAL : RPC_MODEL_MATERIAL_PLAIN);
 							g_RenderProfiler.AddCounter(RPC_VBO_DRAW_SUCCEEDED);
 							if (translatedVboEligible)
 								g_RenderProfiler.AddCounter(RPC_VBO_TRANSLATED_DRAW_SUCCEEDED);
@@ -1932,6 +1976,24 @@ void BMD::RenderMeshInternal(int i, int RenderFlag, float Alpha, int BlendMesh, 
 
 					if (target_vertex_index != -1)
 					{
+						g_RenderProfiler.AddModelsCounter(ClassifyLegacyModelMaterial(renderFlags,
+							EnableWave, RenderFlag));
+						g_RenderProfiler.AddModelsCounter(RPC_MODEL_RENDERED_MESHES);
+						if (RenderFlag & RENDER_SHADOWMAP)
+							g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_SHADOW);
+						else if (BoneScale != 1.f)
+							g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_SELECTION);
+						else if (matrixSnapshot == NULL)
+							g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_DIRECT_OVERLAY);
+						else
+							g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_BODY);
+						if (Alpha < 0.99f)
+							g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_ALPHA);
+						g_RenderProfiler.AddModelsCounter((RenderFlag & (RENDER_BRIGHT |
+							RENDER_CHROME | RENDER_METAL | RENDER_CHROME2 | RENDER_CHROME3 |
+							RENDER_CHROME4 | RENDER_CHROME5 | RENDER_CHROME6 | RENDER_CHROME7 |
+							RENDER_CHROME8 | RENDER_OIL | RENDER_WAVE))
+							? RPC_MODEL_MATERIAL_SPECIAL : RPC_MODEL_MATERIAL_PLAIN);
 						// Legacy immediate-mode fallback (also the only path when the
 						// GPU short-circuit above did not fire, or SHADER_VERSION_TEST off).
 						glEnableClientState(GL_VERTEX_ARRAY);
@@ -1958,6 +2020,7 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 {
 	if (NumMeshs)
 	{
+		g_RenderProfiler.AddModelsCounter(RPC_MODEL_RENDERED_BODIES);
 		int iBlendMesh = BlendMesh;
 
 		this->BeginRender(Alpha);
@@ -1995,6 +2058,7 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 
 					if (shadowType == SHADOW_RENDER_COLOR)
 					{
+						g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_TEXTURE_SCRIPT_REPEAT);
 						DisableAlphaBlend();
 						if (Alpha < 0.99)
 							glColor4f(0.f, 0.f, 0.f, Alpha);
@@ -2007,6 +2071,7 @@ void BMD::RenderBody(int Flag, float Alpha, int BlendMesh, float BlendMeshLight,
 					}
 					else if (shadowType == SHADOW_RENDER_TEXTURE)
 					{
+						g_RenderProfiler.AddModelsCounter(RPC_MODEL_PASS_TEXTURE_SCRIPT_REPEAT);
 						DisableAlphaBlend();
 						if (Alpha < 0.99)
 							glColor4f(0.f, 0.f, 0.f, Alpha);
@@ -3733,13 +3798,26 @@ void BMD::CreateVertexBuffer(Mesh_t& mesh)
 		mesh.NumTexCoords <= 0 || mesh.NumTriangles <= 0)
 		return;
 
-	// Expand the mesh into a flat, STATIC bind-pose vertex list matching the
-	// Data\Effect\VBO attribute layout: 0=pos(local), 1=normal, 2=uv, 3=bone(Node*3).
-	// Skinning + animation happen on the GPU via u_Bones, so this is uploaded once.
-	std::vector<float>          positions;
-	std::vector<float>          normals;
-	std::vector<float>          texcoords;
-	std::vector<unsigned int>   bones;
+	const bool blessOriginalModelSync = gShaderGL->IsBlessOriginalModelSyncEnabled();
+
+	// The direct Bless mode keeps its supplied shader untouched. Its VertexUnit2
+	// contract is (uv, weight, bone), position, normal; the established path keeps
+	// the existing Model layout below.
+	struct VBOModelVertex
+	{
+		float Position[3];
+		float Normal[3];
+		float TexCoord[2];
+		unsigned int Bone;
+	};
+	struct BlessModelSyncVertex
+	{
+		float TexCoordBone[4];
+		float Position[3];
+		float Normal[3];
+	};
+	std::vector<VBOModelVertex> vertices;
+	std::vector<BlessModelSyncVertex> blessVertices;
 	std::vector<unsigned short> indices;
 
 	static const int cornerSet[2][3] = { { 0, 1, 2 }, { 0, 2, 3 } };
@@ -3771,10 +3849,6 @@ void BMD::CreateVertexBuffer(Mesh_t& mesh)
 				}
 
 				Vertex_t* v = &mesh.Vertices[tr->VertexIndex[k]];
-				positions.push_back(v->Position[0]);
-				positions.push_back(v->Position[1]);
-				positions.push_back(v->Position[2]);
-
 				Normal_t* sourceNormal = &mesh.Normals[tr->NormalIndex[k]];
 				const int vertexNode = v->Node;
 				const int normalNode = sourceNormal->Node;
@@ -3790,16 +3864,28 @@ void BMD::CreateVertexBuffer(Mesh_t& mesh)
 					return;
 				}
 
-				normals.push_back(sourceNormal->Normal[0]);
-				normals.push_back(sourceNormal->Normal[1]);
-				normals.push_back(sourceNormal->Normal[2]);
-
 				TexCoord_t* t = &mesh.TexCoords[tr->TexCoordIndex[k]];
-				texcoords.push_back(t->TexCoordU);
-				texcoords.push_back(t->TexCoordV);
-
-				bones.push_back((unsigned int)vertexNode * 3u);
-
+				if (blessOriginalModelSync)
+				{
+					BlessModelSyncVertex vertex;
+					vertex.TexCoordBone[0] = t->TexCoordU;
+					vertex.TexCoordBone[1] = t->TexCoordV;
+					vertex.TexCoordBone[2] = 1.f;
+					vertex.TexCoordBone[3] = (float)vertexNode;
+					memcpy(vertex.Position, v->Position, sizeof(vertex.Position));
+					memcpy(vertex.Normal, sourceNormal->Normal, sizeof(vertex.Normal));
+					blessVertices.push_back(vertex);
+				}
+				else
+				{
+					VBOModelVertex vertex;
+					memcpy(vertex.Position, v->Position, sizeof(vertex.Position));
+					memcpy(vertex.Normal, sourceNormal->Normal, sizeof(vertex.Normal));
+					vertex.TexCoord[0] = t->TexCoordU;
+					vertex.TexCoord[1] = t->TexCoordV;
+					vertex.Bone = (unsigned int)vertexNode * 3u;
+					vertices.push_back(vertex);
+				}
 				indices.push_back((unsigned short)indices.size());
 			}
 		}
@@ -3813,32 +3899,33 @@ void BMD::CreateVertexBuffer(Mesh_t& mesh)
 
 	RenderProfilerGenVertexArrays(1, &mesh.VAO);
 	RenderProfilerGenBuffers(1, &mesh.VBO_Vertices);
-	RenderProfilerGenBuffers(1, &mesh.VBO_Normals);
-	RenderProfilerGenBuffers(1, &mesh.VBO_TexCoords);
-	RenderProfilerGenBuffers(1, &mesh.VBO_Bones);
 	RenderProfilerGenBuffers(1, &mesh.EBO);
 
 	RenderProfilerBindVertexArray(mesh.VAO);
 
 	RenderProfilerBindBuffer(GL_ARRAY_BUFFER, mesh.VBO_Vertices);
-	glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(float), positions.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	RenderProfilerBindBuffer(GL_ARRAY_BUFFER, mesh.VBO_Normals);
-	glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(float), normals.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
-
-	RenderProfilerBindBuffer(GL_ARRAY_BUFFER, mesh.VBO_TexCoords);
-	glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(float), texcoords.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(2);
-
-	RenderProfilerBindBuffer(GL_ARRAY_BUFFER, mesh.VBO_Bones);
-	glBufferData(GL_ARRAY_BUFFER, bones.size() * sizeof(unsigned int), bones.data(), GL_STATIC_DRAW);
-	glVertexAttribIPointer(3, 1, GL_UNSIGNED_INT, sizeof(unsigned int), (void*)0);
-	glEnableVertexAttribArray(3);
+	if (blessOriginalModelSync)
+	{
+		glBufferData(GL_ARRAY_BUFFER, blessVertices.size() * sizeof(BlessModelSyncVertex), blessVertices.data(), GL_STATIC_DRAW);
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(BlessModelSyncVertex), (void*)offsetof(BlessModelSyncVertex, TexCoordBone));
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(BlessModelSyncVertex), (void*)offsetof(BlessModelSyncVertex, Position));
+		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(BlessModelSyncVertex), (void*)offsetof(BlessModelSyncVertex, Normal));
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
+		glEnableVertexAttribArray(2);
+	}
+	else
+	{
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(VBOModelVertex), vertices.data(), GL_STATIC_DRAW);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VBOModelVertex), (void*)offsetof(VBOModelVertex, Position));
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VBOModelVertex), (void*)offsetof(VBOModelVertex, Normal));
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VBOModelVertex), (void*)offsetof(VBOModelVertex, TexCoord));
+		glEnableVertexAttribArray(2);
+		glVertexAttribIPointer(3, 1, GL_UNSIGNED_INT, sizeof(VBOModelVertex), (void*)offsetof(VBOModelVertex, Bone));
+		glEnableVertexAttribArray(3);
+	}
 
 	RenderProfilerBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned short), indices.data(), GL_STATIC_DRAW);
@@ -3928,8 +4015,16 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 
 	if (uploadMatrices)
 	{
-		gShaderGL->vboSetMat4("uView", modelView);
-		gShaderGL->vboSetMat4("uProj", projection);
+		if (gShaderGL->IsBlessOriginalModelSyncEnabled())
+		{
+			gShaderGL->vboSetMat4("uModelViewMatrix", modelView);
+			gShaderGL->vboSetMat4("uProjectionMatrix", projection);
+		}
+		else
+		{
+			gShaderGL->vboSetMat4("uView", modelView);
+			gShaderGL->vboSetMat4("uProj", projection);
+		}
 
 		if (matrixSnapshot != NULL &&
 			matrixProgram != 0 &&
@@ -3942,16 +4037,50 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 	// Upload only THIS model's verified bone range. CShaderGL owns the selected
 	// UBO or uniform-array transport. A rejected upload restores the predecessor
 	// program and lets the caller execute the authoritative legacy draw.
-	if (!gShaderGL->UploadBones((const float*)g_pShaderBoneMatrix, boneCount))
+	int boneBaseVec4 = matrixSnapshot != NULL ? matrixSnapshot->BoneBaseVec4 : 0;
+	if (matrixSnapshot == NULL || !matrixSnapshot->BonePaletteUploaded)
 	{
-		gShaderGL->RestoreProgram(prevProgram);
-		return false;
+		if (!gShaderGL->UploadBones((const float*)g_pShaderBoneMatrix, boneCount, &boneBaseVec4))
+		{
+			gShaderGL->RestoreProgram(prevProgram);
+			return false;
+		}
+		if (matrixSnapshot != NULL)
+		{
+			matrixSnapshot->BonePaletteUploaded = true;
+			matrixSnapshot->BoneBaseVec4 = boneBaseVec4;
+		}
+		g_RenderProfiler.AddCounter(RPC_GPU_UPLOADED_BONES, boneCount);
 	}
-	g_RenderProfiler.AddCounter(RPC_GPU_UPLOADED_BONES, boneCount);
+	if (!gShaderGL->IsBlessOriginalModelSyncEnabled() &&
+		gShaderGL->GetBoneTransport() == eVBOBoneTransport_ShaderStorageBuffer &&
+		(matrixSnapshot == NULL || !matrixSnapshot->BoneBaseUploaded))
+	{
+		gShaderGL->vboSetInt("u_BoneBase", boneBaseVec4);
+		if (matrixSnapshot != NULL)
+			matrixSnapshot->BoneBaseUploaded = true;
+	}
 
-	gShaderGL->vboSetVec4("u_bodyLight", BodyLight[0], BodyLight[1], BodyLight[2], Alpha);
-	gShaderGL->vboSetVec4("u_lightPosition", g_ShaderLightPos[0], g_ShaderLightPos[1], g_ShaderLightPos[2], 0.f);
-	gShaderGL->vboSetInt("u_enableLight", EnableLight);
+	if (gShaderGL->IsBlessOriginalModelSyncEnabled())
+	{
+		gShaderGL->vboSetInt("uAnimationType", 1);
+		gShaderGL->vboSetFloat("uBoneScale", BoneScale);
+		gShaderGL->vboSetVec4("uBodyColor", BodyLight[0], BodyLight[1], BodyLight[2], Alpha);
+		gShaderGL->vboSetVec4("uLightDirLegacy", g_ShaderLightPos[0], g_ShaderLightPos[1], g_ShaderLightPos[2], 0.f);
+		gShaderGL->vboSetVec4("uBodyScale", 1.f, 1.f, 1.f, 0.f);
+		gShaderGL->vboSetVec4("uBodyOrigin", 0.f, 0.f, 0.f, 0.f);
+		gShaderGL->vboSetInt("uEnableLight", EnableLight);
+		gShaderGL->vboSetInt("uEffectType", 0);
+		gShaderGL->vboSetInt("uFogEnabled", 0);
+		gShaderGL->vboSetInt("uAlphaTestEnabled", 0);
+		gShaderGL->vboSetInt("uTexture0", 0);
+	}
+	else
+	{
+		gShaderGL->vboSetVec4("u_bodyLight", BodyLight[0], BodyLight[1], BodyLight[2], Alpha);
+		gShaderGL->vboSetVec4("u_lightPosition", g_ShaderLightPos[0], g_ShaderLightPos[1], g_ShaderLightPos[2], 0.f);
+		gShaderGL->vboSetInt("u_enableLight", EnableLight);
+	}
 	if (IsTranslatedVBOEnabled() &&
 		(matrixSnapshot == NULL || !matrixSnapshot->BodyTransformUploaded))
 	{
@@ -3964,13 +4093,14 @@ bool BMD::RenderMeshVBO(Mesh_t* m, float Alpha, int EnableLight, bool Translate,
 		if (matrixSnapshot != NULL)
 			matrixSnapshot->BodyTransformUploaded = true;
 	}
-	gShaderGL->vboSetInt("uTexture", 0); // texture already bound by the caller
+	if (!gShaderGL->IsBlessOriginalModelSyncEnabled())
+		gShaderGL->vboSetInt("uTexture", 0); // texture already bound by the caller
 
 	// Glow layers. Written on EVERY draw including the zeroed case: these live in
 	// the shared Model program, so skipping the clear would leak one mesh's glow
 	// onto the next.
-	const bool chromeOn = GlowLayerActive(g_VboGlowMaterial.Chrome);
-	const bool shinyOn = GlowLayerActive(g_VboGlowMaterial.Shiny);
+	const bool chromeOn = !gShaderGL->IsBlessOriginalModelSyncEnabled() && GlowLayerActive(g_VboGlowMaterial.Chrome);
+	const bool shinyOn = !gShaderGL->IsBlessOriginalModelSyncEnabled() && GlowLayerActive(g_VboGlowMaterial.Shiny);
 
 	gShaderGL->vboSetVec4("uChromeColor", g_VboGlowMaterial.Chrome[0],
 		g_VboGlowMaterial.Chrome[1], g_VboGlowMaterial.Chrome[2], 0.f);
